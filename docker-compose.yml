@@ -1,0 +1,9 @@
+services:
+  test-service:
+    build:
+      context: ./services/test-service
+    container_name: resourcehive-test
+    ports:
+      - "80:80"
+    volumes:
+      - ./services/test-service:/usr/share/nginx/html
