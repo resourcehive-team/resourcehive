@@ -4,6 +4,6 @@ services:
       context: ./services/landing-service
     container_name: resourcehive-landing
     ports:
-      - "80:80"
+      - "8080:80"
     volumes:
       - ./services/landing-service:/usr/share/nginx/html
