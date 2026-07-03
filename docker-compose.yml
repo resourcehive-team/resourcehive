@@ -1,9 +1,9 @@
 services:
-  test-service:
+  landing-service:
     build:
-      context: ./services/test-service
-    container_name: resourcehive-test
+      context: ./services/landing-service
+    container_name: resourcehive-landing
     ports:
       - "80:80"
     volumes:
-      - ./services/test-service:/usr/share/nginx/html
+      - ./services/landing-service:/usr/share/nginx/html
