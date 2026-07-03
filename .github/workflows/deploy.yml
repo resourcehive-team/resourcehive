@@ -21,8 +21,10 @@ jobs:
           script: |
             cd ~/resourcehive
 
-            git pull origin dev
+            git fetch origin
 
-            docker compose down
+            git reset --hard origin/dev
+
+            docker compose down || true
 
             docker compose up --build -d
