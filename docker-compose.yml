@@ -3,9 +3,9 @@ services:
     image: postgres:15-alpine
     container_name: resourcehive-postgres
     environment:
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: resourcehive
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
       - "5432:5432"
     volumes:
@@ -18,6 +18,21 @@ services:
       - "6379:6379"
     volumes:
       - ./redis:/data
+
+  identity-service:
+    image: node:20-alpine
+    container_name: resourcehive-identity
+    working_dir: /usr/src/app/services/identity-service
+    volumes:
+      - ./:/usr/src/app
+    environment:
+      DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public"
+    command: sh -c "npm install -g pnpm && cd /usr/src/app && pnpm install && cd services/identity-service && pnpm run start:dev"
+    ports:
+      - "3001:3000"
+    depends_on:
+      - postgres
+      - redis
 
   landing-service:
     build:

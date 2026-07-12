@@ -1,0 +1,37 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Tenant {
+  tenant_id           String   @id @default(uuid()) @db.Uuid
+  name                String
+  tenant_type         String
+  instituional_domain String
+  is_active           Boolean  @default(true)
+  created_at          DateTime @default(now())
+  updated_at          DateTime @updatedAt
+
+  users               User[]
+}
+
+model User {
+  user_id       String   @id @default(uuid()) @db.Uuid
+  tenant_id     String   @db.Uuid
+  full_name     String
+  email         String   @unique
+  password_hash String
+  role          String
+  status        String
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  tenant        Tenant   @relation(fields: [tenant_id], references: [tenant_id])
+}

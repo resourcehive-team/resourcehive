@@ -1,0 +1,22 @@
+# Dependencies
+**/node_modules/
+node_modules/
+pnpm-debug.log
+
+# Build outputs
+**/dist/
+**/build/
+coverage/
+
+# Docker Volumes (Crucial so you don't commit database data!)
+postgres/
+redis/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# OS files
+.DS_Store
+*.log

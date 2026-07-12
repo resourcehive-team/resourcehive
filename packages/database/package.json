@@ -1,0 +1,18 @@
+{
+  "name": "@resourcehive/database",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.js",
+  "types": "index.d.ts",
+  "scripts": {
+    "generate": "dotenv -e ../../.env -- prisma generate",
+    "push": "dotenv -e ../../.env -- prisma db push"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.0.0"
+  },
+  "devDependencies": {
+    "dotenv-cli": "^7.3.0",
+    "prisma": "^5.0.0"
+  }
+}
