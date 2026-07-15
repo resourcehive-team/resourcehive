@@ -3,10 +3,20 @@
 node_modules/
 pnpm-debug.log
 
+# pnpm local store (do NOT commit this)
+.pnpm-store/
+
 # Build outputs
 **/dist/
 **/build/
 coverage/
+
+# Compiled JS/DTS outputs in packages (generated files)
+packages/**/*.js
+packages/**/*.d.ts
+packages/**/*.js.map
+packages/**/package-lock.json
+packages/**/dist/
 
 # Docker Volumes (Crucial so you don't commit database data!)
 postgres/

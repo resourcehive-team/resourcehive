@@ -28,15 +28,7 @@ resourcehive/
 │   ├── notification-service/        # NestJS microservice for WebSocket & email alerts
 │   └── landing-service/             # Simple landing page container (Dockerized Nginx)
 ├── packages/
-│   ├── database/                    # Shared Prisma schema, migrations, and database client
-│   ├── api-contracts/               # Shared TypeScript DTOs, interfaces, and event payloads
-│   ├── eslint-config/               # Shared ESLint configuration for the whole monorepo
-│   ├── tsconfig/                    # Base TypeScript configs for extending
-│   └── test-utils/                  # Shared utilities and mocks for testing
-├── infrastructure/
-│   ├── nginx/                       # Nginx reverse proxy configuration files
-│   ├── docker/                      # Shared Dockerfiles and container scripts
-│   └── scripts/                     # CI/CD and deployment bash scripts
+│   └── database/                    # Shared Prisma schema, migrations, and database client
 ├── tests/
 │   └── e2e/                         # End-to-End integration tests across multiple services
 ├── .env                             # Root environment variables for Docker Compose

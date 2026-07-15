@@ -10,28 +10,55 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Tenant {
-  tenant_id           String   @id @default(uuid()) @db.Uuid
-  name                String
-  tenant_type         String
-  instituional_domain String
-  is_active           Boolean  @default(true)
-  created_at          DateTime @default(now())
-  updated_at          DateTime @updatedAt
+enum TenantType {
+  department
+  club
+  society
 
-  users               User[]
+  @@map("tenant_type_enum")
+}
+
+enum UserRole {
+  member
+  admin
+
+  @@map("user_role_enum")
+}
+
+enum UserStatus {
+  active
+  inactive
+  suspended
+
+  @@map("user_status_enum")
+}
+
+model Tenant {
+  tenant_id                  String     @id @default(uuid()) @db.Uuid
+  name                       String     @db.VarChar(150)
+  tenant_type                TenantType
+  institutional_email_domain String     @db.VarChar(255)
+  is_active                  Boolean    @default(true)
+  created_at                 DateTime   @default(now()) @db.Timestamptz
+  updated_at                 DateTime   @default(now()) @updatedAt @db.Timestamptz
+
+  users                      User[]
+
+  @@map("tenant")
 }
 
 model User {
-  user_id       String   @id @default(uuid()) @db.Uuid
-  tenant_id     String   @db.Uuid
-  full_name     String
-  email         String   @unique
+  user_id       String     @id @default(uuid()) @db.Uuid
+  tenant_id     String     @db.Uuid
+  full_name     String     @db.VarChar(150)
+  email         String     @unique @db.VarChar(255)
   password_hash String
-  role          String
-  status        String
-  created_at    DateTime @default(now())
-  updated_at    DateTime @updatedAt
+  user_role     UserRole   @default(member)
+  user_status   UserStatus @default(active)
+  created_at    DateTime   @default(now()) @db.Timestamptz
+  updated_at    DateTime   @default(now()) @updatedAt @db.Timestamptz
 
-  tenant        Tenant   @relation(fields: [tenant_id], references: [tenant_id])
+  tenant        Tenant     @relation(fields: [tenant_id], references: [tenant_id])
+
+  @@map("app_user")
 }

@@ -1,44 +1,107 @@
+name: resourcehive
+
 services:
+
+  # ── Infrastructure ──────────────────────────────────────────────────────────
+
   postgres:
     image: postgres:15-alpine
     container_name: resourcehive-postgres
+    restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
-    ports:
-      - "5432:5432"
     volumes:
-      - ./postgres:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:7-alpine
     container_name: resourcehive-redis
-    ports:
-      - "6379:6379"
+    restart: unless-stopped
     volumes:
-      - ./redis:/data
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Database Migration (runs once, then exits) ────────────────────────────────
+
+  db-migrate:
+    image: node:20
+    container_name: resourcehive-db-migrate
+    working_dir: /app
+    volumes:
+      - ./:/app
+    environment:
+      DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public"
+      CI: "true"
+    command: >
+      sh -c "
+        npm install -g pnpm &&
+        cd /app &&
+        pnpm install --config.confirmModulesPurge=false &&
+        pnpm --filter @resourcehive/database run generate &&
+        pnpm --filter @resourcehive/database run build &&
+        pnpm --filter @resourcehive/database run push
+      "
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ── Backend Services ──────────────────────────────────────────────────────────
 
   identity-service:
-    image: node:20-alpine
+    image: node:20
     container_name: resourcehive-identity
+    restart: unless-stopped
     working_dir: /usr/src/app/services/identity-service
     volumes:
       - ./:/usr/src/app
     environment:
       DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public"
-    command: sh -c "npm install -g pnpm && cd /usr/src/app && pnpm install && cd services/identity-service && pnpm run start:dev"
+      REDIS_URL: "redis://redis:6379"
+      NODE_ENV: development
+      CI: "true"
+    command: >
+      sh -c "
+        npm install -g pnpm &&
+        cd /usr/src/app &&
+        pnpm --filter @resourcehive/database run generate &&
+        cd services/identity-service &&
+        pnpm run start:dev
+      "
     ports:
       - "3001:3000"
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
+
+  # ── Frontend (placeholder until Next.js app is ready) ────────────────────────
 
   landing-service:
     build:
       context: ./services/landing-service
     container_name: resourcehive-landing
+    restart: unless-stopped
     ports:
       - "8080:80"
     volumes:
       - ./services/landing-service:/usr/share/nginx/html
+
+# ── Named Volumes (managed by Docker, never in git) ──────────────────────────
+
+volumes:
+  postgres_data:
+  redis_data:
