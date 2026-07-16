@@ -1,5 +1,8 @@
-import { Controller, Get, Post, Body, Param } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, UseGuards, Request } from '@nestjs/common';
 import { UsersService } from './users.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
 @Controller('users')
 export class UsersController {
@@ -10,13 +13,10 @@ export class UsersController {
     return this.usersService.createUser(body.tenantId, body.fullName, body.email, body.passwordHash);
   }
 
+  @UseGuards(JwtAuthGuard,RolesGuard)
+  @Roles('admin')
   @Get()
-  async getAllUsers() {
+  async getAllUsers(@Request() req ) {
     return this.usersService.findAll();
-  }
-
-  @Get(':email')
-  async getUserByEmail(@Param('email') email: string) {
-    return this.usersService.findByEmail(email);
   }
 }

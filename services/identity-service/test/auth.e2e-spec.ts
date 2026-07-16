@@ -7,6 +7,7 @@ import { AppModule } from './../src/app.module';
 describe('Authentication Flow (e2e)', () => {
   let app: INestApplication<App>;
   let tenantId: string;
+  let jwtToken: string;
   const uniqueId = Date.now().toString();
   const testEmail = `testuser_${uniqueId}@cs.university.edu`;
   const testPassword = 'MySecretPassword123!';
@@ -62,6 +63,21 @@ describe('Authentication Flow (e2e)', () => {
     expect(response.body.message).toBe('user login successfully');
     expect(response.body.token).toBeDefined();
     expect(typeof response.body.token).toBe('string');
+    
+    jwtToken = response.body.token; 
+  });
+
+  it('4. Should block access to /users without a token', async () => {
+    return request(app.getHttpServer())
+      .get('/users')
+      .expect(401);
+  });
+
+  it('5. Should block access to /users for a user without the admin role', async () => {
+    await request(app.getHttpServer())
+      .get('/users')
+      .set('Authorization', `Bearer ${jwtToken}`)
+      .expect(403);
   });
 
   afterAll(async () => {
