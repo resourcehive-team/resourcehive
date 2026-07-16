@@ -1,3 +1,13 @@
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+
 const resources = [
   { name: "Camera", owner: "Media Club", available: true },
   { name: "Projector", owner: "CSE Department", available: true },
@@ -7,77 +17,72 @@ const resources = [
 export default function Home() {
   return (
     <>
-      <nav className="navbar navbar-light bg-light border-bottom">
-        <div className="container">
-          <a className="navbar-brand fw-bold" href="#">
-            ResourceHive
-          </a>
-          <div>
-            <a className="btn btn-link text-decoration-none text-dark" href="#resources">
+      <header className="border-b">
+        <nav className="container mx-auto flex items-center justify-between p-4">
+          <a href="#">ResourceHive</a>
+          <div className="flex gap-2">
+            <Button variant="ghost" render={<a href="#resources" />}>
               Resources
-            </a>
-            <button className="btn btn-primary">Login</button>
+            </Button>
+            <Button>Login</Button>
           </div>
-        </div>
-      </nav>
+        </nav>
+      </header>
 
       <main>
-        <div className="container py-5">
-          <div className="row">
-            <div className="col-lg-7">
-              <h1>Share resources at the university</h1>
-              <p className="lead mt-3">
-                Students and university groups can list items here and let other
-                students borrow them.
-              </p>
-              <a className="btn btn-primary me-2" href="#resources">
-                See resources
-              </a>
-              <button className="btn btn-outline-secondary">Add resource</button>
-            </div>
+        <section className="container mx-auto grid gap-4 py-8">
+          <h1>Share resources at the university</h1>
+          <p>
+            Students and university groups can list items here and let other
+            students borrow them.
+          </p>
+          <div className="flex gap-2">
+            <Button render={<a href="#resources" />}>
+              See resources
+            </Button>
+            <Button variant="outline">Add resource</Button>
           </div>
-        </div>
+        </section>
 
-        <div className="bg-light border-top border-bottom" id="resources">
-          <div className="container py-5">
-            <h2 className="h3 mb-4">Resources</h2>
+        <section
+          className="container mx-auto grid gap-4 py-8"
+          id="resources"
+        >
+          <h2>Resources</h2>
 
-            <div className="row g-4">
-              {resources.map((resource) => (
-                <div className="col-md-4" key={resource.name}>
-                  <div className="card h-100">
-                    <div className="card-img-top bg-secondary-subtle text-center py-5 text-secondary">
-                      Image here
-                    </div>
-                    <div className="card-body">
-                      <h3 className="card-title h5">{resource.name}</h3>
-                      <p className="card-text">Owner: {resource.owner}</p>
-                      <span
-                        className={resource.available ? "badge text-bg-success" : "badge text-bg-secondary"}
-                      >
-                        {resource.available ? "Available" : "Not available"}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+          <div className="grid gap-4 md:grid-cols-3">
+            {resources.map((resource) => (
+              <Card key={resource.name}>
+                <CardContent>Image here</CardContent>
+                <CardHeader>
+                  <CardTitle>{resource.name}</CardTitle>
+                  <CardDescription>Owner: {resource.owner}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Badge
+                    variant={resource.available ? "default" : "secondary"}
+                  >
+                    {resource.available ? "Available" : "Not available"}
+                  </Badge>
+                </CardContent>
+              </Card>
+            ))}
           </div>
-        </div>
+        </section>
 
-        <div className="container py-5">
-          <h2 className="h3">How to use it</h2>
-          <ol className="mt-3">
-            <li className="mb-2">Find an item.</li>
-            <li className="mb-2">Send a request.</li>
+        <section className="container mx-auto grid gap-4 py-8">
+          <h2>How to use it</h2>
+          <ol className="list-decimal pl-4">
+            <li>Find an item.</li>
+            <li>Send a request.</li>
             <li>Return it when you are done.</li>
           </ol>
-        </div>
+        </section>
       </main>
 
-      <footer className="border-top">
-        <div className="container py-3">
-          <small className="text-secondary">ResourceHive - University of Moratuwa</small>
+      <footer className="border-t">
+        <div className="container mx-auto p-4">
+          <small>ResourceHive - University of Moratuwa</small>
         </div>
       </footer>
     </>
