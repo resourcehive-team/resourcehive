@@ -1,0 +1,14 @@
+packages:
+  - "apps/*"
+  - "services/*"
+  - "packages/*"
+
+allowBuilds:
+  '0': '@prisma/client'
+  '1': '@prisma/engines'
+  '2': prisma
+  '3': unrs-resolver
+  '@prisma/client': true
+  '@prisma/engines': true
+  prisma: true
+  unrs-resolver: true
