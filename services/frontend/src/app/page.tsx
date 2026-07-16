@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,7 +26,10 @@ export default function Home() {
             <Button variant="ghost" render={<a href="#resources" />}>
               Resources
             </Button>
-            <Button>Login</Button>
+            <Button render={<Link href="/login" />}>Login</Button>
+            <Button variant="outline" render={<Link href="/signup" />}>
+              Sign up
+            </Button>
           </div>
         </nav>
       </header>
