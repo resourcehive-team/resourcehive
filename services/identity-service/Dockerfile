@@ -13,6 +13,9 @@ RUN pnpm install
 # Generate the Prisma Client for Linux
 RUN pnpm --filter @resourcehive/database run generate
 
+# Build the database package
+RUN pnpm --filter @resourcehive/database run build
+
 # Build the identity-service
 RUN pnpm --filter identity-service run build
 
