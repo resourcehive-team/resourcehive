@@ -10,5 +10,6 @@ allowBuilds:
   '3': unrs-resolver
   '@prisma/client': true
   '@prisma/engines': true
+  'bcrypt': true
   prisma: true
   unrs-resolver: true
