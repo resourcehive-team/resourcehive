@@ -58,6 +58,7 @@ jobs:
             # Pull the new pre-built image
             docker compose -f docker-compose.prod.yml pull
             
-            # Restart the services
+            # This shuts down any old development containers holding onto ports
+            docker compose down || true
             docker compose -f docker-compose.prod.yml down || true
             docker compose -f docker-compose.prod.yml up -d
