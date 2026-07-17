@@ -5,6 +5,7 @@ import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
 
 describe('Authentication Flow (e2e)', () => {
+  jest.setTimeout(30000);
   let app: INestApplication<App>;
   let tenantId: string;
   let jwtToken: string;

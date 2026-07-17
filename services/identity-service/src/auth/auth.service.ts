@@ -25,9 +25,10 @@ export class AuthService{
         }
 
         // validate institutional email
-        const requiredDomain = `@${tenant.institutional_email_domain}`;
-         if (!registrationData.email.endsWith(requiredDomain)) {
-            throw new BadRequestException(`Email must belong to the domain: ${requiredDomain}`);
+        const requiredDomain = tenant.institutional_email_domain.toLowerCase().trim();
+        const emailLower = registrationData.email.toLowerCase().trim();
+        if (!emailLower.endsWith(`@${requiredDomain}`)) {
+            throw new BadRequestException(`Email must belong to the institutional domain: ${tenant.institutional_email_domain}`);
         }
 
         //check if user is already exists

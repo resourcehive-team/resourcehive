@@ -1,15 +1,13 @@
-name: resourcehive
+name: resourcehive-production
 
 services:
-
   # ── Infrastructure ──────────────────────────────────────────────────────────
-
   redis:
     image: redis:7-alpine
-    container_name: resourcehive-redis
-    restart: unless-stopped
+    container_name: resourcehive-redis-prod
+    restart: always
     volumes:
-      - redis_data:/data
+      - redis_data_prod:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -17,46 +15,35 @@ services:
       retries: 5
 
   # ── Backend Services ──────────────────────────────────────────────────────────
-
   identity-service:
-    image: node:20
-    container_name: resourcehive-identity
-    restart: unless-stopped
-    working_dir: /usr/src/app/services/identity-service
-    volumes:
-      - ./:/usr/src/app
+    build:
+      context: . 
+      dockerfile: ./services/identity-service/Dockerfile
+    container_name: resourcehive-identity-prod
+    restart: always
     environment:
+      # EC2 injects env vars from the .env file on the server
       DATABASE_URL: ${DATABASE_URL}
+      DIRECT_URL: ${DIRECT_URL}
+      JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: "redis://redis:6379"
-      NODE_ENV: development
-      CI: "true"
-    command: >
-      sh -c "
-        npm install -g pnpm &&
-        cd /usr/src/app &&
-        pnpm --filter @resourcehive/database run generate &&
-        cd services/identity-service &&
-        pnpm run start:dev
-      "
+      NODE_ENV: production
     ports:
       - "3001:3000"
     depends_on:
       redis:
         condition: service_healthy
 
-  # ── Frontend (placeholder until Next.js app is ready) ────────────────────────
-
+  # ── Frontend ───────────────────────────────────────────────────────────────
   landing-service:
     build:
       context: ./services/landing-service
-    container_name: resourcehive-landing
-    restart: unless-stopped
+    container_name: resourcehive-landing-prod
+    restart: always
     ports:
       - "8080:80"
     volumes:
       - ./services/landing-service:/usr/share/nginx/html
 
-# ── Named Volumes (managed by Docker, never in git) ──────────────────────────
-
 volumes:
-  redis_data:
+  redis_data_prod:

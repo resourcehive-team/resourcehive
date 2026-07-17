@@ -25,6 +25,6 @@ jobs:
 
             git reset --hard origin/dev
 
-            docker compose down || true
+            docker compose -f docker-compose.prod.yml down || true
 
-            docker compose up --build -d
+            docker compose -f docker-compose.prod.yml up --build -d

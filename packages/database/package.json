@@ -9,7 +9,8 @@
     "generate": "dotenv -e ../../.env -- prisma generate",
     "push": "dotenv -e ../../.env -- prisma db push",
     "migrate": "dotenv -e ../../.env -- prisma migrate deploy",
-    "migrate:dev": "dotenv -e ../../.env -- prisma migrate dev"
+    "migrate:dev": "dotenv -e ../../.env -- prisma migrate dev",
+    "studio": "dotenv -e ../../.env -- prisma studio"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",
