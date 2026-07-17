@@ -16,9 +16,7 @@ services:
 
   # ── Backend Services ──────────────────────────────────────────────────────────
   identity-service:
-    build:
-      context: . 
-      dockerfile: ./services/identity-service/Dockerfile
+    image: ghcr.io/resourcehive-team/resourcehive-identity:latest
     container_name: resourcehive-identity-prod
     restart: always
     environment:

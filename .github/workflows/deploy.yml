@@ -6,25 +6,58 @@ on:
       - dev
 
 jobs:
-  deploy:
+  build-and-push:
     runs-on: ubuntu-latest
+    # These permissions allow the action to push the Docker image to GitHub Packages
+    permissions:
+      contents: read
+      packages: write
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
+      # Setup Docker Buildx in github cloud
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Login to GitHub Container Registry
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./services/identity-service/Dockerfile
+          push: true
+          tags: ghcr.io/resourcehive-team/resourcehive-identity:latest
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
     steps:
       - name: Deploy to EC2
-        uses: appleboy/ssh-action@v1.2.0
-
+        uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USERNAME }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-
+          key: ${{ secrets.EC2_PRIVATE_KEY }}
           script: |
             cd ~/resourcehive
-
-            git fetch origin
-
+            git fetch
             git reset --hard origin/dev
-
+            
+            # Login to GHCR on the EC2 server using the ephemeral GitHub token
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            
+            # Pull the new pre-built image
+            docker compose -f docker-compose.prod.yml pull
+            
+            # Restart the services
             docker compose -f docker-compose.prod.yml down || true
-
-            docker compose -f docker-compose.prod.yml up --build -d
+            docker compose -f docker-compose.prod.yml up -d
