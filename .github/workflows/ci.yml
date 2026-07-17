@@ -41,7 +41,7 @@ jobs:
           version: 8
 
       - name: Install Dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install
 
       - name: Run Prisma Database Migration (To Temporary DB)
         run: pnpm --filter @resourcehive/database run push

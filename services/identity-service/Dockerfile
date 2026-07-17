@@ -8,7 +8,7 @@ RUN npm install -g pnpm
 COPY . .
 
 # Install all dependencies
-RUN pnpm install --frozen-lockfile
+RUN pnpm install
 
 # Generate the Prisma Client for Linux
 RUN pnpm --filter @resourcehive/database run generate
