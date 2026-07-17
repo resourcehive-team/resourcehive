@@ -30,3 +30,6 @@ redis/
 # OS files
 .DS_Store
 *.log
+
+# AI/Temp folders
+.gemini/

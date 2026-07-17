@@ -20,18 +20,19 @@ RUN pnpm --filter @resourcehive/database run build
 # Build the identity-service
 RUN pnpm --filter identity-service run build
 
-# Deploy the identity-service to a clean folder for production
-RUN pnpm --filter identity-service --prod deploy --legacy /pruned
-
 # Production Runner Stage
 FROM node:20-alpine AS runner
 WORKDIR /app
 
-# Copy the deployed application from the builder stage
-COPY --from=builder /pruned /app
+# Install pnpm
+RUN npm install -g pnpm
+
+# Copy the entire built application from the builder stage
+# This ensures the generated Prisma client in node_modules/.prisma is preserved
+COPY --from=builder /app /app
 
 # Expose the port the NestJS app runs on
 EXPOSE 3000
 
 # Start the application using the production build
-CMD ["node", "dist/main"]
+CMD ["pnpm", "--filter", "identity-service", "run", "start:prod"]
