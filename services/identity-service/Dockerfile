@@ -2,7 +2,8 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-# Install pnpm
+# Install pnpm and openssl (required for Prisma engine detection on Alpine)
+RUN apk add --no-cache openssl
 RUN npm install -g pnpm
 
 # Copy all workspace files
@@ -11,8 +12,8 @@ COPY . .
 # Install all dependencies
 RUN pnpm install
 
-# Generate the Prisma Client for Linux
-RUN pnpm --filter @resourcehive/database run generate
+# Generate the Prisma Client for Linux (bypassing dotenv to avoid silent failures)
+RUN cd packages/database && npx prisma generate
 
 # Build the database package
 RUN pnpm --filter @resourcehive/database run build
@@ -24,7 +25,8 @@ RUN pnpm --filter identity-service run build
 FROM node:20-alpine AS runner
 WORKDIR /app
 
-# Install pnpm
+# Install pnpm and openssl (required for Prisma runtime on Alpine)
+RUN apk add --no-cache openssl
 RUN npm install -g pnpm
 
 # Copy the entire built application from the builder stage
