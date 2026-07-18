@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 
 import { login, LoginError } from "@/lib/auth-api"
+import { storeAccessToken } from "@/lib/auth-storage"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
@@ -45,7 +46,8 @@ export function LoginForm({
     const password = String(formData.get("password") ?? "")
 
     try {
-      await login({ email, password })
+      const response = await login({ email, password })
+      storeAccessToken(response.token)
       router.replace("/")
     } catch (loginError) {
       setError(
