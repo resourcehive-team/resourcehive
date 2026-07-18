@@ -1,8 +1,10 @@
 "use client"
 
-import type { FormEvent } from "react"
+import { useState, type FormEvent } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 
+import { login, LoginError } from "@/lib/auth-api"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
@@ -24,8 +26,36 @@ export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  const router = useRouter()
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState("")
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+
+    if (isSubmitting) {
+      return
+    }
+
+    setIsSubmitting(true)
+    setError("")
+
+    const formData = new FormData(event.currentTarget)
+    const email = String(formData.get("email") ?? "")
+    const password = String(formData.get("password") ?? "")
+
+    try {
+      await login({ email, password })
+      router.replace("/")
+    } catch (loginError) {
+      setError(
+        loginError instanceof LoginError
+          ? loginError.message
+          : "Unable to log in. Please try again.",
+      )
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -70,7 +100,14 @@ export function LoginForm({
                 />
               </Field>
               <Field>
-                <Button type="submit">Login</Button>
+                {error && (
+                  <p className="text-sm text-destructive" role="alert">
+                    {error}
+                  </p>
+                )}
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? "Logging in..." : "Login"}
+                </Button>
                 <FieldDescription className="text-center">
                   Don&apos;t have an account? <Link href="/signup">Sign up</Link>
                 </FieldDescription>
