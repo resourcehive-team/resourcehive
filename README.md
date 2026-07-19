@@ -38,13 +38,71 @@ resourcehive/
 └── pnpm-workspace.yaml              # Monorepo workspace definitions
 ```
 
-## 🚀 Project Setup (Local Development)
+## Local Demo
 
-The entire backend infrastructure can be spun up using Docker Compose.
+You need Node.js, pnpm, Docker and Docker Compose installed. Run the following commands from the repository root.
 
-1. Ensure you have Docker and Docker Compose installed.
-2. Ensure you have copied `.env.example` to `.env`.
-3. At the root of the repository, run:
+1. Install the project dependencies:
+
    ```bash
-   docker-compose up -d --build
+   pnpm install
    ```
+
+2. Create the backend environment file and fill in the database connection and secrets:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+3. Create the frontend environment file:
+
+   ```bash
+   cp apps/web/.env.example apps/web/.env.local
+   ```
+
+4. Generate the Prisma client:
+
+   ```bash
+   pnpm --filter @resourcehive/database run generate
+   ```
+
+5. Apply the Prisma schema to the database configured in `.env`:
+
+   ```bash
+   pnpm --filter @resourcehive/database run push
+   ```
+
+6. Start Redis and the identity service:
+
+   ```bash
+   docker compose up identity-service redis
+   ```
+
+7. In a second terminal, start the Next.js frontend:
+
+   ```bash
+   pnpm --filter frontend run dev
+   ```
+
+8. Open the application:
+
+   - Frontend: <http://localhost:3000>
+   - Login: <http://localhost:3000/login>
+   - Signup: <http://localhost:3000/signup>
+   - Identity API: <http://localhost:3001>
+
+9. Stop the frontend with `Ctrl+C`. Stop the Docker services with:
+
+   ```bash
+   docker compose down
+   ```
+
+The signup page is not connected to the registration API yet. You may need to create a user through `POST /auth/register` before testing login. Replace the tenant ID below with one that exists in your database:
+
+```bash
+curl -X POST http://localhost:3001/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"tenantId":"replace-with-tenant-id","fullName":"Demo User","email":"demo@example.edu","password":"DemoPassword123!"}'
+```
+
+After a successful login, the frontend stores the access token in browser `localStorage`. This is a temporary development approach, not the final production security design.
