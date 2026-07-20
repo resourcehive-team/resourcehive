@@ -15,6 +15,16 @@ services:
       retries: 5
 
   # ── Backend Services ──────────────────────────────────────────────────────────
+  api-gateway:
+    build:
+      context: ./services/api-gateway
+    container_name: resourcehive-api-gateway-prod
+    restart: always
+    ports:
+      - "8000:80"
+    depends_on:
+      - identity-service
+
   identity-service:
     image: ghcr.io/resourcehive-team/resourcehive-identity:latest
     container_name: resourcehive-identity-prod
@@ -26,22 +36,11 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: "redis://redis:6379"
       NODE_ENV: production
-    ports:
-      - "3001:3000"
     depends_on:
       redis:
         condition: service_healthy
 
-  # ── Frontend ───────────────────────────────────────────────────────────────
-  landing-service:
-    build:
-      context: ./services/landing-service
-    container_name: resourcehive-landing-prod
-    restart: always
-    ports:
-      - "8080:80"
-    volumes:
-      - ./services/landing-service:/usr/share/nginx/html
+
 
 volumes:
   redis_data_prod:
