@@ -76,7 +76,7 @@ describe('Authentication Flow (e2e)', () => {
 
     // NGINX uses this endpoint to capture headers
     expect(response.headers['x-user-id']).toBeDefined();
-    expect(response.headers['x-user-role']).toBe('user');
+    expect(response.headers['x-user-role']).toBe('member');
     expect(response.headers['x-user-email']).toBe(testEmail);
   });
 
@@ -92,7 +92,7 @@ describe('Authentication Flow (e2e)', () => {
     await request(app.getHttpServer())
       .get('/users')
       .set('x-user-id', 'mock-id')
-      .set('x-user-role', 'user')
+      .set('x-user-role', 'member')
       .expect(403);
   });
 
