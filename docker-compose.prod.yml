@@ -21,7 +21,7 @@ services:
     container_name: resourcehive-api-gateway-prod
     restart: always
     ports:
-      - "8000:80"
+      - "80:80"
     depends_on:
       - identity-service
 
