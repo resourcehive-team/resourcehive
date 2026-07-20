@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Body, Param, UseGuards, Request } from '@nestjs/common';
 import { UsersService } from './users.service';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { HeaderAuthGuard } from '../auth/header-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 
@@ -13,10 +13,21 @@ export class UsersController {
     return this.usersService.createUser(body.tenantId, body.fullName, body.email, body.passwordHash);
   }
 
-  @UseGuards(JwtAuthGuard,RolesGuard)
+  @UseGuards(HeaderAuthGuard, RolesGuard)
   @Roles('admin')
   @Get()
   async getAllUsers(@Request() req ) {
     return this.usersService.findAll();
+  }
+
+  // A temporary debug endpoint 
+  @UseGuards(HeaderAuthGuard)
+  @Get('debug-headers')
+  async debugHeaders(@Request() req) {
+    return {
+      message: "Here is exactly what the backend received from NGINX:",
+      receivedHeaders: req.headers,
+      reconstructedUserObject: req.user
+    };
   }
 }

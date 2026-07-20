@@ -68,16 +68,31 @@ describe('Authentication Flow (e2e)', () => {
     jwtToken = response.body.token; 
   });
 
-  it('4. Should block access to /users without a token', async () => {
+  it('4. Should validate token and return identity headers via /auth/validate', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/auth/validate')
+      .set('Authorization', `Bearer ${jwtToken}`)
+      .expect(200);
+
+    // NGINX uses this endpoint to capture headers
+    expect(response.headers['x-user-id']).toBeDefined();
+    expect(response.headers['x-user-role']).toBe('member');
+    expect(response.headers['x-user-email']).toBe(testEmail);
+  });
+
+  it('5. Should block access to /users if gateway headers are missing', async () => {
+    // Simulates a request bypassing the gateway
     return request(app.getHttpServer())
       .get('/users')
       .expect(401);
   });
 
-  it('5. Should block access to /users for a user without the admin role', async () => {
+  it('6. Should block access to /users for a user without the admin role', async () => {
+    // Simulates NGINX injecting headers for a normal user
     await request(app.getHttpServer())
       .get('/users')
-      .set('Authorization', `Bearer ${jwtToken}`)
+      .set('x-user-id', 'mock-id')
+      .set('x-user-role', 'member')
       .expect(403);
   });
 
