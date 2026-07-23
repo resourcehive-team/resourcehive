@@ -36,12 +36,10 @@ jobs:
           node-version: '20'
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 8
+        uses: pnpm/action-setup@v6
 
       - name: Install Dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Run Prisma Database Migration (To Temporary DB)
         run: pnpm --filter @resourcehive/database run push
@@ -49,6 +47,9 @@ jobs:
           # Use the temporary GitHub Actions database instead of real Supabase one
           DATABASE_URL: "postgresql://postgres:password@localhost:5432/testdb?schema=public"
           DIRECT_URL: "postgresql://postgres:password@localhost:5432/testdb?schema=public"
+
+      - name: Build Shared Database Package
+        run: pnpm --filter @resourcehive/database run build
 
       - name: Run Identity Service E2E Tests
         run: pnpm --filter identity-service run test:e2e
