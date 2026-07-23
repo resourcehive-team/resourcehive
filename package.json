@@ -13,5 +13,8 @@
       "prisma",
       "unrs-resolver"
     ]
+  },
+  "devDependencies": {
+    "supabase": "^2.109.1"
   }
 }

@@ -1,0 +1,3 @@
+-- Development seed placeholder.
+-- Create Auth-linked users through Supabase Auth, not by inserting auth.users.
+-- Add non-sensitive organization and resource fixtures here when agreed by the team.
