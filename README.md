@@ -40,7 +40,7 @@ resourcehive/
 
 ## Local Demo
 
-You need Node.js, pnpm, Docker and Docker Compose installed. Run the following commands from the repository root.
+These steps create a tenant and user, then test the existing login page. You need Node.js 20, pnpm 10.34.5, Docker and Docker Compose. Run every command from the repository root unless a step says otherwise.
 
 1. Install the project dependencies:
 
@@ -48,16 +48,24 @@ You need Node.js, pnpm, Docker and Docker Compose installed. Run the following c
    pnpm install
    ```
 
-2. Create the backend environment file and fill in the database connection and secrets:
+2. Create the backend environment file:
 
    ```bash
    cp .env.example .env
    ```
 
+   Open `.env` and replace the placeholder values for `DATABASE_URL`, `DIRECT_URL` and `JWT_SECRET`. For Neon, use the pooled connection string for `DATABASE_URL` and the direct, non-pooler connection string for `DIRECT_URL`. Keep this file private; Git ignores it.
+
 3. Create the frontend environment file:
 
    ```bash
    cp apps/web/.env.example apps/web/.env.local
+   ```
+
+   Its value should be:
+
+   ```env
+   NEXT_PUBLIC_IDENTITY_API_URL=http://localhost:3001
    ```
 
 4. Generate the Prisma client:
@@ -66,11 +74,13 @@ You need Node.js, pnpm, Docker and Docker Compose installed. Run the following c
    pnpm --filter @resourcehive/database run generate
    ```
 
-5. Apply the Prisma schema to the database configured in `.env`:
+5. Create the tables in the database configured in `.env`:
 
    ```bash
    pnpm --filter @resourcehive/database run push
    ```
+
+   Prisma should report that the database is in sync. If the Neon dashboard still has no tables, check that the connection string in `.env` belongs to the same Neon project and database that you are viewing.
 
 6. Start Redis and the identity service:
 
@@ -78,31 +88,72 @@ You need Node.js, pnpm, Docker and Docker Compose installed. Run the following c
    docker compose up identity-service redis
    ```
 
+   The first start can take a little while. Wait for `Nest application successfully started`, then check the API in another terminal:
+
+   ```bash
+   curl http://localhost:3001/
+   ```
+
+   It should print `Identity Service is running`. Keep Docker Compose running.
+
 7. In a second terminal, start the Next.js frontend:
 
    ```bash
    pnpm --filter frontend run dev
    ```
 
-8. Open the application:
+8. Check whether the demo user already exists:
+
+   ```bash
+   curl -X POST http://localhost:3001/auth/login \
+     -H "Content-Type: application/json" \
+     -d '{"email":"demo@example.edu","password":"DemoPassword123!"}'
+   ```
+
+   If this returns `user login successfully` and a token, skip the rest of this step. Do not register the same email twice.
+
+   If login fails because this is a new database, create a tenant. A user cannot be registered without one:
+
+   ```bash
+   curl -X POST http://localhost:3001/tenants \
+     -H "Content-Type: application/json" \
+     -d '{"name":"Demo Department","type":"department","domain":"example.edu"}'
+   ```
+
+   Copy the `tenant_id` from the response. Register a user with that ID. The email must use the tenant domain (`example.edu` in this example):
+
+   ```bash
+   curl -X POST http://localhost:3001/auth/register \
+     -H "Content-Type: application/json" \
+     -d '{"tenantId":"PASTE_TENANT_ID_HERE","fullName":"Demo User","email":"demo@example.edu","password":"DemoPassword123!"}'
+   ```
+
+9. Open the application:
 
    - Frontend: <http://localhost:3000>
    - Login: <http://localhost:3000/login>
    - Signup: <http://localhost:3000/signup>
    - Identity API: <http://localhost:3001>
 
-9. Stop the frontend with `Ctrl+C`. Stop the Docker services with:
+   On the login page, enter:
+
+   ```text
+   Email: demo@example.edu
+   Password: DemoPassword123!
+   ```
+
+   A successful login redirects to the home page. You can also test the API directly:
+
+   ```bash
+   curl -X POST http://localhost:3001/auth/login \
+     -H "Content-Type: application/json" \
+     -d '{"email":"demo@example.edu","password":"DemoPassword123!"}'
+   ```
+
+10. Stop the frontend with `Ctrl+C`. Stop the Docker services with:
 
    ```bash
    docker compose down
    ```
 
-The signup page is not connected to the registration API yet. You may need to create a user through `POST /auth/register` before testing login. Replace the tenant ID below with one that exists in your database:
-
-```bash
-curl -X POST http://localhost:3001/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"tenantId":"replace-with-tenant-id","fullName":"Demo User","email":"demo@example.edu","password":"DemoPassword123!"}'
-```
-
-After a successful login, the frontend stores the access token in browser `localStorage`. This is a temporary development approach, not the final production security design.
+The signup page is not connected to the registration API yet, so use the tenant and registration commands above. After a successful login, the frontend stores the returned token under `resourcehive_access_token` in browser `localStorage`. This is temporary and is not the final production security design.
