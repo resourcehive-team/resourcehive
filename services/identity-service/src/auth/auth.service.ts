@@ -1,43 +1,91 @@
 import {
   BadRequestException,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
+import { PrismaService } from '@resourcehive/database';
 import { TenantsService } from '../tenants/tenants.service';
 import { UsersService } from '../users/users.service';
 import { RegisterDto } from './dto/register.dto';
-import * as bcrypt from 'bcrypt';
 import { LoginDto } from './dto/login.dto';
-import { JwtService } from '@nestjs/jwt';
+
+type SupabaseAuthResponse = {
+  access_token?: string;
+  refresh_token?: string;
+  expires_in?: number;
+  user?: { id: string; email?: string };
+  error?: string;
+  error_description?: string;
+  msg?: string;
+};
 
 @Injectable()
 export class AuthService {
   constructor(
-    private readonly jwtService: JwtService,
+    private readonly prisma: PrismaService,
     private readonly usersService: UsersService,
     private readonly tenantsService: TenantsService,
   ) {}
 
+  private getSupabaseConfig() {
+    const url = process.env.SUPABASE_URL?.replace(/\/$/, '');
+    const key =
+      process.env.SUPABASE_ANON_KEY ??
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+
+    if (!url || !key) {
+      throw new InternalServerErrorException(
+        'SUPABASE_URL and SUPABASE_ANON_KEY are required',
+      );
+    }
+    return { url, key };
+  }
+
+  private async authRequest(path: string, body: object) {
+    const { url, key } = this.getSupabaseConfig();
+    const response = await fetch(`${url}/auth/v1/${path}`, {
+      method: 'POST',
+      headers: {
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+    const payload = (await response.json()) as SupabaseAuthResponse;
+    if (!response.ok) {
+      throw new BadRequestException(
+        payload.msg ??
+          payload.error_description ??
+          payload.error ??
+          'Supabase authentication failed',
+      );
+    }
+    return payload;
+  }
+
   async register(registrationData: RegisterDto) {
     //fetch tenant and get their allowed email domain
-    const tenant = await this.tenantsService
-      .getAllTenants()
-      .then((tenants) =>
-        tenants.find((t) => t.tenant_id === registrationData.tenantId),
-      );
+    const tenant = await this.tenantsService.findById(
+      registrationData.tenantId,
+    );
 
     if (!tenant) {
       throw new NotFoundException('Tenant not found');
     }
 
     // validate institutional email
-    const requiredDomain = tenant.institutional_email_domain
-      .toLowerCase()
-      .trim();
+    const verifiedDomains =
+      tenant.tenant_tenant_organization_tenant_idTotenant.organization_domain
+        .filter((item) => item.is_verified)
+        .map((item) => item.domain.toLowerCase().trim());
     const emailLower = registrationData.email.toLowerCase().trim();
-    if (!emailLower.endsWith(`@${requiredDomain}`)) {
+    const emailDomain = emailLower.split('@')[1];
+    if (!emailDomain || !verifiedDomains.includes(emailDomain)) {
       throw new BadRequestException(
-        `Email must belong to the institutional domain: ${tenant.institutional_email_domain}`,
+        'Email must belong to a verified domain for this organization',
       );
     }
 
@@ -49,55 +97,51 @@ export class AuthService {
       throw new BadRequestException('User with this email already exists');
     }
 
-    //hash password and save user
-    const passwordHash = await bcrypt.hash(registrationData.password, 10);
+    const result = await this.authRequest('signup', {
+      email: emailLower,
+      password: registrationData.password,
+      data: { full_name: registrationData.fullName },
+    });
+    if (!result.user) {
+      throw new InternalServerErrorException(
+        'Supabase did not return the registered user',
+      );
+    }
 
-    const newUser = await this.usersService.createUser(
-      registrationData.tenantId,
-      registrationData.fullName,
-      registrationData.email,
-      passwordHash,
-    );
+    await this.prisma.tenant_membership.create({
+      data: {
+        person_id: result.user.id,
+        tenant_id: registrationData.tenantId,
+      },
+    });
 
     return {
-      message: 'user registration successfully',
+      message: 'User registered successfully',
       user: {
-        id: newUser.user_id,
-        tenantId: newUser.tenant_id,
-        fullName: newUser.full_name,
-        email: newUser.email,
+        id: result.user.id,
+        tenantId: registrationData.tenantId,
+        fullName: registrationData.fullName,
+        email: result.user.email ?? emailLower,
       },
+      accessToken: result.access_token,
+      refreshToken: result.refresh_token,
     };
   }
 
   async login(loginData: LoginDto) {
-    const user = await this.usersService.findByEmail(loginData.email);
-    if (!user) {
-      throw new NotFoundException('User not found');
+    const result = await this.authRequest('token?grant_type=password', {
+      email: loginData.email.trim().toLowerCase(),
+      password: loginData.password,
+    });
+    if (!result.access_token) {
+      throw new UnauthorizedException('Invalid email or password');
     }
-
-    //check password is correct
-    const isPasswordValid = await bcrypt.compare(
-      loginData.password,
-      user.password_hash,
-    );
-    if (!isPasswordValid) {
-      throw new BadRequestException('Invalid password');
-    }
-
-    //generate jwt token
-    const payload = {
-      userId: user.user_id,
-      tenantId: user.tenant_id,
-      role: user.user_role,
-      email: user.email,
-    };
-
-    const token = this.jwtService.sign(payload);
 
     return {
-      message: 'user login successfully',
-      token: token,
+      message: 'User logged in successfully',
+      token: result.access_token,
+      refreshToken: result.refresh_token,
+      expiresIn: result.expires_in,
     };
   }
 }
