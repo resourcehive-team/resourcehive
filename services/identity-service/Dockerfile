@@ -4,13 +4,13 @@ WORKDIR /app
 
 # Install pnpm and openssl (required for Prisma engine detection on Alpine)
 RUN apk add --no-cache openssl
-RUN npm install -g pnpm
+RUN npm install -g pnpm@10.34.5
 
 # Copy all workspace files
 COPY . .
 
 # Install all dependencies
-RUN pnpm install
+RUN pnpm install --frozen-lockfile
 
 # Generate the Prisma Client for Linux (bypassing dotenv to avoid silent failures)
 RUN cd packages/database && npx prisma generate
@@ -27,7 +27,7 @@ WORKDIR /app
 
 # Install pnpm and openssl (required for Prisma runtime on Alpine)
 RUN apk add --no-cache openssl
-RUN npm install -g pnpm
+RUN npm install -g pnpm@10.34.5
 
 # Copy the entire built application from the builder stage
 # This ensures the generated Prisma client in node_modules/.prisma is preserved

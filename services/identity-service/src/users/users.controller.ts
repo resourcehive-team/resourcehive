@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, UseGuards, Request } from '@nestjs/common';
+import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { HeaderAuthGuard } from '../auth/header-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -9,14 +9,27 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Post()
-  async createUser(@Body() body: { tenantId: string; fullName: string; email: string; passwordHash: string }) {
-    return this.usersService.createUser(body.tenantId, body.fullName, body.email, body.passwordHash);
+  async createUser(
+    @Body()
+    body: {
+      tenantId: string;
+      fullName: string;
+      email: string;
+      passwordHash: string;
+    },
+  ) {
+    return this.usersService.createUser(
+      body.tenantId,
+      body.fullName,
+      body.email,
+      body.passwordHash,
+    );
   }
 
   @UseGuards(HeaderAuthGuard, RolesGuard)
   @Roles('admin')
   @Get()
-  async getAllUsers(@Request() req ) {
+  async getAllUsers() {
     return this.usersService.findAll();
   }
 
