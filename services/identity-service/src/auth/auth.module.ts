@@ -6,17 +6,16 @@ import { TenantsModule } from '../tenants/tenants.module';
 import { JwtModule } from '@nestjs/jwt';
 
 @Module({
-    imports:[
-        UsersModule,
-        TenantsModule,
-        JwtModule.register({
-            global: true, 
-            secret: process.env.JWT_SECRET || 'fallback_secret', 
-            signOptions: { expiresIn: '1h' }, 
-        })
-    ],
-    controllers:[AuthController],
-    providers:[AuthService]
+  imports: [
+    UsersModule,
+    TenantsModule,
+    JwtModule.register({
+      global: true,
+      secret: process.env.JWT_SECRET || 'fallback_secret',
+      signOptions: { expiresIn: '1h' },
+    }),
+  ],
+  controllers: [AuthController],
+  providers: [AuthService],
 })
-
-export class AuthModule{}
+export class AuthModule {}

@@ -5,7 +5,12 @@ import { PrismaService } from '@resourcehive/database';
 export class UsersService {
   constructor(private prisma: PrismaService) {}
 
-  async createUser(tenantId: string, fullName: string, email: string, passwordHash: string) {
+  async createUser(
+    tenantId: string,
+    fullName: string,
+    email: string,
+    passwordHash: string,
+  ) {
     return this.prisma.user.create({
       data: {
         tenant_id: tenantId,
@@ -22,7 +27,7 @@ export class UsersService {
     });
   }
 
-  async findAll(){
+  async findAll() {
     return this.prisma.user.findMany();
   }
 }
