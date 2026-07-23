@@ -5,29 +5,28 @@ import { PrismaService } from '@resourcehive/database';
 export class UsersService {
   constructor(private prisma: PrismaService) {}
 
-  async createUser(
-    tenantId: string,
-    fullName: string,
-    email: string,
-    passwordHash: string,
-  ) {
-    return this.prisma.user.create({
-      data: {
-        tenant_id: tenantId,
-        full_name: fullName,
-        email,
-        password_hash: passwordHash,
+  async findByEmail(email: string) {
+    return this.prisma.person.findFirst({
+      where: { email: { equals: email.trim(), mode: 'insensitive' } },
+      include: {
+        tenant_membership: {
+          include: {
+            tenant_tenant_membership_tenant_idTotenant: true,
+          },
+        },
       },
     });
   }
 
-  async findByEmail(email: string) {
-    return this.prisma.user.findUnique({
-      where: { email },
-    });
-  }
-
   async findAll() {
-    return this.prisma.user.findMany();
+    return this.prisma.person.findMany({
+      include: {
+        tenant_membership: {
+          include: {
+            tenant_tenant_membership_tenant_idTotenant: true,
+          },
+        },
+      },
+    });
   }
 }
