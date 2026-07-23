@@ -34,3 +34,6 @@ redis/
 
 # AI/Temp folders
 .gemini/
+
+# internal documentation/context
+.internal-documentation
