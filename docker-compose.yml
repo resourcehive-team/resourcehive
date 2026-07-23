@@ -32,9 +32,10 @@ services:
       CI: "true"
     command: >
       sh -c "
-        npm install -g pnpm &&
+        npm install -g pnpm@10.34.5 &&
         cd /usr/src/app &&
         pnpm --filter @resourcehive/database run generate &&
+        pnpm --filter @resourcehive/database run build &&
         cd services/identity-service &&
         pnpm run start:dev
       "
