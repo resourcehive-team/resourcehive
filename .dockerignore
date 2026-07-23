@@ -1,0 +1,29 @@
+# Dependency directories
+node_modules/
+**/node_modules/
+.pnpm-store/
+
+# Git
+.git/
+.gitignore
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Build outputs
+dist/
+**/dist/
+
+# Database / Local Volumes
+postgres/
+redis/
+postgres_data/
+redis_data/
+
+# Log files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*

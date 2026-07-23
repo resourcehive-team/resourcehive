@@ -1,0 +1,17 @@
+{
+  "name": "resourcehive-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "db:generate": "pnpm -F @resourcehive/database generate",
+    "db:push": "pnpm -F @resourcehive/database push"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "prisma",
+      "unrs-resolver"
+    ]
+  }
+}

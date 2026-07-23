@@ -1,15 +1,13 @@
-name: resourcehive
+name: resourcehive-production
 
 services:
-
   # ── Infrastructure ──────────────────────────────────────────────────────────
-
   redis:
     image: redis:7-alpine
-    container_name: resourcehive-redis
-    restart: unless-stopped
+    container_name: resourcehive-redis-prod
+    restart: always
     volumes:
-      - redis_data:/data
+      - redis_data_prod:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -17,44 +15,32 @@ services:
       retries: 5
 
   # ── Backend Services ──────────────────────────────────────────────────────────
-
   api-gateway:
     build:
       context: ./services/api-gateway
-    container_name: resourcehive-api-gateway
-    restart: unless-stopped
+    container_name: resourcehive-api-gateway-prod
+    restart: always
     ports:
-      - "8000:80"
+      - "80:80"
     depends_on:
       - identity-service
 
   identity-service:
-    image: node:20
-    container_name: resourcehive-identity
-    restart: unless-stopped
-    working_dir: /usr/src/app/services/identity-service
-    volumes:
-      - ./:/usr/src/app
+    image: ghcr.io/resourcehive-team/resourcehive-identity:latest
+    container_name: resourcehive-identity-prod
+    restart: always
     environment:
+      # EC2 injects env vars from the .env file on the server
       DATABASE_URL: ${DATABASE_URL}
+      DIRECT_URL: ${DIRECT_URL}
+      JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: "redis://redis:6379"
-      NODE_ENV: development
-      CI: "true"
-    command: >
-      sh -c "
-        npm install -g pnpm &&
-        cd /usr/src/app &&
-        pnpm --filter @resourcehive/database run generate &&
-        cd services/identity-service &&
-        pnpm run start:dev
-      "
+      NODE_ENV: production
     depends_on:
       redis:
         condition: service_healthy
 
 
 
-# ── Named Volumes (managed by Docker, never in git) ──────────────────────────
-
 volumes:
-  redis_data:
+  redis_data_prod:
