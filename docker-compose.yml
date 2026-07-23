@@ -18,6 +18,16 @@ services:
 
   # ── Backend Services ──────────────────────────────────────────────────────────
 
+  api-gateway:
+    build:
+      context: ./services/api-gateway
+    container_name: resourcehive-api-gateway
+    restart: unless-stopped
+    ports:
+      - "8000:80"
+    depends_on:
+      - identity-service
+
   identity-service:
     image: node:20
     container_name: resourcehive-identity
@@ -45,17 +55,7 @@ services:
       redis:
         condition: service_healthy
 
-  # ── Frontend (placeholder until Next.js app is ready) ────────────────────────
 
-  landing-service:
-    build:
-      context: ./services/landing-service
-    container_name: resourcehive-landing
-    restart: unless-stopped
-    ports:
-      - "8080:80"
-    volumes:
-      - ./services/landing-service:/usr/share/nginx/html
 
 # ── Named Volumes (managed by Docker, never in git) ──────────────────────────
 
