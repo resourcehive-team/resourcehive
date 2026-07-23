@@ -4,6 +4,22 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
 
+interface TenantResponse {
+  tenant_id: string;
+}
+
+interface RegisterResponse {
+  message: string;
+  user: {
+    email: string;
+  };
+}
+
+interface LoginResponse {
+  message: string;
+  token: string;
+}
+
 describe('Authentication Flow (e2e)', () => {
   jest.setTimeout(30000);
   let app: INestApplication<App>;
@@ -31,8 +47,9 @@ describe('Authentication Flow (e2e)', () => {
         domain: 'cs.university.edu',
       })
       .expect(201);
-    
-    tenantId = response.body.tenant_id;
+
+    const body = response.body as TenantResponse;
+    tenantId = body.tenant_id;
     expect(tenantId).toBeDefined();
   });
 
@@ -46,10 +63,11 @@ describe('Authentication Flow (e2e)', () => {
         password: testPassword,
       })
       .expect(201);
-    
-    expect(response.body.message).toBe('user registration successfully');
-    expect(response.body.user).toBeDefined();
-    expect(response.body.user.email).toBe(testEmail);
+
+    const body = response.body as RegisterResponse;
+    expect(body.message).toBe('user registration successfully');
+    expect(body.user).toBeDefined();
+    expect(body.user.email).toBe(testEmail);
   });
 
   it('3. Should login and return a JWT', async () => {
@@ -61,17 +79,16 @@ describe('Authentication Flow (e2e)', () => {
       })
       .expect(200);
 
-    expect(response.body.message).toBe('user login successfully');
-    expect(response.body.token).toBeDefined();
-    expect(typeof response.body.token).toBe('string');
-    
-    jwtToken = response.body.token; 
+    const body = response.body as LoginResponse;
+    expect(body.message).toBe('user login successfully');
+    expect(body.token).toBeDefined();
+    expect(typeof body.token).toBe('string');
+
+    jwtToken = body.token;
   });
 
   it('4. Should block access to /users without a token', async () => {
-    return request(app.getHttpServer())
-      .get('/users')
-      .expect(401);
+    return request(app.getHttpServer()).get('/users').expect(401);
   });
 
   it('5. Should block access to /users for a user without the admin role', async () => {
