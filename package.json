@@ -6,14 +6,6 @@
     "db:generate": "pnpm -F @resourcehive/database generate",
     "db:push": "pnpm -F @resourcehive/database push"
   },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "@prisma/client",
-      "@prisma/engines",
-      "prisma",
-      "unrs-resolver"
-    ]
-  },
   "devDependencies": {
     "supabase": "^2.109.1"
   }
