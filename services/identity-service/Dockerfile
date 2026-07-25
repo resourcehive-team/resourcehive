@@ -12,10 +12,7 @@ COPY . .
 # Install all dependencies
 RUN pnpm install --frozen-lockfile
 
-# Generate the Prisma Client for Linux (bypassing dotenv to avoid silent failures)
-RUN cd packages/database && npx prisma generate
-
-# Build the database package
+# Generate the Prisma client and build the database package.
 RUN pnpm --filter @resourcehive/database run build
 
 # Build the identity-service

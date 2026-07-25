@@ -4,10 +4,18 @@
   "private": true,
   "packageManager": "pnpm@10.34.5",
   "scripts": {
-    "db:generate": "pnpm -F @resourcehive/database generate",
-    "db:push": "pnpm -F @resourcehive/database push"
+    "db:init": "pnpm -F @resourcehive/database run init",
+    "db:generate": "pnpm -F @resourcehive/database run generate",
+    "db:migrate": "pnpm -F @resourcehive/database run migrate:deploy",
+    "db:migrate:create": "pnpm -F @resourcehive/database run migrate:create",
+    "db:migrate:dev": "pnpm -F @resourcehive/database run migrate:dev",
+    "db:migrate:status": "pnpm -F @resourcehive/database run migrate:status",
+    "db:studio": "pnpm -F @resourcehive/database run studio",
+    "db:test": "bash db/schema/tests/run.sh",
+    "db:validate": "pnpm -F @resourcehive/database run validate"
   },
   "devDependencies": {
-    "supabase": "^2.109.1"
+    "@prisma/client": "^5.22.0",
+    "prisma": "^5.22.0"
   }
 }

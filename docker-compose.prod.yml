@@ -32,10 +32,16 @@ services:
     environment:
       # EC2 injects env vars from the .env file on the server
       DATABASE_URL: ${DATABASE_URL}
-      DIRECT_URL: ${DIRECT_URL}
       JWT_SECRET: ${JWT_SECRET}
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
       REDIS_URL: "redis://redis:6379"
       NODE_ENV: production
+    command: >
+      sh -c "
+        pnpm run db:migrate &&
+        pnpm --filter identity-service run start:prod
+      "
     depends_on:
       redis:
         condition: service_healthy

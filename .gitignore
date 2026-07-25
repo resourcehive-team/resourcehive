@@ -18,6 +18,7 @@ packages/**/*.d.ts
 packages/**/*.js.map
 packages/**/package-lock.json
 packages/**/dist/
+packages/database/generated/
 
 # Docker Volumes (Crucial so you don't commit database data!)
 postgres/

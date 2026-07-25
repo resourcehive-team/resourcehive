@@ -28,7 +28,9 @@ resourcehive/
 │   ├── notification-service/        # NestJS microservice for WebSocket & email alerts
 │   └── landing-service/             # Simple landing page container (Dockerized Nginx)
 ├── packages/
-│   └── database/                    # Shared Prisma schema, migrations, and database client
+│   └── database/                    # Shared generated Prisma client and NestJS database module
+├── db/
+│   └── schema/                      # Canonical Prisma schema, migrations, and integrity tests
 ├── tests/
 │   └── e2e/                         # End-to-End integration tests across multiple services
 ├── .env                             # Root environment variables for Docker Compose
@@ -54,7 +56,9 @@ These steps create a tenant and user, then test the existing login page. You nee
    cp .env.example .env
    ```
 
-   Open `.env` and replace the placeholder values for `DATABASE_URL`, `DIRECT_URL` and `JWT_SECRET`. For Neon, use the pooled connection string for `DATABASE_URL` and the direct, non-pooler connection string for `DIRECT_URL`. Keep this file private; Git ignores it.
+   Open `.env` and replace the placeholder values for `DATABASE_URL` and `JWT_SECRET`. `DATABASE_URL` must be a PostgreSQL connection string with permission to create tables, indexes, triggers, and the `btree_gist` extension. For Neon, use its direct PostgreSQL connection string with `sslmode=require&connect_timeout=30`. Remove `channel_binding=require` because the project's pinned Prisma 5.22 engine cannot connect when that newer libpq option is present. Changing this one value is enough to switch PostgreSQL providers. Keep this file private; Git ignores it.
+
+   The existing authentication implementation also requires `SUPABASE_URL` and `SUPABASE_ANON_KEY`. These are used only by authentication; Supabase is not the database or migration provider.
 
 3. Create the frontend environment file:
 
@@ -68,19 +72,29 @@ These steps create a tenant and user, then test the existing login page. You nee
    NEXT_PUBLIC_IDENTITY_API_URL=http://localhost:3001
    ```
 
-4. Generate the Prisma client:
+4. Validate and initialize the database:
 
    ```bash
-   pnpm --filter @resourcehive/database run generate
+   pnpm run db:validate
+   pnpm run db:init
    ```
 
-5. Create the tables in the database configured in `.env`:
+   `db:init` applies committed migrations, generates the Prisma client, and builds the shared database package. It is safe to run again because Prisma records applied migrations.
+
+5. Confirm that the configured database is current:
 
    ```bash
-   pnpm --filter @resourcehive/database run push
+   pnpm run db:migrate:status
    ```
 
-   Prisma should report that the database is in sync. If the Neon dashboard still has no tables, check that the connection string in `.env` belongs to the same Neon project and database that you are viewing.
+   Prisma should report that the database schema is up to date. Future schema changes should be created with `pnpm run db:migrate:create`; do not use `prisma db push`.
+
+   To run the schema integrity and concurrent-booking tests against an empty disposable database:
+
+   ```bash
+   TEST_DATABASE_URL="postgresql://user:password@host:5432/database" \
+   pnpm run db:test
+   ```
 
 6. Start Redis and the identity service:
 

@@ -37,6 +37,8 @@ services:
       - ./:/usr/src/app
     environment:
       DATABASE_URL: ${DATABASE_URL}
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
       REDIS_URL: "redis://redis:6379"
       NODE_ENV: development
       CI: "true"
@@ -44,8 +46,7 @@ services:
       sh -c "
         npm install -g pnpm@10.34.5 &&
         cd /usr/src/app &&
-        pnpm --filter @resourcehive/database run generate &&
-        pnpm --filter @resourcehive/database run build &&
+        pnpm run db:init &&
         cd services/identity-service &&
         pnpm run start:dev
       "

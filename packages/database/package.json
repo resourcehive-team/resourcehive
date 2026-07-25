@@ -2,24 +2,30 @@
   "name": "@resourcehive/database",
   "version": "1.0.0",
   "private": true,
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "generate": "dotenv -e ../../.env -- prisma generate",
-    "push": "dotenv -e ../../.env -- prisma db push",
-    "migrate": "dotenv -e ../../.env -- prisma migrate deploy",
-    "migrate:dev": "dotenv -e ../../.env -- prisma migrate dev",
-    "studio": "dotenv -e ../../.env -- prisma studio"
+    "build": "pnpm run generate && tsc -p tsconfig.json && mkdir -p dist/generated/client && cp -R generated/client/. dist/generated/client",
+    "generate": "dotenv -e ../../.env -- prisma generate --schema ../../db/schema/schema.prisma",
+    "init": "pnpm run migrate:deploy && pnpm run build",
+    "migrate": "pnpm run migrate:deploy",
+    "migrate:create": "dotenv -e ../../.env -- prisma migrate dev --create-only --schema ../../db/schema/schema.prisma",
+    "migrate:deploy": "dotenv -e ../../.env -- prisma migrate deploy --schema ../../db/schema/schema.prisma",
+    "migrate:dev": "dotenv -e ../../.env -- prisma migrate dev --schema ../../db/schema/schema.prisma",
+    "migrate:status": "dotenv -e ../../.env -- prisma migrate status --schema ../../db/schema/schema.prisma",
+    "studio": "dotenv -e ../../.env -- prisma studio --schema ../../db/schema/schema.prisma",
+    "validate": "dotenv -e ../../.env -- prisma validate --schema ../../db/schema/schema.prisma"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",
-    "@prisma/client": "^5.0.0"
+    "@prisma/client": "^5.22.0"
   },
   "devDependencies": {
     "dotenv-cli": "^7.3.0",
-    "prisma": "^5.0.0",
+    "prisma": "^5.22.0",
     "typescript": "^5.0.0"
   }
 }
