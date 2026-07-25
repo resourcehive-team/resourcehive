@@ -23,12 +23,15 @@ export default function Home() {
         <nav className="container mx-auto flex items-center justify-between p-4">
           <a href="#">ResourceHive</a>
           <div className="flex gap-2">
-            <Button variant="ghost" render={<a href="#resources" />}>
+            <Button
+              variant="ghost"
+              nativeButton={false}
+              render={<a href="#resources" />}
+            >
               Resources
             </Button>
-            <Button render={<Link href="/login" />}>Login</Button>
-            <Button variant="outline" render={<Link href="/signup" />}>
-              Sign up
+            <Button nativeButton={false} render={<Link href="/login" />}>
+              Login
             </Button>
           </div>
         </nav>
@@ -42,7 +45,10 @@ export default function Home() {
             students borrow them.
           </p>
           <div className="flex gap-2">
-            <Button render={<a href="#resources" />}>
+            <Button
+              nativeButton={false}
+              render={<a href="#resources" />}
+            >
               See resources
             </Button>
             <Button variant="outline">Add resource</Button>

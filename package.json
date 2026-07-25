@@ -10,9 +10,13 @@
     "db:migrate:create": "pnpm -F @resourcehive/database run migrate:create",
     "db:migrate:dev": "pnpm -F @resourcehive/database run migrate:dev",
     "db:migrate:status": "pnpm -F @resourcehive/database run migrate:status",
+    "db:seed:demo": "pnpm -F identity-service run seed:demo",
     "db:studio": "pnpm -F @resourcehive/database run studio",
     "db:test": "bash db/schema/tests/run.sh",
-    "db:validate": "pnpm -F @resourcehive/database run validate"
+    "db:validate": "pnpm -F @resourcehive/database run validate",
+    "dev:identity": "pnpm -F identity-service run start:dev",
+    "dev:setup": "pnpm run db:init && pnpm run db:seed:demo",
+    "dev:web": "pnpm -F frontend run dev"
   },
   "devDependencies": {
     "@prisma/client": "^5.22.0",

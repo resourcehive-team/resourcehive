@@ -33,7 +33,11 @@ export async function login(credentials: LoginRequest): Promise<LoginResponse> {
   }
 
   if (!response.ok) {
-    if (response.status === 400 || response.status === 404) {
+    if (
+      response.status === 400 ||
+      response.status === 401 ||
+      response.status === 404
+    ) {
       throw new LoginError("Email or password is incorrect.")
     }
 
