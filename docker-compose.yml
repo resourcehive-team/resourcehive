@@ -1,23 +1,6 @@
 name: resourcehive
 
 services:
-
-  # ── Infrastructure ──────────────────────────────────────────────────────────
-
-  redis:
-    image: redis:7-alpine
-    container_name: resourcehive-redis
-    restart: unless-stopped
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # ── Backend Services ──────────────────────────────────────────────────────────
-
   api-gateway:
     build:
       context: ./services/api-gateway
@@ -29,35 +12,21 @@ services:
       - identity-service
 
   identity-service:
-    image: node:20
+    build:
+      context: .
+      dockerfile: services/identity-service/Dockerfile
     container_name: resourcehive-identity
     restart: unless-stopped
-    working_dir: /usr/src/app/services/identity-service
-    volumes:
-      - ./:/usr/src/app
     environment:
       DATABASE_URL: ${DATABASE_URL}
-      REDIS_URL: "redis://redis:6379"
+      JWT_SECRET: ${JWT_SECRET}
+      PORT: 3000
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
       NODE_ENV: development
-      CI: "true"
     command: >
       sh -c "
-        npm install -g pnpm@10.34.5 &&
-        cd /usr/src/app &&
-        pnpm --filter @resourcehive/database run generate &&
-        pnpm --filter @resourcehive/database run build &&
-        cd services/identity-service &&
-        pnpm run start:dev
+        pnpm run db:migrate &&
+        pnpm --filter identity-service run start:prod
       "
     ports:
-      - "3001:3001"
-    depends_on:
-      redis:
-        condition: service_healthy
-
-
-
-# ── Named Volumes (managed by Docker, never in git) ──────────────────────────
-
-volumes:
-  redis_data:
+      - "3001:3000"

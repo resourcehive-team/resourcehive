@@ -4,6 +4,7 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '@resourcehive/database';
 import { Request } from 'express';
 
@@ -18,9 +19,25 @@ export type AuthenticatedRequest = Request & {
   user?: AuthenticatedUser;
 };
 
+interface AccessTokenPayload {
+  sub: string;
+  email: string;
+}
+
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly jwtService: JwtService,
+  ) {}
+
+  private getJwtSecret() {
+    const secret = process.env.JWT_SECRET;
+    if (!secret || secret === 'change_me') {
+      throw new Error('JWT_SECRET is not configured');
+    }
+    return secret;
+  }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
@@ -37,34 +54,36 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     try {
-      const url = process.env.SUPABASE_URL?.replace(/\/$/, '');
-      const key =
-        process.env.SUPABASE_ANON_KEY ??
-        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-      if (!url || !key) {
-        throw new Error('Supabase environment is not configured');
+      const payload = await this.jwtService.verifyAsync<AccessTokenPayload>(
+        token,
+        {
+          secret: this.getJwtSecret(),
+        },
+      );
+      const user = await this.prisma.user.findUnique({
+        where: {
+          id: payload.sub,
+          status: 'ACTIVE',
+        },
+      });
+
+      if (!user) {
+        throw new Error('User is not active');
       }
 
-      const response = await fetch(`${url}/auth/v1/user`, {
-        headers: { apikey: key, Authorization: `Bearer ${token}` },
+      const membership = await this.prisma.organizationMembership.findFirst({
+        where: {
+          userId: user.id,
+          status: 'APPROVED',
+        },
+        orderBy: { joinedAt: 'asc' },
       });
-      const authUser = (await response.json()) as {
-        id?: string;
-        email?: string;
-      };
-      if (!response.ok || !authUser.id) {
-        throw new Error('Invalid Supabase access token');
-      }
 
-      const membership = await this.prisma.tenant_membership.findFirst({
-        where: { person_id: authUser.id, status: 'active' },
-        orderBy: { joined_at: 'asc' },
-      });
       request.user = {
-        userId: authUser.id,
-        tenantId: membership?.tenant_id ?? '',
-        role: membership?.role ?? 'member',
-        email: authUser.email ?? '',
+        userId: user.id,
+        tenantId: membership?.organizationId ?? '',
+        role: membership?.role.toLowerCase() ?? 'member',
+        email: user.email,
       };
     } catch {
       throw new UnauthorizedException('Invalid or expired token');

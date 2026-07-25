@@ -1,20 +1,6 @@
 name: resourcehive-production
 
 services:
-  # ── Infrastructure ──────────────────────────────────────────────────────────
-  redis:
-    image: redis:7-alpine
-    container_name: resourcehive-redis-prod
-    restart: always
-    volumes:
-      - redis_data_prod:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # ── Backend Services ──────────────────────────────────────────────────────────
   api-gateway:
     build:
       context: ./services/api-gateway
@@ -32,15 +18,12 @@ services:
     environment:
       # EC2 injects env vars from the .env file on the server
       DATABASE_URL: ${DATABASE_URL}
-      DIRECT_URL: ${DIRECT_URL}
       JWT_SECRET: ${JWT_SECRET}
-      REDIS_URL: "redis://redis:6379"
+      PORT: 3000
+      CORS_ORIGINS: ${CORS_ORIGINS}
       NODE_ENV: production
-    depends_on:
-      redis:
-        condition: service_healthy
-
-
-
-volumes:
-  redis_data_prod:
+    command: >
+      sh -c "
+        pnpm run db:migrate &&
+        pnpm --filter identity-service run start:prod
+      "

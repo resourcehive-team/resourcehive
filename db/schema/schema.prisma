@@ -1,0 +1,226 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../packages/database/generated/client"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL_UNPOOLED")
+}
+
+model User {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email           String    @unique(map: "users_email_unique")
+  passwordHash    String    @map("password_hash")
+  firstName       String    @map("first_name")
+  lastName        String    @map("last_name")
+  emailVerifiedAt DateTime? @map("email_verified_at") @db.Timestamptz
+  status          String    @default("ACTIVE")
+  platformRole    String    @default("USER") @map("platform_role")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  createdOrganizations    Organization[]               @relation("OrganizationCreatedBy")
+  allowlistEntriesAdded   OrganizationEmailAllowlist[] @relation("AllowlistAddedBy")
+  memberships             OrganizationMembership[]     @relation("MembershipUser")
+  membershipsApproved     OrganizationMembership[]     @relation("MembershipApprover")
+  createdResources        Resource[]                   @relation("ResourceCreatedBy")
+  bookings                Booking[]                    @relation("BookingUser")
+  pointTransactions       PointTransaction[]           @relation("PointTransactionUser")
+  emailVerificationTokens EmailVerificationToken[]
+  notifications           Notification[]
+
+  @@map("users")
+}
+
+model Organization {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name               String
+  type               String
+  parentId           String?  @map("parent_id") @db.Uuid
+  rootOrganizationId String   @map("root_organization_id") @db.Uuid
+  joinBonusPoints    Int      @default(0) @map("join_bonus_points")
+  status             String   @default("ACTIVE")
+  createdBy          String   @map("created_by") @db.Uuid
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  creator          User           @relation("OrganizationCreatedBy", fields: [createdBy], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  parent           Organization?  @relation("OrganizationHierarchy", fields: [parentId, rootOrganizationId], references: [id, rootOrganizationId], onDelete: NoAction, onUpdate: NoAction)
+  children         Organization[] @relation("OrganizationHierarchy")
+  rootOrganization Organization   @relation("OrganizationRoot", fields: [rootOrganizationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  rootDescendants  Organization[] @relation("OrganizationRoot")
+
+  emailDomains            OrganizationEmailDomain[]
+  emailAllowlistEntries   OrganizationEmailAllowlist[]
+  memberships             OrganizationMembership[]
+  ownedResources          Resource[]                    @relation("ResourceOwner")
+  allowedResources        ResourceAllowedOrganization[] @relation("AllowedOrganization")
+  sourcePointTransactions PointTransaction[]            @relation("PointTransactionSourceOrganization")
+
+  @@unique([id, rootOrganizationId], map: "organizations_id_root_unique")
+  @@index([parentId], map: "organizations_parent_id_idx")
+  @@index([rootOrganizationId], map: "organizations_root_organization_id_idx")
+  @@map("organizations")
+}
+
+model OrganizationEmailDomain {
+  id             String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String  @map("organization_id") @db.Uuid
+  domain         String  @unique(map: "organization_email_domains_domain_unique")
+  autoJoin       Boolean @default(false) @map("auto_join")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([organizationId], map: "organization_email_domains_organization_id_idx")
+  @@map("organization_email_domains")
+}
+
+model OrganizationEmailAllowlist {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  email          String
+  addedBy        String    @map("added_by") @db.Uuid
+  usedAt         DateTime? @map("used_at") @db.Timestamptz
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  addedByUser  User         @relation("AllowlistAddedBy", fields: [addedBy], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([organizationId, email], map: "organization_email_allowlist_org_email_unique")
+  @@index([email], map: "organization_email_allowlist_email_idx")
+  @@map("organization_email_allowlist")
+}
+
+model OrganizationMembership {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  role           String   @default("MEMBER")
+  status         String   @default("PENDING")
+  joinedAt       DateTime @default(now()) @map("joined_at") @db.Timestamptz
+  approvedBy     String?  @map("approved_by") @db.Uuid
+
+  user         User         @relation("MembershipUser", fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  approver     User?        @relation("MembershipApprover", fields: [approvedBy], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([userId, organizationId], map: "organization_memberships_user_org_unique")
+  @@index([organizationId, status], map: "organization_memberships_organization_status_idx")
+  @@index([userId, status], map: "organization_memberships_user_status_idx")
+  @@map("organization_memberships")
+}
+
+model Resource {
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                String
+  description         String?
+  ownerOrganizationId String   @map("owner_organization_id") @db.Uuid
+  rootOrganizationId  String   @map("root_organization_id") @db.Uuid
+  createdByUserId     String   @map("created_by_user_id") @db.Uuid
+  status              String   @default("ACTIVE")
+  pointCost           Int      @default(0) @map("point_cost")
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  ownerOrganization    Organization                  @relation("ResourceOwner", fields: [ownerOrganizationId, rootOrganizationId], references: [id, rootOrganizationId], onDelete: NoAction, onUpdate: NoAction)
+  createdByUser        User                          @relation("ResourceCreatedBy", fields: [createdByUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  allowedOrganizations ResourceAllowedOrganization[]
+  slots                ResourceSlot[]
+
+  @@unique([id, rootOrganizationId], map: "resources_id_root_unique")
+  @@index([ownerOrganizationId, status], map: "resources_owner_status_idx")
+  @@index([rootOrganizationId], map: "resources_root_organization_id_idx")
+  @@map("resources")
+}
+
+model ResourceAllowedOrganization {
+  resourceId         String @map("resource_id") @db.Uuid
+  organizationId     String @map("organization_id") @db.Uuid
+  rootOrganizationId String @map("root_organization_id") @db.Uuid
+
+  resource     Resource     @relation(fields: [resourceId, rootOrganizationId], references: [id, rootOrganizationId], onDelete: NoAction, onUpdate: NoAction)
+  organization Organization @relation("AllowedOrganization", fields: [organizationId, rootOrganizationId], references: [id, rootOrganizationId], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([resourceId, organizationId])
+  @@index([organizationId], map: "resource_allowed_organizations_organization_id_idx")
+  @@map("resource_allowed_organizations")
+}
+
+/// Slot overlap prevention is defined by resource_slots_no_overlap in the baseline migration.
+model ResourceSlot {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  resourceId String   @map("resource_id") @db.Uuid
+  startsAt   DateTime @map("starts_at") @db.Timestamptz
+  endsAt     DateTime @map("ends_at") @db.Timestamptz
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  resource Resource  @relation(fields: [resourceId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  bookings Booking[]
+
+  @@index([resourceId, startsAt], map: "resource_slots_resource_start_idx")
+  @@map("resource_slots")
+}
+
+/// One non-cancelled booking per slot is enforced by bookings_active_slot_unique.
+model Booking {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  resourceSlotId String    @map("resource_slot_id") @db.Uuid
+  userId         String    @map("user_id") @db.Uuid
+  status         String    @default("CONFIRMED")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  cancelledAt    DateTime? @map("cancelled_at") @db.Timestamptz
+  completedAt    DateTime? @map("completed_at") @db.Timestamptz
+
+  resourceSlot      ResourceSlot       @relation(fields: [resourceSlotId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  user              User               @relation("BookingUser", fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  pointTransactions PointTransaction[]
+
+  @@unique([id, userId], map: "bookings_id_user_unique")
+  @@index([userId, status], map: "bookings_user_status_idx")
+  @@map("bookings")
+}
+
+/// Partial uniqueness and append-only behavior are defined in the baseline migration.
+model PointTransaction {
+  id                   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId               String   @map("user_id") @db.Uuid
+  amount               Int
+  transactionType      String   @map("transaction_type")
+  sourceOrganizationId String?  @map("source_organization_id") @db.Uuid
+  bookingId            String?  @map("booking_id") @db.Uuid
+  description          String?
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  user               User          @relation("PointTransactionUser", fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  sourceOrganization Organization? @relation("PointTransactionSourceOrganization", fields: [sourceOrganizationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  booking            Booking?      @relation(fields: [bookingId, userId], references: [id, userId], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([userId, createdAt], map: "point_transactions_user_created_at_idx")
+  @@map("point_transactions")
+}
+
+model EmailVerificationToken {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz
+  usedAt    DateTime? @map("used_at") @db.Timestamptz
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([userId], map: "email_verification_tokens_user_id_idx")
+  @@map("email_verification_tokens")
+}
+
+model Notification {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  type      String
+  title     String
+  message   String
+  readAt    DateTime? @map("read_at") @db.Timestamptz
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("notifications")
+}

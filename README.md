@@ -1,159 +1,142 @@
 # ResourceHive
 
-**ResourceHive** is a Microservices-Based Multi-Tenant Resource Sharing and Optimization Platform for University Campus Communities. 
-This is the internal project for Group 02.
+ResourceHive currently provides a PostgreSQL database baseline, a NestJS
+identity API, and a Next.js login page. Signup is intentionally not available
+yet.
 
-## 🏗️ Architecture
+## Requirements
 
-The system uses a four-service backend architecture:
-1. **Identity Service** - users, tenants, authentication and roles.
-2. **Resource Service** - listings, approval, search, categories and images.
-3. **Booking and Transaction Service** - availability, reservations, points, returns and disputes.
-4. **Notification Service** - WebSocket/in-app notifications and email fallback.
+- Node.js 20 or newer
+- pnpm 10.34.5
+- An empty PostgreSQL 15 database
+- `psql` only when running the database integrity tests
 
-These services run alongside a **PostgreSQL** database and a **Redis** instance, fronted by an **Nginx** reverse proxy and a **Next.js** frontend.
+Run all commands from the repository root.
 
-## 📁 Repository Structure
+## First-time setup
 
-This project uses a Monorepo strategy managed by `pnpm`. Below is the layout and purpose of each directory:
+Install dependencies:
 
-```text
-resourcehive/
-├── apps/
-│   └── web/                         # The Next.js frontend application (User Interface)
-├── services/
-│   ├── identity-service/            # NestJS microservice for Auth, Users, Tenants, & Points
-│   ├── resource-service/            # NestJS microservice for Resource listings & search
-│   ├── booking-service/             # NestJS microservice for Reservations & transactions
-│   ├── notification-service/        # NestJS microservice for WebSocket & email alerts
-│   └── landing-service/             # Simple landing page container (Dockerized Nginx)
-├── packages/
-│   └── database/                    # Shared Prisma schema, migrations, and database client
-├── tests/
-│   └── e2e/                         # End-to-End integration tests across multiple services
-├── .env                             # Root environment variables for Docker Compose
-├── .env.example                     # Template for required environment variables
-├── docker-compose.yml               # Local development container orchestration
-├── package.json                     # Root monorepo scripts
-└── pnpm-workspace.yaml              # Monorepo workspace definitions
+```bash
+pnpm install --frozen-lockfile
 ```
 
-## Local Demo
+Create local environment files without overwriting existing ones:
 
-These steps create a tenant and user, then test the existing login page. You need Node.js 20, pnpm 10.34.5, Docker and Docker Compose. Run every command from the repository root unless a step says otherwise.
+```bash
+test -f .env || cp .env.example .env
+test -f apps/web/.env.local || cp apps/web/.env.example apps/web/.env.local
+```
 
-1. Install the project dependencies:
+Edit `.env` and set both PostgreSQL connection strings. The database user must
+be able to create tables, indexes, triggers, and the `btree_gist` extension.
+The provider can be local PostgreSQL, Neon, or another PostgreSQL-compatible
+host.
 
-   ```bash
-   pnpm install
-   ```
+For Neon, use the pooled hostname containing `-pooler` for application queries:
 
-2. Create the backend environment file:
+```env
+DATABASE_URL="postgresql://USER:PASSWORD@ENDPOINT-pooler.REGION.aws.neon.tech/DATABASE?sslmode=require&connect_timeout=30&pool_timeout=30"
+```
 
-   ```bash
-   cp .env.example .env
-   ```
+Use the direct hostname for migrations:
 
-   Open `.env` and replace the placeholder values for `DATABASE_URL`, `DIRECT_URL` and `JWT_SECRET`. For Neon, use the pooled connection string for `DATABASE_URL` and the direct, non-pooler connection string for `DIRECT_URL`. Keep this file private; Git ignores it.
+```env
+DATABASE_URL_UNPOOLED="postgresql://USER:PASSWORD@ENDPOINT.REGION.aws.neon.tech/DATABASE?sslmode=require&connect_timeout=30"
+```
 
-3. Create the frontend environment file:
+For local PostgreSQL and providers without pooling, both variables can contain
+the same URL. Remove `channel_binding=require` if Neon included it. Keep
+`JWT_SECRET` private and replace the development value before deploying.
 
-   ```bash
-   cp apps/web/.env.example apps/web/.env.local
-   ```
+Apply migrations, build the shared Prisma package, and create the repeatable
+demo login:
 
-   Its value should be:
+```bash
+pnpm run dev:setup
+```
 
-   ```env
-   NEXT_PUBLIC_IDENTITY_API_URL=http://localhost:3001
-   ```
+## Run the application
 
-4. Generate the Prisma client:
+Start the NestJS identity service:
 
-   ```bash
-   pnpm --filter @resourcehive/database run generate
-   ```
+```bash
+pnpm run dev:identity
+```
 
-5. Create the tables in the database configured in `.env`:
+In a second terminal, start the Next.js application:
 
-   ```bash
-   pnpm --filter @resourcehive/database run push
-   ```
+```bash
+pnpm run dev:web
+```
 
-   Prisma should report that the database is in sync. If the Neon dashboard still has no tables, check that the connection string in `.env` belongs to the same Neon project and database that you are viewing.
+Open <http://localhost:3000/login> and sign in with:
 
-6. Start Redis and the identity service:
+```text
+Email: demo@example.edu
+Password: DemoPassword123!
+```
 
-   ```bash
-   docker compose up identity-service redis
-   ```
+Successful login returns to the home page. The demo seed is safe to run again.
 
-   The first start can take a little while. Wait for `Nest application successfully started`, then check the API in another terminal:
+## Verify the running service
 
-   ```bash
-   curl http://localhost:3001/
-   ```
+Check the NestJS service:
 
-   It should print `Identity Service is running`. Keep Docker Compose running.
+```bash
+curl http://localhost:3001/
+```
 
-7. In a second terminal, start the Next.js frontend:
+Expected response:
 
-   ```bash
-   pnpm --filter frontend run dev
-   ```
+```text
+Identity Service is running
+```
 
-8. Check whether the demo user already exists:
+Test login directly:
 
-   ```bash
-   curl -X POST http://localhost:3001/auth/login \
-     -H "Content-Type: application/json" \
-     -d '{"email":"demo@example.edu","password":"DemoPassword123!"}'
-   ```
+```bash
+curl -X POST http://localhost:3001/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"demo@example.edu","password":"DemoPassword123!"}'
+```
 
-   If this returns `user login successfully` and a token, skip the rest of this step. Do not register the same email twice.
+The response contains `user login successfully` and a JWT.
 
-   If login fails because this is a new database, create a tenant. A user cannot be registered without one:
+## Database and test commands
 
-   ```bash
-   curl -X POST http://localhost:3001/tenants \
-     -H "Content-Type: application/json" \
-     -d '{"name":"Demo Department","type":"department","domain":"example.edu"}'
-   ```
+Validate the Prisma schema:
 
-   Copy the `tenant_id` from the response. Register a user with that ID. The email must use the tenant domain (`example.edu` in this example):
+```bash
+pnpm run db:validate
+```
 
-   ```bash
-   curl -X POST http://localhost:3001/auth/register \
-     -H "Content-Type: application/json" \
-     -d '{"tenantId":"PASTE_TENANT_ID_HERE","fullName":"Demo User","email":"demo@example.edu","password":"DemoPassword123!"}'
-   ```
+Check migration status:
 
-9. Open the application:
+```bash
+pnpm run db:migrate:status
+```
 
-   - Frontend: <http://localhost:3000>
-   - Login: <http://localhost:3000/login>
-   - Signup: <http://localhost:3000/signup>
-   - Identity API: <http://localhost:3001>
+Run identity service tests after `pnpm run dev:setup`:
 
-   On the login page, enter:
+```bash
+pnpm --filter identity-service run test
+pnpm --filter identity-service run test:e2e
+```
 
-   ```text
-   Email: demo@example.edu
-   Password: DemoPassword123!
-   ```
+Run database integrity and concurrent-booking tests only against a clean,
+disposable PostgreSQL 15 database:
 
-   A successful login redirects to the home page. You can also test the API directly:
+```bash
+TEST_DATABASE_URL="postgresql://user:password@host:5432/database" \
+bash db/schema/tests/run.sh
+```
 
-   ```bash
-   curl -X POST http://localhost:3001/auth/login \
-     -H "Content-Type: application/json" \
-     -d '{"email":"demo@example.edu","password":"DemoPassword123!"}'
-   ```
+Create a migration after intentionally changing the Prisma schema:
 
-10. Stop the frontend with `Ctrl+C`. Stop the Docker services with:
+```bash
+pnpm run db:migrate:create
+```
 
-   ```bash
-   docker compose down
-   ```
-
-The signup page is not connected to the registration API yet, so use the tenant and registration commands above. After a successful login, the frontend stores the returned token under `resourcehive_access_token` in browser `localStorage`. This is temporary and is not the final production security design.
+Do not use `prisma db push`; committed migrations are the database source of
+truth.
