@@ -37,4 +37,5 @@ redis/
 .gemini/
 
 # internal documentation/context
-.internal-documentation
+.internal-documentation/
+internal-documentation/
