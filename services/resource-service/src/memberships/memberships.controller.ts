@@ -3,6 +3,7 @@ import { MembershipsService } from './memberships.service';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { CurrentUser } from '../auth/current-user.decorator';
+import { TenantGuard } from '../auth/tenant.guard';
 
 @ApiTags('Memberships')
 @ApiBearerAuth()
@@ -26,6 +27,7 @@ export class MembershipsController {
     return this.membershipsService.getUserMemberships(user.userId);
   }
 
+  @UseGuards(TenantGuard)
   @Get('organization/:organizationId')
   @ApiOperation({ summary: 'Get all members of an organization' })
   getOrganizationMembers(@Param('organizationId') orgId: string) {
