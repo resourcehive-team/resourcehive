@@ -1,8 +1,16 @@
 # Notification Service
 
 Person B owns this NestJS service for persistent, real-time, and fallback
-notifications. Week 1 provides infrastructure only; persistence, WebSockets,
-and email delivery are scheduled for later weeks.
+notifications.
+
+Week 2 adds validated notification creation persistence and recipient-scoped
+repository retrieval. Public read APIs, WebSockets, and email delivery remain
+later milestones.
+
+Proposed contracts requiring Person C approval:
+
+- [Notification API](docs/api-contract.md)
+- [Consumed booking events](docs/event-contracts.md)
 
 ## Local development
 
@@ -16,6 +24,12 @@ pnpm --filter notification-service run start:dev
 - Internal port: `3003`
 - Readiness: `GET /health`
 - Swagger UI: `GET /docs`
+
+Run persistence integration tests only against a migrated disposable database:
+
+```sh
+TEST_DATABASE_URL=postgresql://... pnpm --filter notification-service run test:integration
+```
 
 ## Docker
 

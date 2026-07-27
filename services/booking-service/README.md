@@ -1,8 +1,15 @@
 # Booking Service
 
 Person B owns this NestJS service for slots, availability, bookings, and
-booking-related point transactions. Week 1 provides infrastructure only; no
-business endpoints are implemented yet.
+booking-related point transactions.
+
+Week 2 adds a tenant-scoped Prisma slot repository. Public slot and booking
+controllers are intentionally not implemented yet.
+
+Proposed contracts requiring Person C approval:
+
+- [Booking API](docs/api-contract.md)
+- [Booking events](docs/event-contracts.md)
 
 ## Local development
 
@@ -17,6 +24,12 @@ pnpm --filter booking-service run start:dev
 - Readiness: `GET /health`
 - Swagger UI: `GET /docs`
 
+Run repository integration tests only against a migrated disposable database:
+
+```sh
+TEST_DATABASE_URL=postgresql://... pnpm --filter booking-service run test:integration
+```
+
 ## Docker
 
 Build from the monorepo root:
@@ -29,3 +42,6 @@ docker run --rm -p 3002:3002 -e DATABASE_URL=postgresql://... resourcehive-booki
 The public prefixes proposed for Person C's gateway integration are
 `/bookings/*` and `/points/*`. Root Compose, Nginx, shared environment files,
 CI workflows, and port assignments require Person C approval.
+
+The additional `/slots/*` route is a Week 2 proposal and is not an approved
+gateway route yet.
