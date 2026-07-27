@@ -18,7 +18,7 @@ async function bootstrap() {
   SwaggerModule.setup('api/docs', app, document);
 
   const configService = app.get(ConfigService);
-  const port = configService.get<number>('PORT') || 3002;
+  const port = configService.get<number>('PORT') || 3004;
   
   await app.listen(port);
   console.log(`Resource Service is running on: http://localhost:${port}`);
