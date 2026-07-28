@@ -176,6 +176,179 @@ export class AuthService {
     };
   }
 
+  async verifyEmail(token: string) {
+    const tokenHash = this.hashToken(token);
+    const now = new Date();
+
+    return this.prisma.$transaction(async (transaction) => {
+      const verificationToken =
+        await transaction.emailVerificationToken.findUnique({
+          where: { tokenHash },
+          select: {
+            id: true,
+            usedAt: true,
+            expiresAt: true,
+            user: {
+              select: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+                emailVerifiedAt: true,
+              },
+            },
+          },
+        });
+
+      if (
+        !verificationToken ||
+        verificationToken.usedAt ||
+        verificationToken.expiresAt <= now ||
+        verificationToken.user.emailVerifiedAt
+      ) {
+        throw new BadRequestException(
+          'Verification link is invalid or has expired',
+        );
+      }
+
+      const emailDomain = this.getEmailDomain(verificationToken.user.email);
+      const domainConfiguration =
+        await transaction.organizationEmailDomain.findUnique({
+          where: { domain: emailDomain },
+          select: {
+            organizationId: true,
+            autoJoin: true,
+            organization: {
+              select: {
+                id: true,
+                name: true,
+                status: true,
+              },
+            },
+          },
+        });
+
+      if (
+        !domainConfiguration ||
+        domainConfiguration.organization.status !== 'ACTIVE'
+      ) {
+        throw new BadRequestException(
+          'Verification link is invalid or has expired',
+        );
+      }
+
+      const claimedToken = await transaction.emailVerificationToken.updateMany({
+        where: {
+          id: verificationToken.id,
+          usedAt: null,
+          expiresAt: { gt: now },
+        },
+        data: { usedAt: now },
+      });
+
+      if (claimedToken.count !== 1) {
+        throw new BadRequestException(
+          'Verification link is invalid or has expired',
+        );
+      }
+
+      const allowlistEntries =
+        await transaction.organizationEmailAllowlist.findMany({
+          where: {
+            email: verificationToken.user.email,
+            usedAt: null,
+            organization: {
+              rootOrganizationId: domainConfiguration.organizationId,
+              status: 'ACTIVE',
+            },
+          },
+          select: {
+            id: true,
+            organization: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        });
+
+      const organizationsToJoin = new Map<
+        string,
+        { id: string; name: string }
+      >();
+      if (domainConfiguration.autoJoin) {
+        organizationsToJoin.set(domainConfiguration.organization.id, {
+          id: domainConfiguration.organization.id,
+          name: domainConfiguration.organization.name,
+        });
+      }
+      for (const entry of allowlistEntries) {
+        organizationsToJoin.set(entry.organization.id, entry.organization);
+      }
+
+      for (const organization of organizationsToJoin.values()) {
+        await transaction.organizationMembership.upsert({
+          where: {
+            userId_organizationId: {
+              userId: verificationToken.user.id,
+              organizationId: organization.id,
+            },
+          },
+          create: {
+            userId: verificationToken.user.id,
+            organizationId: organization.id,
+            role: 'MEMBER',
+            status: 'APPROVED',
+          },
+          update: {
+            role: 'MEMBER',
+            status: 'APPROVED',
+            approvedBy: null,
+          },
+        });
+      }
+
+      if (allowlistEntries.length > 0) {
+        await transaction.organizationEmailAllowlist.updateMany({
+          where: {
+            id: { in: allowlistEntries.map((entry) => entry.id) },
+            usedAt: null,
+          },
+          data: { usedAt: now },
+        });
+      }
+
+      const user = await transaction.user.update({
+        where: { id: verificationToken.user.id },
+        data: { emailVerifiedAt: now },
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          status: true,
+          emailVerifiedAt: true,
+        },
+      });
+
+      return {
+        message: 'Email verified. You can now sign in.',
+        user: {
+          ...user,
+          emailVerified: true,
+          organizations: [...organizationsToJoin.values()].map(
+            (organization) => ({
+              ...organization,
+              role: 'MEMBER',
+              status: 'APPROVED',
+            }),
+          ),
+        },
+      };
+    });
+  }
+
   private getEmailDomain(email: string): string {
     const separatorIndex = email.lastIndexOf('@');
     if (separatorIndex <= 0 || separatorIndex === email.length - 1) {

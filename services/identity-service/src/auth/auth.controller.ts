@@ -13,6 +13,7 @@ import { Response } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { VerifyEmailDto } from './dto/verify-email.dto';
 import { AuthenticatedRequest, JwtAuthGuard } from './jwt-auth.guard';
 
 @Controller('auth')
@@ -22,6 +23,12 @@ export class AuthController {
   @Post('register')
   async register(@Body() registration: RegisterDto) {
     return this.authService.register(registration);
+  }
+
+  @Post('verify-email')
+  @HttpCode(HttpStatus.OK)
+  async verifyEmail(@Body() verification: VerifyEmailDto) {
+    return this.authService.verifyEmail(verification.token);
   }
 
   @Post('login')
