@@ -2,6 +2,7 @@
 
 import { useMemo, useSyncExternalStore } from "react";
 
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -56,6 +57,19 @@ export default function DashboardPage() {
                 <dd>{signup.user.emailVerified ? "Yes" : "No"}</dd>
                 <dt>Organization</dt>
                 <dd>{signup.user.organization.name}</dd>
+                {signup.developmentVerificationUrl && (
+                  <>
+                    <dt>Development verification</dt>
+                    <dd>
+                      <Button
+                        nativeButton={false}
+                        render={<a href={signup.developmentVerificationUrl} />}
+                      >
+                        Verify email
+                      </Button>
+                    </dd>
+                  </>
+                )}
               </dl>
             ) : (
               <p>No signup details are available in this browser session.</p>

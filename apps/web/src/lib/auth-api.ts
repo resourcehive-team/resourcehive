@@ -38,6 +38,25 @@ export interface RegistrationResponse {
   user: RegisteredUser;
 }
 
+export interface EmailVerificationResponse {
+  message: string;
+  user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    status: string;
+    emailVerifiedAt: string;
+    emailVerified: true;
+    organizations: Array<{
+      id: string;
+      name: string;
+      role: string;
+      status: string;
+    }>;
+  };
+}
+
 export class LoginError extends Error {
   constructor(message: string) {
     super(message);
@@ -49,6 +68,13 @@ export class RegistrationError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "RegistrationError";
+  }
+}
+
+export class EmailVerificationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "EmailVerificationError";
   }
 }
 
@@ -132,6 +158,43 @@ export async function register(
   return data;
 }
 
+export async function verifyEmail(
+  token: string,
+): Promise<EmailVerificationResponse> {
+  let response: Response;
+
+  try {
+    response = await fetch(`${identityApiUrl}/auth/verify-email`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ token }),
+      cache: "no-store",
+    });
+  } catch {
+    throw new EmailVerificationError(
+      "Unable to connect to the email verification service.",
+    );
+  }
+
+  const data: unknown = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    throw new EmailVerificationError(
+      getApiErrorMessage(data, "Unable to verify this email address."),
+    );
+  }
+
+  if (!isEmailVerificationResponse(data)) {
+    throw new EmailVerificationError(
+      "The email verification service returned an invalid response.",
+    );
+  }
+
+  return data;
+}
+
 function getApiErrorMessage(data: unknown, fallback: string): string {
   if (!data || typeof data !== "object" || !("message" in data)) {
     return fallback;
@@ -189,5 +252,33 @@ function isRegistrationResponse(data: unknown): data is RegistrationResponse {
     typeof user.organization.id === "string" &&
     "name" in user.organization &&
     typeof user.organization.name === "string"
+  );
+}
+
+function isEmailVerificationResponse(
+  data: unknown,
+): data is EmailVerificationResponse {
+  if (
+    !data ||
+    typeof data !== "object" ||
+    !("message" in data) ||
+    typeof data.message !== "string" ||
+    !("user" in data) ||
+    !data.user ||
+    typeof data.user !== "object"
+  ) {
+    return false;
+  }
+
+  const user = data.user;
+  return (
+    "id" in user &&
+    typeof user.id === "string" &&
+    "email" in user &&
+    typeof user.email === "string" &&
+    "emailVerified" in user &&
+    user.emailVerified === true &&
+    "organizations" in user &&
+    Array.isArray(user.organizations)
   );
 }
