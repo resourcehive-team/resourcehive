@@ -12,14 +12,17 @@ import {
 import { Response } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
-import {
-  AuthenticatedRequest,
-  JwtAuthGuard,
-} from './jwt-auth.guard';
+import { RegisterDto } from './dto/register.dto';
+import { AuthenticatedRequest, JwtAuthGuard } from './jwt-auth.guard';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
+  @Post('register')
+  async register(@Body() registration: RegisterDto) {
+    return this.authService.register(registration);
+  }
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
