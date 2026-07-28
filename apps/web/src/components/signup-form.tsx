@@ -1,6 +1,8 @@
 "use client";
 
+import { useState, type FormEvent } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -13,16 +15,62 @@ import {
 import {
   Field,
   FieldDescription,
+  FieldError,
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { register, RegistrationError } from "@/lib/auth-api";
+import { storeSignupDebugData } from "@/lib/auth-storage";
 import { cn } from "@/lib/utils";
 
 export function SignupForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
+  const router = useRouter();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (isSubmitting) {
+      return;
+    }
+
+    setError("");
+    const formData = new FormData(event.currentTarget);
+    const password = String(formData.get("password") ?? "");
+    const confirmPassword = String(formData.get("confirmPassword") ?? "");
+
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const response = await register({
+        firstName: String(formData.get("firstName") ?? ""),
+        lastName: String(formData.get("lastName") ?? ""),
+        email: String(formData.get("email") ?? ""),
+        password,
+      });
+      storeSignupDebugData(response);
+      router.replace("/dashboard");
+    } catch (registrationError) {
+      setError(
+        registrationError instanceof RegistrationError
+          ? registrationError.message
+          : "Unable to create your account. Please try again.",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
@@ -33,7 +81,7 @@ export function SignupForm({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form>
+          <form onSubmit={handleSubmit}>
             <FieldGroup>
               <Field>
                 <FieldLabel htmlFor="firstName">First name</FieldLabel>
@@ -96,7 +144,10 @@ export function SignupForm({
                 />
               </Field>
               <Field>
-                <Button type="submit">Create account</Button>
+                <FieldError>{error}</FieldError>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? "Creating account..." : "Create account"}
+                </Button>
                 <FieldDescription className="text-center">
                   Already have an account? <Link href="/login">Log in</Link>
                 </FieldDescription>
