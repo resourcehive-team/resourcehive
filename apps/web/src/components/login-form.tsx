@@ -1,60 +1,62 @@
-"use client"
+"use client";
 
-import { useState, type FormEvent } from "react"
-import { useRouter } from "next/navigation"
+import { useState, type FormEvent } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 
-import { login, LoginError } from "@/lib/auth-api"
-import { storeAccessToken } from "@/lib/auth-storage"
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
+import { login, LoginError } from "@/lib/auth-api";
+import { storeAccessToken } from "@/lib/auth-storage";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
+} from "@/components/ui/card";
 import {
   Field,
+  FieldDescription,
   FieldGroup,
   FieldLabel,
-} from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+} from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 
 export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
-  const router = useRouter()
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState("")
+  const router = useRouter();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState("");
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
+    event.preventDefault();
 
     if (isSubmitting) {
-      return
+      return;
     }
 
-    setIsSubmitting(true)
-    setError("")
+    setIsSubmitting(true);
+    setError("");
 
-    const formData = new FormData(event.currentTarget)
-    const email = String(formData.get("email") ?? "")
-    const password = String(formData.get("password") ?? "")
+    const formData = new FormData(event.currentTarget);
+    const email = String(formData.get("email") ?? "");
+    const password = String(formData.get("password") ?? "");
 
     try {
-      const response = await login({ email, password })
-      storeAccessToken(response.token)
-      router.replace("/")
+      const response = await login({ email, password });
+      storeAccessToken(response.token);
+      router.replace("/");
     } catch (loginError) {
       setError(
         loginError instanceof LoginError
           ? loginError.message
           : "Unable to log in. Please try again.",
-      )
+      );
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
   }
 
@@ -100,11 +102,15 @@ export function LoginForm({
                 <Button type="submit" disabled={isSubmitting}>
                   {isSubmitting ? "Logging in..." : "Login"}
                 </Button>
+                <FieldDescription className="text-center">
+                  Don&apos;t have an account?{" "}
+                  <Link href="/signup">Sign up</Link>
+                </FieldDescription>
               </Field>
             </FieldGroup>
           </form>
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

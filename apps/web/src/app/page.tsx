@@ -33,6 +33,13 @@ export default function Home() {
             <Button nativeButton={false} render={<Link href="/login" />}>
               Login
             </Button>
+            <Button
+              variant="outline"
+              nativeButton={false}
+              render={<Link href="/signup" />}
+            >
+              Sign up
+            </Button>
           </div>
         </nav>
       </header>
@@ -45,20 +52,14 @@ export default function Home() {
             students borrow them.
           </p>
           <div className="flex gap-2">
-            <Button
-              nativeButton={false}
-              render={<a href="#resources" />}
-            >
+            <Button nativeButton={false} render={<a href="#resources" />}>
               See resources
             </Button>
             <Button variant="outline">Add resource</Button>
           </div>
         </section>
 
-        <section
-          className="container mx-auto grid gap-4 py-8"
-          id="resources"
-        >
+        <section className="container mx-auto grid gap-4 py-8" id="resources">
           <h2>Resources</h2>
 
           <div className="grid gap-4 md:grid-cols-3">
@@ -70,9 +71,7 @@ export default function Home() {
                   <CardDescription>Owner: {resource.owner}</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Badge
-                    variant={resource.available ? "default" : "secondary"}
-                  >
+                  <Badge variant={resource.available ? "default" : "secondary"}>
                     {resource.available ? "Available" : "Not available"}
                   </Badge>
                 </CardContent>
