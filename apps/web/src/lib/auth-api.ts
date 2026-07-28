@@ -222,6 +222,8 @@ function isRegistrationResponse(data: unknown): data is RegistrationResponse {
     typeof data.message !== "string" ||
     !("verificationRequired" in data) ||
     data.verificationRequired !== true ||
+    ("developmentVerificationUrl" in data &&
+      typeof data.developmentVerificationUrl !== "string") ||
     !("user" in data) ||
     !data.user ||
     typeof data.user !== "object"
