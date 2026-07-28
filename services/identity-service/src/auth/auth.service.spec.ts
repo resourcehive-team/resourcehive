@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '@resourcehive/database';
 import * as bcrypt from 'bcrypt';
+import { EmailService } from '../email/email.service';
 import { AuthService } from './auth.service';
 
 interface CreateUserRequest {
@@ -59,7 +60,11 @@ describe('AuthService registration', () => {
     user,
     $transaction: runTransaction,
   } as unknown as PrismaService;
-  const service = new AuthService(prisma, new JwtService());
+  const sendVerificationEmail = jest.fn();
+  const emailService = {
+    sendVerificationEmail,
+  } as unknown as EmailService;
+  const service = new AuthService(prisma, new JwtService(), emailService);
   const originalBcryptRounds = process.env.BCRYPT_ROUNDS;
 
   beforeAll(() => {
@@ -85,6 +90,9 @@ describe('AuthService registration', () => {
       createdAt: new Date('2026-07-28T00:00:00.000Z'),
     });
     emailVerificationToken.create.mockResolvedValue({ id: 'token-id' });
+    sendVerificationEmail.mockResolvedValue({
+      developmentVerificationUrl: 'verification-url',
+    });
   });
 
   afterAll(() => {
@@ -125,6 +133,7 @@ describe('AuthService registration', () => {
     );
     expect(result).toMatchObject({
       verificationRequired: true,
+      developmentVerificationUrl: 'verification-url',
       user: {
         id: 'user-id',
         email: 'alex@example.edu',
@@ -135,6 +144,10 @@ describe('AuthService registration', () => {
         },
       },
     });
+    expect(sendVerificationEmail).toHaveBeenCalledWith(
+      'alex@example.edu',
+      expect.any(String),
+    );
   });
 
   it('rejects an email without a configured organization domain', async () => {

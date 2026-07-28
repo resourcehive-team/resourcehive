@@ -9,6 +9,7 @@ import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '@resourcehive/database';
 import * as bcrypt from 'bcrypt';
 import { createHash, randomBytes } from 'node:crypto';
+import { EmailService } from '../email/email.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 
@@ -20,6 +21,7 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
+    private readonly emailService: EmailService,
   ) {}
 
   private getJwtSecret() {
@@ -106,10 +108,15 @@ export class AuthService {
 
       return createdUser;
     });
+    const emailResult = await this.emailService.sendVerificationEmail(
+      email,
+      verificationToken,
+    );
 
     return {
       message: 'Account created. Verify your email to continue.',
       verificationRequired: true,
+      ...emailResult,
       user: {
         ...user,
         emailVerified: false,
