@@ -1,10 +1,8 @@
 # Notification Service API Contract Proposal
 
-Status: **proposed; Person C approval is required before these public paths or
-response conventions are implemented.**
+Status: **approved by Person C for Week 3 implementation.**
 
-Week 2 implements persistence only. Notification read endpoints are scheduled
-for Week 3 and are not exposed as placeholders.
+Week 2 implemented persistence. Week 3 implements the approved read endpoints.
 
 ## Common rules
 
@@ -68,7 +66,6 @@ Expected responses: `200`, `401`, `404`, `500`.
 
 The public representation does not need to return the recipient user ID.
 
-## Approval questions
-
-Person C must approve the common pagination/error envelopes, JWT identity
-claims, read-all path semantics, and whether inaccessible records return `404`.
+`PATCH /notifications/read-all` returns the number of records changed.
+Inaccessible records return `404` without revealing whether another user owns
+the supplied identifier.

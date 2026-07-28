@@ -1,10 +1,10 @@
 # Booking Service API Contract Proposal
 
-Status: **proposed; Person C approval is required before these public paths or
-response conventions are implemented.**
+Status: **approved by Person C for Week 3 implementation.**
 
-This document defines the intended HTTP surface. Week 2 implements only the
-slot data-access layer; it does not expose placeholder business endpoints.
+This document defines the agreed HTTP surface. Week 3 implements the slot
+endpoints while later booking and public points endpoints remain scheduled for
+their stated milestones.
 
 ## Common rules
 
@@ -53,6 +53,9 @@ access. Results are ordered by `startsAt`, then slot ID.
 
 Expected responses: `200`, `400`, `401`, `403`, `404`, `500`.
 
+Each returned slot includes an `available` boolean. It is `true` only when the
+resource is active, the slot has not ended, and no non-cancelled booking exists.
+
 ## Slot create proposal
 
 `POST /slots`
@@ -92,13 +95,10 @@ constraint remains the final concurrency protection.
 
 Expected responses: `201`, `400`, `401`, `403`, `404`, `409`, `422`, `500`.
 
-## Approval questions
+## Week 3 internal point ledger boundary
 
-Person C must approve:
-
-- `/slots` as a Booking Service public prefix in addition to `/bookings` and
-  `/points`;
-- the common error and pagination envelopes;
-- the JWT claims used for user and root-tenant identity;
-- the idempotency-key convention;
-- whether cancellation/completion use action endpoints or status updates.
+Week 3 adds no public points endpoint. Booking Service provides an internal
+append-only ledger abstraction that can calculate a user's balance, assert
+sufficient points, and append a booking deduction using a caller-supplied
+Prisma transaction client. Week 5 booking creation will use that client so the
+booking and deduction share one PostgreSQL transaction.

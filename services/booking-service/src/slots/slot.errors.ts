@@ -4,3 +4,15 @@ export class SlotResourceNotFoundError extends Error {
     this.name = "SlotResourceNotFoundError";
   }
 }
+
+export class SlotNotFoundError extends Error {
+  constructor() {
+    super("Slot not found");
+  }
+}
+
+export class SlotAccessDeniedError extends Error {
+  constructor() {
+    super("The authenticated user cannot access this resource");
+  }
+}

@@ -57,6 +57,30 @@ describeWithDatabase("Notification persistence integration", () => {
     await expect(
       service.findByIdForUser(notification.id, otherUserId),
     ).resolves.toBeNull();
+
+    await expect(
+      repository.findManyForUser({
+        userId: recipientId,
+        unreadOnly: true,
+      }),
+    ).resolves.toEqual([expect.objectContaining({ id: notification.id })]);
+
+    await expect(
+      repository.markReadForUser({
+        notificationId: notification.id,
+        userId: otherUserId,
+      }),
+    ).resolves.toBeNull();
+
+    const marked = await repository.markReadForUser({
+      notificationId: notification.id,
+      userId: recipientId,
+    });
+    expect(marked).toMatchObject({
+      id: notification.id,
+      userId: recipientId,
+    });
+    expect(marked?.readAt).toBeInstanceOf(Date);
   });
 
   afterAll(async () => {
