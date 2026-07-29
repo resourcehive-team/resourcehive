@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { Prisma } from "@resourcehive/database";
 import { AuthenticatedUser } from "@resourcehive/service-auth";
 import { BookingAuthorizationService } from "../authorization/booking-authorization.service";
 import { PointLedgerService } from "../points/point-ledger.service";
@@ -24,23 +25,36 @@ export class BookingValidationService {
   async validate(
     resourceSlotId: string,
     user: AuthenticatedUser,
+    client?: Prisma.TransactionClient,
   ): Promise<ValidatedBookingContext> {
-    const context = await this.authorization.resolve(user);
-    const slot = await this.slots.findById({
+    const context = client
+      ? await this.authorization.resolve(user, client)
+      : await this.authorization.resolve(user);
+    const slotLookup = {
       slotId: resourceSlotId,
       rootOrganizationId: context.rootOrganizationId,
-    });
+    };
+    const slot = client
+      ? await this.slots.findById(slotLookup, client)
+      : await this.slots.findById(slotLookup);
 
     if (!slot) throw new BookingSlotNotFoundError();
     if (slot.resource.status !== "ACTIVE") {
       throw new BookingResourceInactiveError();
     }
 
-    const canAccess = await this.slots.canAccessResource(
-      slot.resourceId,
-      context.userId,
-      context.rootOrganizationId,
-    );
+    const canAccess = client
+      ? await this.slots.canAccessResource(
+          slot.resourceId,
+          context.userId,
+          context.rootOrganizationId,
+          client,
+        )
+      : await this.slots.canAccessResource(
+          slot.resourceId,
+          context.userId,
+          context.rootOrganizationId,
+        );
     if (!canAccess) throw new BookingResourceAccessDeniedError();
     if (slot.startsAt <= new Date()) throw new BookingSlotStartedError();
     if (slot.bookings.length > 0) throw new BookingSlotUnavailableError();
@@ -51,10 +65,18 @@ export class BookingValidationService {
       throw new BookingPointCostInvalidError();
     }
 
-    await this.points.assertSufficientBalance(
-      context.userId,
-      slot.resource.pointCost,
-    );
+    if (client) {
+      await this.points.assertSufficientBalance(
+        context.userId,
+        slot.resource.pointCost,
+        client,
+      );
+    } else {
+      await this.points.assertSufficientBalance(
+        context.userId,
+        slot.resource.pointCost,
+      );
+    }
 
     return {
       userId: context.userId,

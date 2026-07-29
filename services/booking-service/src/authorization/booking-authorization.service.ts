@@ -1,5 +1,5 @@
 import { Injectable, UnauthorizedException } from "@nestjs/common";
-import { PrismaService } from "@resourcehive/database";
+import { Prisma, PrismaService } from "@resourcehive/database";
 import { AuthenticatedUser } from "@resourcehive/service-auth";
 import { BookingAuthorizationContext } from "./booking-authorization.types";
 
@@ -7,11 +7,15 @@ import { BookingAuthorizationContext } from "./booking-authorization.types";
 export class BookingAuthorizationService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async resolve(user: AuthenticatedUser): Promise<BookingAuthorizationContext> {
+  async resolve(
+    user: AuthenticatedUser,
+    client: Pick<Prisma.TransactionClient, "organizationMembership"> = this
+      .prisma,
+  ): Promise<BookingAuthorizationContext> {
     if (!user.organizationId) {
       throw new UnauthorizedException("An active organization is required");
     }
-    const membership = await this.prisma.organizationMembership.findFirst({
+    const membership = await client.organizationMembership.findFirst({
       where: {
         userId: user.userId,
         organizationId: user.organizationId,
