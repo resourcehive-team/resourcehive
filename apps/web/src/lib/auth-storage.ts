@@ -75,6 +75,28 @@ export function storeSignupDebugData(data: RegistrationResponse) {
   sessionStorage.setItem(signupDebugDataKey, JSON.stringify(data));
 }
 
+export function markSignupEmailVerified(verifiedEmail: string) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const signup = parseSignupDebugData(getSignupDebugDataSnapshot());
+  if (
+    !signup ||
+    signup.user.email.toLowerCase() !== verifiedEmail.toLowerCase()
+  ) {
+    return;
+  }
+
+  storeSignupDebugData({
+    ...signup,
+    user: {
+      ...signup.user,
+      emailVerified: true,
+    },
+  });
+}
+
 export function getSignupDebugDataSnapshot(): string | null {
   return sessionStorage.getItem(signupDebugDataKey);
 }
