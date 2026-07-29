@@ -1,0 +1,128 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import { INestApplication } from '@nestjs/common';
+import request from 'supertest';
+import { App } from 'supertest/types';
+import { AppModule } from '../../src/app.module';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
+import { PrismaService } from '@resourcehive/database';
+
+describe('MembershipsController (e2e)', () => {
+  let app: INestApplication<App>;
+  let jwtToken: string;
+
+  const demoUserId = '00000000-0000-4000-8000-000000000001';
+  const demoOrganizationId = '00000000-0000-4000-8000-000000000002';
+
+  beforeAll(async () => {
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
+
+    app = moduleFixture.createNestApplication();
+    await app.init();
+
+    const configService = app.get(ConfigService);
+    const secret = configService.get<string>('JWT_SECRET') || 'development-only-resourcehive-secret-change-before-production';
+    const jwtService = app.get(JwtService);
+    
+    jwtToken = jwtService.sign({
+      sub: demoUserId,
+      email: 'demo@example.edu',
+      organizationId: demoOrganizationId,
+      role: 'member',
+    }, { secret });
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it('gets my memberships', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/memberships/my-memberships')
+      .set('Authorization', `Bearer ${jwtToken}`)
+      .expect(200);
+    
+    expect(Array.isArray(response.body)).toBe(true);
+  });
+
+  it('gets members of the demo organization', async () => {
+    const response = await request(app.getHttpServer())
+      .get(`/memberships/organization/${demoOrganizationId}`)
+      .set('Authorization', `Bearer ${jwtToken}`)
+      .expect(200);
+
+    expect(Array.isArray(response.body)).toBe(true);
+  });
+
+  it('rejects access if user is not a member of the organization (Cross-Tenant check)', async () => {
+    const randomOrgId = '00000000-0000-4000-8000-000000000999';
+    
+    await request(app.getHttpServer())
+      .get(`/memberships/organization/${randomOrgId}`)
+      .set('Authorization', `Bearer ${jwtToken}`)
+      .expect(403);
+  });
+
+  it('approves a membership request', async () => {
+    const targetUserId = '00000000-0000-4000-8000-000000000888';
+    const prisma = app.get(PrismaService);
+
+    // Create or update a dummy user to satisfy foreign key constraints
+    await prisma.user.upsert({
+      where: { id: targetUserId },
+      update: {},
+      create: {
+        id: targetUserId,
+        email: 'target-approve-test@example.edu',
+        passwordHash: 'dummyhash',
+        firstName: 'Target',
+        lastName: 'User'
+      }
+    });
+
+    const jwtService = app.get(JwtService);
+    const configService = app.get(ConfigService);
+    const secret = configService.get<string>('JWT_SECRET') || 'development-only-resourcehive-secret-change-before-production';
+
+    // Generate JWT for the target user
+    const targetJwtToken = jwtService.sign({
+      sub: targetUserId,
+      email: 'target-approve-test@example.edu',
+      organizationId: demoOrganizationId,
+      role: 'member',
+    }, { secret });
+
+    // Delete any leftover membership from previous failed test runs
+    await prisma.organizationMembership.deleteMany({
+      where: { userId: targetUserId }
+    });
+
+    // Target user requests membership
+    await request(app.getHttpServer())
+      .post(`/memberships/${demoOrganizationId}/request`)
+      .set('Authorization', `Bearer ${targetJwtToken}`)
+      .expect(201); 
+
+    // Ensure the approving user (demoUserId) has ADMIN role in DB
+    await prisma.organizationMembership.update({
+      where: { userId_organizationId: { userId: demoUserId, organizationId: demoOrganizationId } },
+      data: { role: 'ADMIN' }
+    });
+
+    // Admin user (demoUserId) approves the membership
+    await request(app.getHttpServer())
+      .patch(`/memberships/organization/${demoOrganizationId}/users/${targetUserId}/approve`)
+      .set('Authorization', `Bearer ${jwtToken}`)
+      .expect(200);
+      
+    // Cleanup
+    await prisma.organizationMembership.deleteMany({
+      where: { userId: targetUserId }
+    });
+    await prisma.user.delete({
+      where: { id: targetUserId }
+    });
+  }, 15000);
+});
