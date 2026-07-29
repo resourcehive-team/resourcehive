@@ -10,6 +10,9 @@ services:
       - "8000:80"
     depends_on:
       - identity-service
+      - resource-service
+      - booking-service
+      - notification-service
 
   identity-service:
     build:
@@ -19,6 +22,7 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: ${DATABASE_URL}
+      DATABASE_URL_UNPOOLED: ${DATABASE_URL_UNPOOLED}
       JWT_SECRET: ${JWT_SECRET}
       PORT: 3000
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
@@ -30,3 +34,42 @@ services:
       "
     ports:
       - "3001:3000"
+
+  resource-service:
+    build:
+      context: .
+      dockerfile: services/resource-service/Dockerfile
+    container_name: resourcehive-resource
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      PORT: 3004
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      NODE_ENV: development
+
+  booking-service:
+    build:
+      context: .
+      dockerfile: services/booking-service/Dockerfile
+    container_name: resourcehive-booking
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      PORT: 3002
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      NODE_ENV: development
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: services/notification-service/Dockerfile
+    container_name: resourcehive-notification
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      PORT: 3003
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      NODE_ENV: development
