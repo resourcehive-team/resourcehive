@@ -87,6 +87,7 @@ describe("SlotRepository", () => {
       where: {
         id: "resource-id",
         rootOrganizationId: "tenant-id",
+        status: "ACTIVE",
       },
       select: { id: true },
     });

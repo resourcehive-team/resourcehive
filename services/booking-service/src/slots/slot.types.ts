@@ -33,4 +33,14 @@ export interface SlotRecord {
     ownerOrganizationId: string;
     pointCost: number;
   };
+  bookings: { id: string }[];
+}
+
+export interface SlotView {
+  id: string;
+  resourceId: string;
+  startsAt: Date;
+  endsAt: Date;
+  createdAt: Date;
+  available: boolean;
 }

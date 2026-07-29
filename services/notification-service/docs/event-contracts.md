@@ -1,7 +1,6 @@
 # Notification Event Consumption Proposal
 
-Status: **proposed; Person C approval is required before this becomes a shared
-contract.**
+Status: **approved by Person C.**
 
 The Notification Service is the intended consumer of the versioned Booking
 events documented by the Booking Service. Week 2 implements only the

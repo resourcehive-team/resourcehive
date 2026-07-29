@@ -1,7 +1,6 @@
 # Booking Event Contract Proposal
 
-Status: **proposed; Person C approval is required before this becomes a shared
-contract.**
+Status: **approved by Person C.**
 
 The contract is transport-neutral. Week 2 does not add Redis, a message broker,
 WebSockets, or delivery infrastructure.
@@ -69,7 +68,5 @@ The booking transaction must not depend on real-time or email delivery.
 Persistence/delivery failures are recorded and retried by the notification
 workflow when that workflow is implemented.
 
-## Approval questions
-
-Person C must approve the shared event location, correlation convention, JWT
-identity mapping, transport choice, retry ownership, and retention policy.
+Transport, retry ownership, and retention remain delivery decisions for the
+later notification-delivery milestone; Week 3 does not introduce a broker.
