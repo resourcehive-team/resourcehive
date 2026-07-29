@@ -1,9 +1,10 @@
-import { Controller, Get, Post, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Param, UseGuards, Patch } from '@nestjs/common';
 import { MembershipsService } from './memberships.service';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { TenantGuard } from '../auth/tenant.guard';
+import { AdminGuard } from '../auth/admin.guard';
 
 @ApiTags('Memberships')
 @ApiBearerAuth()
@@ -19,6 +20,28 @@ export class MembershipsController {
     @CurrentUser() user: any,
   ) {
     return this.membershipsService.requestMembership(user.userId, orgId);
+  }
+
+  @UseGuards(TenantGuard, AdminGuard)
+  @Patch('organization/:organizationId/users/:userId/approve')
+  @ApiOperation({ summary: 'Approve a membership request' })
+  approveMembership(
+    @Param('organizationId') orgId: string,
+    @Param('userId') targetUserId: string,
+    @CurrentUser() user: any
+  ) {
+    return this.membershipsService.updateMembershipStatus(targetUserId, orgId, 'APPROVED', user.userId);
+  }
+
+  @UseGuards(TenantGuard, AdminGuard)
+  @Patch('organization/:organizationId/users/:userId/reject')
+  @ApiOperation({ summary: 'Reject a membership request' })
+  rejectMembership(
+    @Param('organizationId') orgId: string,
+    @Param('userId') targetUserId: string,
+    @CurrentUser() user: any
+  ) {
+    return this.membershipsService.updateMembershipStatus(targetUserId, orgId, 'REJECTED', user.userId);
   }
 
   @Get('my-memberships')

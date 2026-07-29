@@ -1,4 +1,4 @@
-import { Injectable, ConflictException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@resourcehive/database';
 
 @Injectable()
@@ -22,6 +22,20 @@ export class MembershipsService {
         status: 'PENDING',
         role: 'MEMBER'
       },
+    });
+  }
+
+  // for updating membership status (approve/reject)
+  async updateMembershipStatus(userId: string, organizationId: string, status: string, approvedByUserId: string) {
+    const membership = await this.prisma.organizationMembership.findUnique({
+      where: { userId_organizationId: { userId, organizationId } }
+    });
+    if (!membership) {
+      throw new NotFoundException('Membership request not found');
+    }
+    return this.prisma.organizationMembership.update({
+      where: { userId_organizationId: { userId, organizationId } },
+      data: { status, approvedBy: approvedByUserId },
     });
   }
 
