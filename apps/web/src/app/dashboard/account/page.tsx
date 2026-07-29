@@ -1,4 +1,5 @@
 import { AccountProfileCard } from "@/components/account-profile-card";
+import { AccountStatusCard } from "@/components/account-status-card";
 import { SiteHeader } from "@/components/site-header";
 import {
   Card,
@@ -25,8 +26,9 @@ export default function AccountPage() {
               <TabsTrigger value="membership">Membership</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="profile">
+            <TabsContent value="profile" className="grid gap-4">
               <AccountProfileCard />
+              <AccountStatusCard />
             </TabsContent>
 
             <TabsContent value="membership">
