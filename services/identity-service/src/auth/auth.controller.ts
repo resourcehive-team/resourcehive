@@ -31,6 +31,12 @@ export class AuthController {
     return this.authService.verifyEmail(verification.token);
   }
 
+  @Post('verification-status')
+  @HttpCode(HttpStatus.OK)
+  async getVerificationStatus(@Body() verification: VerifyEmailDto) {
+    return this.authService.getEmailVerificationStatus(verification.token);
+  }
+
   @Post('login')
   @HttpCode(HttpStatus.OK)
   async login(@Body() loginData: LoginDto) {

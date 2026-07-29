@@ -22,6 +22,7 @@ interface UpdateUserRequest {
 }
 
 describe('AuthService email verification', () => {
+  const findVerificationStatusToken = jest.fn();
   const findVerificationToken = jest.fn<
     Promise<unknown>,
     [FindVerificationTokenRequest]
@@ -61,6 +62,9 @@ describe('AuthService email verification', () => {
       callback(transaction),
   );
   const prisma = {
+    emailVerificationToken: {
+      findUnique: findVerificationStatusToken,
+    },
     $transaction: runTransaction,
   } as unknown as PrismaService;
   const service = new AuthService(prisma, new JwtService(), {} as EmailService);
@@ -77,6 +81,13 @@ describe('AuthService email verification', () => {
         firstName: 'Alex',
         lastName: 'Student',
         status: 'ACTIVE',
+        emailVerifiedAt: null,
+      },
+    });
+    findVerificationStatusToken.mockResolvedValue({
+      usedAt: null,
+      expiresAt: new Date(Date.now() + 60_000),
+      user: {
         emailVerifiedAt: null,
       },
     });
@@ -233,5 +244,29 @@ describe('AuthService email verification', () => {
       service.verifyEmail('verification-token'),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(upsertMembership).not.toHaveBeenCalled();
+  });
+
+  it('reports the database-backed verification status', async () => {
+    await expect(
+      service.getEmailVerificationStatus('verification-token'),
+    ).resolves.toEqual({
+      status: 'PENDING',
+      emailVerified: false,
+    });
+
+    findVerificationStatusToken.mockResolvedValue({
+      usedAt: new Date(),
+      expiresAt: new Date(Date.now() - 60_000),
+      user: {
+        emailVerifiedAt: new Date(),
+      },
+    });
+
+    await expect(
+      service.getEmailVerificationStatus('verification-token'),
+    ).resolves.toEqual({
+      status: 'VERIFIED',
+      emailVerified: true,
+    });
   });
 });

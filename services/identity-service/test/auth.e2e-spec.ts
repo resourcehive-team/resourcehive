@@ -125,6 +125,17 @@ describe('Authentication Flow (e2e)', () => {
     expect(verificationToken).not.toBe('');
   });
 
+  it('reports the signup verification as pending', async () => {
+    await request(app.getHttpServer())
+      .post('/auth/verification-status')
+      .send({ token: verificationToken })
+      .expect(200)
+      .expect({
+        status: 'PENDING',
+        emailVerified: false,
+      });
+  });
+
   it('verifies the signup and creates the approved root membership', async () => {
     const response = await request(app.getHttpServer())
       .post('/auth/verify-email')
@@ -180,6 +191,17 @@ describe('Authentication Flow (e2e)', () => {
         ],
       },
     });
+  });
+
+  it('reports the signup verification as verified from the database', async () => {
+    await request(app.getHttpServer())
+      .post('/auth/verification-status')
+      .send({ token: verificationToken })
+      .expect(200)
+      .expect({
+        status: 'VERIFIED',
+        emailVerified: true,
+      });
   });
 
   afterAll(async () => {

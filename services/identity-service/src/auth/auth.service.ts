@@ -384,6 +384,45 @@ export class AuthService {
     });
   }
 
+  async getEmailVerificationStatus(token: string) {
+    const verificationToken =
+      await this.prisma.emailVerificationToken.findUnique({
+        where: { tokenHash: this.hashToken(token) },
+        select: {
+          usedAt: true,
+          expiresAt: true,
+          user: {
+            select: {
+              emailVerifiedAt: true,
+            },
+          },
+        },
+      });
+
+    if (!verificationToken) {
+      throw new BadRequestException('Verification link is invalid');
+    }
+
+    if (verificationToken.user.emailVerifiedAt) {
+      return {
+        status: 'VERIFIED' as const,
+        emailVerified: true,
+      };
+    }
+
+    if (verificationToken.usedAt || verificationToken.expiresAt <= new Date()) {
+      return {
+        status: 'EXPIRED' as const,
+        emailVerified: false,
+      };
+    }
+
+    return {
+      status: 'PENDING' as const,
+      emailVerified: false,
+    };
+  }
+
   private getEmailDomain(email: string): string {
     const separatorIndex = email.lastIndexOf('@');
     if (separatorIndex <= 0 || separatorIndex === email.length - 1) {
