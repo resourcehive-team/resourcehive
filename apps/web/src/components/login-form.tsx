@@ -51,6 +51,7 @@ export function LoginForm({
       await login({ email, password });
       markSignupEmailVerified(email);
       router.replace(redirectTo);
+      router.refresh();
     } catch (loginError) {
       setError(
         loginError instanceof LoginError

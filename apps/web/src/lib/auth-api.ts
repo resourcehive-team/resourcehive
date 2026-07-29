@@ -9,6 +9,24 @@ export interface LoginResponse {
   message: "user login successfully";
 }
 
+export interface CurrentUserResponse {
+  user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    displayName: string;
+    emailVerified: boolean;
+    status: string;
+    platformRole: string;
+    createdAt: string;
+  };
+  organizationContext: {
+    organizationId: string | null;
+    role: string | null;
+  };
+}
+
 export interface RegistrationRequest {
   firstName: string;
   lastName: string;
@@ -65,6 +83,13 @@ export class LoginError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "LoginError";
+  }
+}
+
+export class AuthenticationRequiredError extends Error {
+  constructor() {
+    super("Your session has expired. Log in again.");
+    this.name = "AuthenticationRequiredError";
   }
 }
 
@@ -135,6 +160,37 @@ export async function logout(): Promise<void> {
   if (!response.ok) {
     throw new Error("Unable to log out. Please try again.");
   }
+}
+
+export async function getCurrentUser(
+  signal?: AbortSignal,
+): Promise<CurrentUserResponse> {
+  let response: Response;
+
+  try {
+    response = await fetch(`${identityApiUrl}/auth/me`, {
+      credentials: "include",
+      cache: "no-store",
+      signal,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw error;
+    }
+
+    throw new Error("Unable to load the current user.");
+  }
+
+  if (response.status === 401) {
+    throw new AuthenticationRequiredError();
+  }
+
+  const data: unknown = await response.json().catch(() => null);
+  if (!response.ok || !isCurrentUserResponse(data)) {
+    throw new Error("The identity service returned an invalid user.");
+  }
+
+  return data;
 }
 
 export async function register(
@@ -259,6 +315,51 @@ function getApiErrorMessage(data: unknown, fallback: string): string {
   }
 
   return fallback;
+}
+
+function isCurrentUserResponse(data: unknown): data is CurrentUserResponse {
+  if (
+    !data ||
+    typeof data !== "object" ||
+    !("user" in data) ||
+    !data.user ||
+    typeof data.user !== "object" ||
+    !("organizationContext" in data) ||
+    !data.organizationContext ||
+    typeof data.organizationContext !== "object"
+  ) {
+    return false;
+  }
+
+  const user = data.user;
+  const organizationContext = data.organizationContext;
+
+  return (
+    "id" in user &&
+    typeof user.id === "string" &&
+    "email" in user &&
+    typeof user.email === "string" &&
+    "firstName" in user &&
+    typeof user.firstName === "string" &&
+    "lastName" in user &&
+    typeof user.lastName === "string" &&
+    "displayName" in user &&
+    typeof user.displayName === "string" &&
+    "emailVerified" in user &&
+    typeof user.emailVerified === "boolean" &&
+    "status" in user &&
+    typeof user.status === "string" &&
+    "platformRole" in user &&
+    typeof user.platformRole === "string" &&
+    "createdAt" in user &&
+    typeof user.createdAt === "string" &&
+    "organizationId" in organizationContext &&
+    (typeof organizationContext.organizationId === "string" ||
+      organizationContext.organizationId === null) &&
+    "role" in organizationContext &&
+    (typeof organizationContext.role === "string" ||
+      organizationContext.role === null)
+  );
 }
 
 function isRegistrationResponse(data: unknown): data is RegistrationResponse {

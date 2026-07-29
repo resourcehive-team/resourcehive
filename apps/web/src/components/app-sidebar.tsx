@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 
 import { NavDocuments } from "@/components/nav-documents";
 import { NavMain } from "@/components/nav-main";
@@ -29,11 +30,16 @@ import {
   Settings2Icon,
   UsersIcon,
 } from "lucide-react";
+import {
+  AuthenticationRequiredError,
+  getCurrentUser,
+  logout,
+} from "@/lib/auth-api";
 
 const data = {
   user: {
-    name: "ResourceHive User",
-    email: "user@example.edu",
+    name: "Loading user",
+    email: "",
     avatar: "",
   },
   navMain: [
@@ -99,6 +105,38 @@ const data = {
   ],
 };
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const router = useRouter();
+  const [user, setUser] = React.useState(data.user);
+
+  React.useEffect(() => {
+    const controller = new AbortController();
+
+    getCurrentUser(controller.signal)
+      .then((currentUser) => {
+        setUser({
+          name: currentUser.user.displayName,
+          email: currentUser.user.email,
+          avatar: "",
+        });
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        if (error instanceof AuthenticationRequiredError) {
+          void logout()
+            .catch(() => undefined)
+            .finally(() => {
+              router.replace("/login");
+              router.refresh();
+            });
+        }
+      });
+
+    return () => controller.abort();
+  }, [router]);
+
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
@@ -120,7 +158,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser user={user} />
       </SidebarFooter>
     </Sidebar>
   );
