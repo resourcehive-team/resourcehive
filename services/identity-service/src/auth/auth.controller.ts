@@ -9,7 +9,8 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common';
-import { Response } from 'express';
+import type { Response } from 'express';
+import { clearAccessTokenCookie, setAccessTokenCookie } from './auth-cookie';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -39,8 +40,22 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  async login(@Body() loginData: LoginDto) {
-    return this.authService.login(loginData);
+  async login(
+    @Body() loginData: LoginDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const login = await this.authService.login(loginData);
+    setAccessTokenCookie(response, login.token);
+
+    return {
+      message: login.message,
+    };
+  }
+
+  @Post('logout')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  logout(@Res({ passthrough: true }) response: Response) {
+    clearAccessTokenCookie(response);
   }
 
   @Get('validate')

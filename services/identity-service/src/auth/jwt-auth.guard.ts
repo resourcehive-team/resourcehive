@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '@resourcehive/database';
+import { extractAccessToken } from '@resourcehive/service-auth';
 import { Request } from 'express';
 
 export interface AuthenticatedUser {
@@ -41,17 +42,7 @@ export class JwtAuthGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
-    const authHeader = request.headers.authorization;
-
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new UnauthorizedException('Token not found or invalid format');
-    }
-
-    const token = authHeader.split(' ')[1];
-
-    if (!token) {
-      throw new UnauthorizedException('Token not found');
-    }
+    const token = extractAccessToken(request);
 
     try {
       const payload = await this.jwtService.verifyAsync<AccessTokenPayload>(
