@@ -8,7 +8,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "pnpm run generate && tsc -p tsconfig.json && mkdir -p dist/generated/client && cp -R generated/client/. dist/generated/client",
+    "build": "pnpm run generate && tsc -p tsconfig.json && node -e \"const fs=require('fs'); fs.cpSync('generated/client', 'dist/generated/client', {recursive: true});\"",
     "generate": "dotenv -e ../../.env -- prisma generate --schema ../../db/schema/schema.prisma",
     "init": "pnpm run migrate:deploy && pnpm run build",
     "migrate": "pnpm run migrate:deploy",
