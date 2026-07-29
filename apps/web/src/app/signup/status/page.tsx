@@ -10,6 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { SignupVerificationStatusSync } from "@/components/signup-verification-status-sync";
 import {
   getSignupDebugDataSnapshot,
   parseSignupDebugData,
@@ -29,6 +30,13 @@ export default function SignupStatusPage() {
 
   return (
     <main className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
+      {signup?.developmentVerificationUrl && (
+        <SignupVerificationStatusSync
+          email={signup.user.email}
+          emailVerified={signup.user.emailVerified}
+          verificationUrl={signup.developmentVerificationUrl}
+        />
+      )}
       <div className="w-full max-w-sm">
         <Card>
           <CardHeader>

@@ -57,6 +57,11 @@ export interface EmailVerificationResponse {
   };
 }
 
+export interface EmailVerificationStatusResponse {
+  status: "PENDING" | "EXPIRED" | "VERIFIED";
+  emailVerified: boolean;
+}
+
 export class LoginError extends Error {
   constructor(message: string) {
     super(message);
@@ -195,6 +200,40 @@ export async function verifyEmail(
   return data;
 }
 
+export async function getEmailVerificationStatus(
+  token: string,
+): Promise<EmailVerificationStatusResponse> {
+  let response: Response;
+
+  try {
+    response = await fetch(`${identityApiUrl}/auth/verification-status`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ token }),
+      cache: "no-store",
+    });
+  } catch {
+    throw new EmailVerificationError(
+      "Unable to check the email verification status.",
+    );
+  }
+
+  const data: unknown = await response.json().catch(() => null);
+
+  if (!response.ok || !isEmailVerificationStatusResponse(data)) {
+    throw new EmailVerificationError(
+      getApiErrorMessage(
+        data,
+        "Unable to check the email verification status.",
+      ),
+    );
+  }
+
+  return data;
+}
+
 function getApiErrorMessage(data: unknown, fallback: string): string {
   if (!data || typeof data !== "object" || !("message" in data)) {
     return fallback;
@@ -282,5 +321,25 @@ function isEmailVerificationResponse(
     user.emailVerified === true &&
     "organizations" in user &&
     Array.isArray(user.organizations)
+  );
+}
+
+function isEmailVerificationStatusResponse(
+  data: unknown,
+): data is EmailVerificationStatusResponse {
+  if (
+    !data ||
+    typeof data !== "object" ||
+    !("status" in data) ||
+    !("emailVerified" in data)
+  ) {
+    return false;
+  }
+
+  return (
+    (data.status === "PENDING" ||
+      data.status === "EXPIRED" ||
+      data.status === "VERIFIED") &&
+    typeof data.emailVerified === "boolean"
   );
 }
