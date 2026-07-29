@@ -1,0 +1,56 @@
+[
+  {
+    "id": 1,
+    "header": "Camera",
+    "type": "Equipment",
+    "status": "Available",
+    "target": "10",
+    "limit": "4",
+    "reviewer": "Media Club"
+  },
+  {
+    "id": 2,
+    "header": "Projector",
+    "type": "Electronics",
+    "status": "Available",
+    "target": "15",
+    "limit": "3",
+    "reviewer": "CSE Department"
+  },
+  {
+    "id": 3,
+    "header": "Seminar room",
+    "type": "Room",
+    "status": "Unavailable",
+    "target": "20",
+    "limit": "2",
+    "reviewer": "Engineering Faculty"
+  },
+  {
+    "id": 4,
+    "header": "Microphone",
+    "type": "Electronics",
+    "status": "Available",
+    "target": "5",
+    "limit": "6",
+    "reviewer": "Media Club"
+  },
+  {
+    "id": 5,
+    "header": "Robotics kit",
+    "type": "Equipment",
+    "status": "Available",
+    "target": "25",
+    "limit": "2",
+    "reviewer": "CSE Department"
+  },
+  {
+    "id": 6,
+    "header": "Design studio",
+    "type": "Room",
+    "status": "Inactive",
+    "target": "30",
+    "limit": "1",
+    "reviewer": "Engineering Faculty"
+  }
+]
