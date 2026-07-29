@@ -28,6 +28,7 @@ redis/
 .env
 .env.*
 !.env.example
+.neon
 
 # OS files
 .DS_Store
