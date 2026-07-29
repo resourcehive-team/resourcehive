@@ -1,4 +1,5 @@
 export * from "./access-token-claims";
+export * from "./access-token-extractor";
 export * from "./access-token-verifier";
 export * from "./authenticated-user";
 export * from "./current-user.decorator";
