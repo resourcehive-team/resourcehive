@@ -53,9 +53,10 @@ export default async function VerifyEmailPage({
             <CardTitle>{title}</CardTitle>
             <CardDescription>{message}</CardDescription>
           </CardHeader>
-          <CardContent className="flex gap-2">
+          <CardContent className="flex flex-col gap-2 sm:flex-row">
             {verifiedEmail && (
               <Button
+                className="w-full sm:w-auto"
                 nativeButton={false}
                 render={<Link href="/signup/status" />}
               >
@@ -63,6 +64,7 @@ export default async function VerifyEmailPage({
               </Button>
             )}
             <Button
+              className="w-full sm:w-auto"
               variant={verifiedEmail ? "outline" : "default"}
               nativeButton={false}
               render={<Link href="/login" />}

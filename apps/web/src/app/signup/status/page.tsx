@@ -47,7 +47,7 @@ export default function SignupStatusPage() {
           </CardHeader>
           <CardContent>
             {signup ? (
-              <dl>
+              <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-3 text-sm [&>dd]:min-w-0 [&>dd]:break-words [&>dt]:font-medium [&>dt]:text-muted-foreground">
                 <dt>Name</dt>
                 <dd>
                   {signup.user.firstName} {signup.user.lastName}
@@ -67,6 +67,7 @@ export default function SignupStatusPage() {
                     <dt>Development verification</dt>
                     <dd>
                       <Button
+                        size="sm"
                         nativeButton={false}
                         render={<a href={signup.developmentVerificationUrl} />}
                       >
