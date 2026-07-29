@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { PrismaService } from '@resourcehive/database';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
@@ -9,21 +10,45 @@ interface LoginResponse {
   token: string;
 }
 
+interface RegistrationResponse {
+  developmentVerificationUrl: string;
+  user: {
+    id: string;
+    email: string;
+    emailVerified: boolean;
+  };
+}
+
 describe('Authentication Flow (e2e)', () => {
   jest.setTimeout(30000);
   let app: INestApplication<App>;
+  let prisma: PrismaService;
   let jwtToken: string;
+  let verificationToken: string;
   const testEmail = process.env.DEMO_USER_EMAIL ?? 'demo@example.edu';
-  const testPassword =
-    process.env.DEMO_USER_PASSWORD ?? 'DemoPassword123!';
+  const testPassword = process.env.DEMO_USER_PASSWORD ?? 'DemoPassword123!';
+  const signupEmail = `signup-${Date.now()}@example.edu`;
+  const originalEmailTransport = process.env.EMAIL_TRANSPORT;
+  const originalBcryptRounds = process.env.BCRYPT_ROUNDS;
 
   beforeAll(async () => {
+    process.env.EMAIL_TRANSPORT = 'console';
+    process.env.BCRYPT_ROUNDS = '4';
+
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    app.useGlobalPipes(
+      new ValidationPipe({
+        transform: true,
+        whitelist: true,
+        forbidNonWhitelisted: true,
+      }),
+    );
     await app.init();
+    prisma = app.get(PrismaService);
   });
 
   it('reports that the service is running', async () => {
@@ -80,7 +105,90 @@ describe('Authentication Flow (e2e)', () => {
       .expect(401);
   });
 
+  it('registers an unverified user from an approved email domain', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({
+        firstName: 'Signup',
+        lastName: 'Test',
+        email: signupEmail,
+        password: 'SignupPassword123!',
+      })
+      .expect(201);
+
+    const body = response.body as RegistrationResponse;
+    expect(body.user.email).toBe(signupEmail);
+    expect(body.user.emailVerified).toBe(false);
+
+    const verificationUrl = new URL(body.developmentVerificationUrl);
+    verificationToken = verificationUrl.searchParams.get('token') ?? '';
+    expect(verificationToken).not.toBe('');
+  });
+
+  it('verifies the signup and creates the approved root membership', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/auth/verify-email')
+      .send({ token: verificationToken })
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      user: {
+        email: signupEmail,
+        emailVerified: true,
+        organizations: [
+          expect.objectContaining({
+            name: 'Demo Organization',
+            role: 'MEMBER',
+            status: 'APPROVED',
+          }),
+        ],
+      },
+    });
+
+    const user = await prisma.user.findUniqueOrThrow({
+      where: { email: signupEmail },
+      include: {
+        memberships: true,
+      },
+    });
+    expect(user.emailVerifiedAt).toBeInstanceOf(Date);
+    expect(user.memberships).toEqual([
+      expect.objectContaining({
+        role: 'MEMBER',
+        status: 'APPROVED',
+      }),
+    ]);
+  });
+
   afterAll(async () => {
+    const signupUser = await prisma.user.findUnique({
+      where: { email: signupEmail },
+      select: { id: true },
+    });
+    if (signupUser) {
+      await prisma.$transaction([
+        prisma.organizationMembership.deleteMany({
+          where: { userId: signupUser.id },
+        }),
+        prisma.emailVerificationToken.deleteMany({
+          where: { userId: signupUser.id },
+        }),
+        prisma.user.delete({
+          where: { id: signupUser.id },
+        }),
+      ]);
+    }
+
     await app.close();
+    if (originalEmailTransport === undefined) {
+      delete process.env.EMAIL_TRANSPORT;
+    } else {
+      process.env.EMAIL_TRANSPORT = originalEmailTransport;
+    }
+    if (originalBcryptRounds === undefined) {
+      delete process.env.BCRYPT_ROUNDS;
+    } else {
+      process.env.BCRYPT_ROUNDS = originalBcryptRounds;
+    }
   });
 });
