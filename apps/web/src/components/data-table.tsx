@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import * as React from "react"
+import * as React from "react";
 import {
   closestCenter,
   DndContext,
@@ -11,15 +11,15 @@ import {
   useSensors,
   type DragEndEvent,
   type UniqueIdentifier,
-} from "@dnd-kit/core"
-import { restrictToVerticalAxis } from "@dnd-kit/modifiers"
+} from "@dnd-kit/core";
+import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import {
   arrayMove,
   SortableContext,
   useSortable,
   verticalListSortingStrategy,
-} from "@dnd-kit/sortable"
-import { CSS } from "@dnd-kit/utilities"
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import {
   flexRender,
   getCoreRowModel,
@@ -34,21 +34,21 @@ import {
   type Row,
   type SortingState,
   type VisibilityState,
-} from "@tanstack/react-table"
-import { Area, AreaChart, CartesianGrid, XAxis } from "recharts"
-import { toast } from "sonner"
-import { z } from "zod"
+} from "@tanstack/react-table";
+import { Area, AreaChart, CartesianGrid, XAxis } from "recharts";
+import { toast } from "sonner";
+import { z } from "zod";
 
-import { useIsMobile } from "@/hooks/use-mobile"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import { useIsMobile } from "@/hooks/use-mobile";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
   type ChartConfig,
-} from "@/components/ui/chart"
-import { Checkbox } from "@/components/ui/checkbox"
+} from "@/components/ui/chart";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Drawer,
   DrawerClose,
@@ -58,7 +58,7 @@ import {
   DrawerHeader,
   DrawerTitle,
   DrawerTrigger,
-} from "@/components/ui/drawer"
+} from "@/components/ui/drawer";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -66,9 +66,9 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -76,8 +76,8 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import { Separator } from "@/components/ui/separator"
+} from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
 import {
   Table,
   TableBody,
@@ -85,14 +85,22 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
+} from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs"
-import { GripVerticalIcon, CircleCheckIcon, LoaderIcon, EllipsisVerticalIcon, Columns3Icon, ChevronDownIcon, PlusIcon, ChevronsLeftIcon, ChevronLeftIcon, ChevronRightIcon, ChevronsRightIcon, TrendingUpIcon } from "lucide-react"
+  GripVerticalIcon,
+  CircleCheckIcon,
+  LoaderIcon,
+  EllipsisVerticalIcon,
+  Columns3Icon,
+  ChevronDownIcon,
+  PlusIcon,
+  ChevronsLeftIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  ChevronsRightIcon,
+  TrendingUpIcon,
+} from "lucide-react";
 
 export const schema = z.object({
   id: z.number(),
@@ -102,13 +110,13 @@ export const schema = z.object({
   target: z.string(),
   limit: z.string(),
   reviewer: z.string(),
-})
+});
 
 // Create a separate component for the drag handle
 function DragHandle({ id }: { id: number }) {
   const { attributes, listeners } = useSortable({
     id,
-  })
+  });
   return (
     <Button
       {...attributes}
@@ -120,7 +128,7 @@ function DragHandle({ id }: { id: number }) {
       <GripVerticalIcon className="size-3 text-muted-foreground" />
       <span className="sr-only">Drag to reorder</span>
     </Button>
-  )
+  );
 }
 const columns: ColumnDef<z.infer<typeof schema>>[] = [
   {
@@ -157,15 +165,15 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
   },
   {
     accessorKey: "header",
-    header: "Header",
+    header: "Resource",
     cell: ({ row }) => {
-      return <TableCellViewer item={row.original} />
+      return <TableCellViewer item={row.original} />;
     },
     enableHiding: false,
   },
   {
     accessorKey: "type",
-    header: "Section Type",
+    header: "Category",
     cell: ({ row }) => (
       <div className="w-32">
         <Badge variant="outline" className="px-1.5 text-muted-foreground">
@@ -179,11 +187,10 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
     header: "Status",
     cell: ({ row }) => (
       <Badge variant="outline" className="px-1.5 text-muted-foreground">
-        {row.original.status === "Done" ? (
+        {row.original.status === "Available" ? (
           <CircleCheckIcon className="fill-green-500 dark:fill-green-400" />
         ) : (
-          <LoaderIcon
-          />
+          <LoaderIcon />
         )}
         {row.original.status}
       </Badge>
@@ -191,20 +198,20 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
   },
   {
     accessorKey: "target",
-    header: () => <div className="w-full text-right">Target</div>,
+    header: () => <div className="w-full text-right">Points</div>,
     cell: ({ row }) => (
       <form
         onSubmit={(e) => {
-          e.preventDefault()
+          e.preventDefault();
           toast.promise(new Promise((resolve) => setTimeout(resolve, 1000)), {
             loading: `Saving ${row.original.header}`,
             success: "Done",
             error: "Error",
-          })
+          });
         }}
       >
         <Label htmlFor={`${row.original.id}-target`} className="sr-only">
-          Target
+          Points
         </Label>
         <Input
           className="h-8 w-16 border-transparent bg-transparent text-right shadow-none hover:bg-input/30 focus-visible:border focus-visible:bg-background dark:bg-transparent dark:hover:bg-input/30 dark:focus-visible:bg-input/30"
@@ -216,20 +223,20 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
   },
   {
     accessorKey: "limit",
-    header: () => <div className="w-full text-right">Limit</div>,
+    header: () => <div className="w-full text-right">Slots</div>,
     cell: ({ row }) => (
       <form
         onSubmit={(e) => {
-          e.preventDefault()
+          e.preventDefault();
           toast.promise(new Promise((resolve) => setTimeout(resolve, 1000)), {
             loading: `Saving ${row.original.header}`,
             success: "Done",
             error: "Error",
-          })
+          });
         }}
       >
         <Label htmlFor={`${row.original.id}-limit`} className="sr-only">
-          Limit
+          Slots
         </Label>
         <Input
           className="h-8 w-16 border-transparent bg-transparent text-right shadow-none hover:bg-input/30 focus-visible:border focus-visible:bg-background dark:bg-transparent dark:hover:bg-input/30 dark:focus-visible:bg-input/30"
@@ -241,21 +248,21 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
   },
   {
     accessorKey: "reviewer",
-    header: "Reviewer",
+    header: "Owner",
     cell: ({ row }) => {
-      const isAssigned = row.original.reviewer !== "Assign reviewer"
+      const isAssigned = row.original.reviewer !== "Assign owner";
       if (isAssigned) {
-        return row.original.reviewer
+        return row.original.reviewer;
       }
       return (
         <>
           <Label htmlFor={`${row.original.id}-reviewer`} className="sr-only">
-            Reviewer
+            Owner
           </Label>
           <Select
             items={[
-              { label: "Eddie Lake", value: "Eddie Lake" },
-              { label: "Jamik Tashpulatov", value: "Jamik Tashpulatov" },
+              { label: "Media Club", value: "Media Club" },
+              { label: "CSE Department", value: "CSE Department" },
             ]}
           >
             <SelectTrigger
@@ -263,19 +270,17 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
               size="sm"
               id={`${row.original.id}-reviewer`}
             >
-              <SelectValue placeholder="Assign reviewer" />
+              <SelectValue placeholder="Assign owner" />
             </SelectTrigger>
             <SelectContent align="end">
               <SelectGroup>
-                <SelectItem value="Eddie Lake">Eddie Lake</SelectItem>
-                <SelectItem value="Jamik Tashpulatov">
-                  Jamik Tashpulatov
-                </SelectItem>
+                <SelectItem value="Media Club">Media Club</SelectItem>
+                <SelectItem value="CSE Department">CSE Department</SelectItem>
               </SelectGroup>
             </SelectContent>
           </Select>
         </>
-      )
+      );
     },
   },
   {
@@ -291,8 +296,7 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
             />
           }
         >
-          <EllipsisVerticalIcon
-          />
+          <EllipsisVerticalIcon />
           <span className="sr-only">Open menu</span>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-32">
@@ -305,11 +309,11 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
       </DropdownMenu>
     ),
   },
-]
+];
 function DraggableRow({ row }: { row: Row<z.infer<typeof schema>> }) {
   const { transform, transition, setNodeRef, isDragging } = useSortable({
     id: row.original.id,
-  })
+  });
   return (
     <TableRow
       data-state={row.getIsSelected() && "selected"}
@@ -327,35 +331,35 @@ function DraggableRow({ row }: { row: Row<z.infer<typeof schema>> }) {
         </TableCell>
       ))}
     </TableRow>
-  )
+  );
 }
 export function DataTable({
   data: initialData,
 }: {
-  data: z.infer<typeof schema>[]
+  data: z.infer<typeof schema>[];
 }) {
-  const [data, setData] = React.useState(() => initialData)
-  const [rowSelection, setRowSelection] = React.useState({})
+  const [data, setData] = React.useState(() => initialData);
+  const [rowSelection, setRowSelection] = React.useState({});
   const [columnVisibility, setColumnVisibility] =
-    React.useState<VisibilityState>({})
+    React.useState<VisibilityState>({});
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
-    []
-  )
-  const [sorting, setSorting] = React.useState<SortingState>([])
+    [],
+  );
+  const [sorting, setSorting] = React.useState<SortingState>([]);
   const [pagination, setPagination] = React.useState({
     pageIndex: 0,
     pageSize: 10,
-  })
-  const sortableId = React.useId()
+  });
+  const sortableId = React.useId();
   const sensors = useSensors(
     useSensor(MouseSensor, {}),
     useSensor(TouchSensor, {}),
-    useSensor(KeyboardSensor, {})
-  )
+    useSensor(KeyboardSensor, {}),
+  );
   const dataIds = React.useMemo<UniqueIdentifier[]>(
     () => data?.map(({ id }) => id) || [],
-    [data]
-  )
+    [data],
+  );
   const table = useReactTable({
     data,
     columns,
@@ -379,20 +383,20 @@ export function DataTable({
     getSortedRowModel: getSortedRowModel(),
     getFacetedRowModel: getFacetedRowModel(),
     getFacetedUniqueValues: getFacetedUniqueValues(),
-  })
+  });
   function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event
+    const { active, over } = event;
     if (active && over && active.id !== over.id) {
       setData((data) => {
-        const oldIndex = dataIds.indexOf(active.id)
-        const newIndex = dataIds.indexOf(over.id)
-        return arrayMove(data, oldIndex, newIndex)
-      })
+        const oldIndex = dataIds.indexOf(active.id);
+        const newIndex = dataIds.indexOf(over.id);
+        return arrayMove(data, oldIndex, newIndex);
+      });
     }
   }
   return (
     <Tabs
-      defaultValue="outline"
+      defaultValue="resources"
       className="w-full flex-col justify-start gap-6"
     >
       <div className="flex items-center justify-between px-4 lg:px-6">
@@ -400,12 +404,12 @@ export function DataTable({
           View
         </Label>
         <Select
-          defaultValue="outline"
+          defaultValue="resources"
           items={[
-            { label: "Outline", value: "outline" },
-            { label: "Past Performance", value: "past-performance" },
-            { label: "Key Personnel", value: "key-personnel" },
-            { label: "Focus Documents", value: "focus-documents" },
+            { label: "Resources", value: "resources" },
+            { label: "Bookings", value: "bookings" },
+            { label: "Memberships", value: "memberships" },
+            { label: "Notifications", value: "notifications" },
           ]}
         >
           <SelectTrigger
@@ -417,22 +421,22 @@ export function DataTable({
           </SelectTrigger>
           <SelectContent>
             <SelectGroup>
-              <SelectItem value="outline">Outline</SelectItem>
-              <SelectItem value="past-performance">Past Performance</SelectItem>
-              <SelectItem value="key-personnel">Key Personnel</SelectItem>
-              <SelectItem value="focus-documents">Focus Documents</SelectItem>
+              <SelectItem value="resources">Resources</SelectItem>
+              <SelectItem value="bookings">Bookings</SelectItem>
+              <SelectItem value="memberships">Memberships</SelectItem>
+              <SelectItem value="notifications">Notifications</SelectItem>
             </SelectGroup>
           </SelectContent>
         </Select>
         <TabsList className="hidden **:data-[slot=badge]:size-5 **:data-[slot=badge]:rounded-full **:data-[slot=badge]:bg-muted-foreground/30 **:data-[slot=badge]:px-1 @4xl/main:flex">
-          <TabsTrigger value="outline">Outline</TabsTrigger>
-          <TabsTrigger value="past-performance">
-            Past Performance <Badge variant="secondary">3</Badge>
+          <TabsTrigger value="resources">Resources</TabsTrigger>
+          <TabsTrigger value="bookings">
+            Bookings <Badge variant="secondary">2</Badge>
           </TabsTrigger>
-          <TabsTrigger value="key-personnel">
-            Key Personnel <Badge variant="secondary">2</Badge>
+          <TabsTrigger value="memberships">
+            Memberships <Badge variant="secondary">3</Badge>
           </TabsTrigger>
-          <TabsTrigger value="focus-documents">Focus Documents</TabsTrigger>
+          <TabsTrigger value="notifications">Notifications</TabsTrigger>
         </TabsList>
         <div className="flex items-center gap-2">
           <DropdownMenu>
@@ -449,7 +453,7 @@ export function DataTable({
                 .filter(
                   (column) =>
                     typeof column.accessorFn !== "undefined" &&
-                    column.getCanHide()
+                    column.getCanHide(),
                 )
                 .map((column) => {
                   return (
@@ -463,19 +467,18 @@ export function DataTable({
                     >
                       {column.id}
                     </DropdownMenuCheckboxItem>
-                  )
+                  );
                 })}
             </DropdownMenuContent>
           </DropdownMenu>
           <Button variant="outline" size="sm">
-            <PlusIcon
-            />
-            <span className="hidden lg:inline">Add Section</span>
+            <PlusIcon />
+            <span className="hidden lg:inline">Add resource</span>
           </Button>
         </div>
       </div>
       <TabsContent
-        value="outline"
+        value="resources"
         className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6"
       >
         <div className="overflow-hidden rounded-lg border">
@@ -497,10 +500,10 @@ export function DataTable({
                             ? null
                             : flexRender(
                                 header.column.columnDef.header,
-                                header.getContext()
+                                header.getContext(),
                               )}
                         </TableHead>
-                      )
+                      );
                     })}
                   </TableRow>
                 ))}
@@ -542,7 +545,7 @@ export function DataTable({
               <Select
                 value={`${table.getState().pagination.pageSize}`}
                 onValueChange={(value) => {
-                  table.setPageSize(Number(value))
+                  table.setPageSize(Number(value));
                 }}
                 items={[10, 20, 30, 40, 50].map((pageSize) => ({
                   label: `${pageSize}`,
@@ -577,8 +580,7 @@ export function DataTable({
                 disabled={!table.getCanPreviousPage()}
               >
                 <span className="sr-only">Go to first page</span>
-                <ChevronsLeftIcon
-                />
+                <ChevronsLeftIcon />
               </Button>
               <Button
                 variant="outline"
@@ -588,8 +590,7 @@ export function DataTable({
                 disabled={!table.getCanPreviousPage()}
               >
                 <span className="sr-only">Go to previous page</span>
-                <ChevronLeftIcon
-                />
+                <ChevronLeftIcon />
               </Button>
               <Button
                 variant="outline"
@@ -599,8 +600,7 @@ export function DataTable({
                 disabled={!table.getCanNextPage()}
               >
                 <span className="sr-only">Go to next page</span>
-                <ChevronRightIcon
-                />
+                <ChevronRightIcon />
               </Button>
               <Button
                 variant="outline"
@@ -610,30 +610,23 @@ export function DataTable({
                 disabled={!table.getCanNextPage()}
               >
                 <span className="sr-only">Go to last page</span>
-                <ChevronsRightIcon
-                />
+                <ChevronsRightIcon />
               </Button>
             </div>
           </div>
         </div>
       </TabsContent>
-      <TabsContent
-        value="past-performance"
-        className="flex flex-col px-4 lg:px-6"
-      >
+      <TabsContent value="bookings" className="flex flex-col px-4 lg:px-6">
         <div className="aspect-video w-full flex-1 rounded-lg border border-dashed"></div>
       </TabsContent>
-      <TabsContent value="key-personnel" className="flex flex-col px-4 lg:px-6">
+      <TabsContent value="memberships" className="flex flex-col px-4 lg:px-6">
         <div className="aspect-video w-full flex-1 rounded-lg border border-dashed"></div>
       </TabsContent>
-      <TabsContent
-        value="focus-documents"
-        className="flex flex-col px-4 lg:px-6"
-      >
+      <TabsContent value="notifications" className="flex flex-col px-4 lg:px-6">
         <div className="aspect-video w-full flex-1 rounded-lg border border-dashed"></div>
       </TabsContent>
     </Tabs>
-  )
+  );
 }
 const chartData = [
   {
@@ -666,19 +659,19 @@ const chartData = [
     desktop: 214,
     mobile: 140,
   },
-]
+];
 const chartConfig = {
   desktop: {
-    label: "Desktop",
+    label: "Resources",
     color: "var(--primary)",
   },
   mobile: {
-    label: "Mobile",
+    label: "Bookings",
     color: "var(--primary)",
   },
-} satisfies ChartConfig
+} satisfies ChartConfig;
 function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
-  const isMobile = useIsMobile()
+  const isMobile = useIsMobile();
   return (
     <Drawer swipeDirection={isMobile ? "down" : "right"}>
       <DrawerTrigger
@@ -695,7 +688,7 @@ function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
         <DrawerHeader className="gap-1">
           <DrawerTitle>{item.header}</DrawerTitle>
           <DrawerDescription>
-            Showing total visitors for the last 6 months
+            Resource details and recent activity
           </DrawerDescription>
         </DrawerHeader>
         <div className="flex flex-col gap-4 overflow-y-auto px-4 text-sm">
@@ -748,9 +741,7 @@ function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
                   <TrendingUpIcon className="size-4" />
                 </div>
                 <div className="text-muted-foreground">
-                  Showing total visitors for the last 6 months. This is just
-                  some random text to test the layout. It spans multiple lines
-                  and should wrap around.
+                  Static development data for the ResourceHive dashboard.
                 </div>
               </div>
               <Separator />
@@ -758,26 +749,19 @@ function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
           )}
           <form className="flex flex-col gap-4">
             <div className="flex flex-col gap-3">
-              <Label htmlFor="header">Header</Label>
+              <Label htmlFor="header">Resource</Label>
               <Input id="header" defaultValue={item.header} />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col gap-3">
-                <Label htmlFor="type">Type</Label>
+                <Label htmlFor="type">Category</Label>
                 <Select
                   defaultValue={item.type}
                   items={[
-                    { label: "Table of Contents", value: "Table of Contents" },
-                    { label: "Executive Summary", value: "Executive Summary" },
-                    {
-                      label: "Technical Approach",
-                      value: "Technical Approach",
-                    },
-                    { label: "Design", value: "Design" },
-                    { label: "Capabilities", value: "Capabilities" },
-                    { label: "Focus Documents", value: "Focus Documents" },
-                    { label: "Narrative", value: "Narrative" },
-                    { label: "Cover Page", value: "Cover Page" },
+                    { label: "Equipment", value: "Equipment" },
+                    { label: "Room", value: "Room" },
+                    { label: "Electronics", value: "Electronics" },
+                    { label: "Other", value: "Other" },
                   ]}
                 >
                   <SelectTrigger id="type" className="w-full">
@@ -785,22 +769,10 @@ function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectGroup>
-                      <SelectItem value="Table of Contents">
-                        Table of Contents
-                      </SelectItem>
-                      <SelectItem value="Executive Summary">
-                        Executive Summary
-                      </SelectItem>
-                      <SelectItem value="Technical Approach">
-                        Technical Approach
-                      </SelectItem>
-                      <SelectItem value="Design">Design</SelectItem>
-                      <SelectItem value="Capabilities">Capabilities</SelectItem>
-                      <SelectItem value="Focus Documents">
-                        Focus Documents
-                      </SelectItem>
-                      <SelectItem value="Narrative">Narrative</SelectItem>
-                      <SelectItem value="Cover Page">Cover Page</SelectItem>
+                      <SelectItem value="Equipment">Equipment</SelectItem>
+                      <SelectItem value="Room">Room</SelectItem>
+                      <SelectItem value="Electronics">Electronics</SelectItem>
+                      <SelectItem value="Other">Other</SelectItem>
                     </SelectGroup>
                   </SelectContent>
                 </Select>
@@ -810,9 +782,9 @@ function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
                 <Select
                   defaultValue={item.status}
                   items={[
-                    { label: "Done", value: "Done" },
-                    { label: "In Progress", value: "In Progress" },
-                    { label: "Not Started", value: "Not Started" },
+                    { label: "Available", value: "Available" },
+                    { label: "Unavailable", value: "Unavailable" },
+                    { label: "Inactive", value: "Inactive" },
                   ]}
                 >
                   <SelectTrigger id="status" className="w-full">
@@ -820,9 +792,9 @@ function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectGroup>
-                      <SelectItem value="Done">Done</SelectItem>
-                      <SelectItem value="In Progress">In Progress</SelectItem>
-                      <SelectItem value="Not Started">Not Started</SelectItem>
+                      <SelectItem value="Available">Available</SelectItem>
+                      <SelectItem value="Unavailable">Unavailable</SelectItem>
+                      <SelectItem value="Inactive">Inactive</SelectItem>
                     </SelectGroup>
                   </SelectContent>
                 </Select>
@@ -830,34 +802,39 @@ function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col gap-3">
-                <Label htmlFor="target">Target</Label>
+                <Label htmlFor="target">Points</Label>
                 <Input id="target" defaultValue={item.target} />
               </div>
               <div className="flex flex-col gap-3">
-                <Label htmlFor="limit">Limit</Label>
+                <Label htmlFor="limit">Slots</Label>
                 <Input id="limit" defaultValue={item.limit} />
               </div>
             </div>
             <div className="flex flex-col gap-3">
-              <Label htmlFor="reviewer">Reviewer</Label>
+              <Label htmlFor="reviewer">Owner</Label>
               <Select
                 defaultValue={item.reviewer}
                 items={[
-                  { label: "Eddie Lake", value: "Eddie Lake" },
-                  { label: "Jamik Tashpulatov", value: "Jamik Tashpulatov" },
-                  { label: "Emily Whalen", value: "Emily Whalen" },
+                  { label: "Media Club", value: "Media Club" },
+                  { label: "CSE Department", value: "CSE Department" },
+                  {
+                    label: "Engineering Faculty",
+                    value: "Engineering Faculty",
+                  },
                 ]}
               >
                 <SelectTrigger id="reviewer" className="w-full">
-                  <SelectValue placeholder="Select a reviewer" />
+                  <SelectValue placeholder="Select an owner" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
-                    <SelectItem value="Eddie Lake">Eddie Lake</SelectItem>
-                    <SelectItem value="Jamik Tashpulatov">
-                      Jamik Tashpulatov
+                    <SelectItem value="Media Club">Media Club</SelectItem>
+                    <SelectItem value="CSE Department">
+                      CSE Department
                     </SelectItem>
-                    <SelectItem value="Emily Whalen">Emily Whalen</SelectItem>
+                    <SelectItem value="Engineering Faculty">
+                      Engineering Faculty
+                    </SelectItem>
                   </SelectGroup>
                 </SelectContent>
               </Select>
@@ -870,5 +847,5 @@ function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
         </DrawerFooter>
       </DrawerContent>
     </Drawer>
-  )
+  );
 }
