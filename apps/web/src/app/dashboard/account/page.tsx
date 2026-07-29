@@ -1,3 +1,4 @@
+import { AccountProfileCard } from "@/components/account-profile-card";
 import { SiteHeader } from "@/components/site-header";
 import {
   Card,
@@ -25,14 +26,7 @@ export default function AccountPage() {
             </TabsList>
 
             <TabsContent value="profile">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Profile</CardTitle>
-                  <CardDescription>
-                    Your personal ResourceHive account information.
-                  </CardDescription>
-                </CardHeader>
-              </Card>
+              <AccountProfileCard />
             </TabsContent>
 
             <TabsContent value="membership">
