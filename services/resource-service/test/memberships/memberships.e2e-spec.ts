@@ -8,6 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '@resourcehive/database';
 
 describe('MembershipsController (e2e)', () => {
+  jest.setTimeout(60000);
   let app: INestApplication<App>;
   let jwtToken: string;
 

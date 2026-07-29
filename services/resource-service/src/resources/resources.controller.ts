@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query, DefaultValuePipe, ParseIntPipe } from '@nestjs/common';
 import { ResourcesService } from './resources.service';
 import { CreateResourceDto } from './dto/create-resource.dto';
 import { UpdateResourceDto } from './dto/update-resource.dto';
@@ -50,8 +50,13 @@ export class ResourcesController {
   @UseGuards(TenantGuard)
   @Get('organization/:organizationId')
   @ApiOperation({ summary: 'List all resources available to this organization' })
-  findAll(@Param('organizationId') organizationId: string) {
-    return this.resourcesService.findAll(organizationId);
+  findAll(
+    @Param('organizationId') organizationId: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
+    @Query('search') search?: string
+  ) {
+    return this.resourcesService.findAll(organizationId, page, limit, search);
   }
 
   @UseGuards(TenantGuard)

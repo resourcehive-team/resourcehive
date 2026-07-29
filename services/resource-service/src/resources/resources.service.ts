@@ -36,7 +36,9 @@ export class ResourcesService {
     });
   }
 
-  async findAll(organizationId: string) {
+  async findAll(organizationId: string, page: number = 1, limit: number = 10, search?: string) {
+    const skip = (page - 1) * limit;
+
     const whereClause: any = {
       OR: [
         { ownerOrganizationId: organizationId },
@@ -44,11 +46,22 @@ export class ResourcesService {
       ]
     };
 
-    return this.prisma.resource.findMany({
-      where: whereClause,
-      include: { allowedOrganizations: true },
-      orderBy: { createdAt: 'desc' }
-    });
+    if (search) {
+      whereClause.name = { contains: search, mode: 'insensitive' };
+    }
+
+    const [data, total] = await Promise.all([
+      this.prisma.resource.findMany({
+        where: whereClause,
+        skip,
+        take: limit,
+        include: { allowedOrganizations: true },
+        orderBy: { createdAt: 'desc' }
+      }),
+      this.prisma.resource.count({ where: whereClause })
+    ]);
+
+    return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
   async findOne(organizationId: string, resourceId: string) {
