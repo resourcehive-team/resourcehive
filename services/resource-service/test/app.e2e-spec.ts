@@ -5,6 +5,7 @@ import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { PrismaService } from '@resourcehive/database';
 
 describe('AppController (e2e)', () => {
   let app: INestApplication<App>;
@@ -78,6 +79,15 @@ describe('AppController (e2e)', () => {
       .expect(200);
 
     expect(Array.isArray(response.body)).toBe(true);
+  });
+
+  it('rejects access if user is not a member of the organization (Cross-Tenant check)', async () => {
+    const randomOrgId = '00000000-0000-4000-8000-000000000999';
+    
+    await request(app.getHttpServer())
+      .get(`/memberships/organization/${randomOrgId}`)
+      .set('Authorization', `Bearer ${jwtToken}`)
+      .expect(403);
   });
 
 });

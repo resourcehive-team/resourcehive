@@ -32,7 +32,7 @@ export class TenantGuard implements CanActivate {
     });
 
     if (!targetOrg) {
-      throw new NotFoundException('Organization not found');
+      throw new ForbiddenException('You do not have access to this organization.');
     }
 
     // check if user an admin of the root organization
