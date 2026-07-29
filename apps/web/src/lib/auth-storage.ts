@@ -2,11 +2,13 @@ import type { RegistrationResponse } from "@/lib/auth-api";
 
 const accessTokenKey = "resourcehive_access_token";
 const signupDebugDataKey = "resourcehive_signup_debug_data";
+const accessTokenChangedEvent = "resourcehive:access-token-changed";
 
 // Temporary until the backend supports an HttpOnly cookie session.
 // localStorage tokens can be read by JavaScript if the page has an XSS flaw.
 export function storeAccessToken(token: string) {
   localStorage.setItem(accessTokenKey, token);
+  window.dispatchEvent(new Event(accessTokenChangedEvent));
 }
 
 export function getAccessToken(): string | null {
@@ -23,6 +25,23 @@ export function clearAccessToken() {
   }
 
   localStorage.removeItem(accessTokenKey);
+  window.dispatchEvent(new Event(accessTokenChangedEvent));
+}
+
+export function subscribeToAccessToken(onStoreChange: () => void) {
+  function handleStorage(event: StorageEvent) {
+    if (event.key === accessTokenKey) {
+      onStoreChange();
+    }
+  }
+
+  window.addEventListener("storage", handleStorage);
+  window.addEventListener(accessTokenChangedEvent, onStoreChange);
+
+  return () => {
+    window.removeEventListener("storage", handleStorage);
+    window.removeEventListener(accessTokenChangedEvent, onStoreChange);
+  };
 }
 
 export function isAccessTokenUsable(token: string | null): token is string {
