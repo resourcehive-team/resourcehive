@@ -30,7 +30,7 @@ export class PointLedgerRepository {
         userId: input.userId,
         bookingId: input.bookingId,
         amount: input.amount,
-        transactionType: "BOOKING_DEDUCTION",
+        transactionType: "BOOKING",
         description: input.description,
       },
     });

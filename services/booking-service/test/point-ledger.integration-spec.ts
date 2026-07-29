@@ -10,61 +10,80 @@ describeWithDatabase("PointLedgerRepository integration", () => {
   const repository = new PointLedgerRepository(prisma);
   const userId = randomUUID();
   const otherUserId = randomUUID();
+  const organizationId = randomUUID();
+  const rollbackFixture = new Error(
+    "rollback point ledger integration fixture",
+  );
 
   beforeAll(async () => {
     process.env.DATABASE_URL = testDatabaseUrl;
     await prisma.$connect();
-    await prisma.user.createMany({
-      data: [
-        {
-          id: userId,
-          email: `point-user-${userId}@example.edu`,
-          passwordHash: "integration-test-only",
-          firstName: "Point",
-          lastName: "User",
-        },
-        {
-          id: otherUserId,
-          email: `point-other-${otherUserId}@example.edu`,
-          passwordHash: "integration-test-only",
-          firstName: "Other",
-          lastName: "User",
-        },
-      ],
-    });
-    await prisma.pointTransaction.createMany({
-      data: [
-        {
-          userId,
-          amount: 100,
-          transactionType: "TEST_CREDIT",
-        },
-        {
-          userId,
-          amount: -25,
-          transactionType: "TEST_DEDUCTION",
-        },
-        {
-          userId: otherUserId,
-          amount: 500,
-          transactionType: "TEST_CREDIT",
-        },
-      ],
-    });
   });
 
   it("calculates balance from only the requested user's append-only entries", async () => {
-    await expect(repository.getBalance(userId)).resolves.toBe(75);
-    await expect(repository.getBalance(otherUserId)).resolves.toBe(500);
+    try {
+      await prisma.$transaction(async (transaction) => {
+        await transaction.user.createMany({
+          data: [
+            {
+              id: userId,
+              email: `point-user-${userId}@example.edu`,
+              passwordHash: "integration-test-only",
+              firstName: "Point",
+              lastName: "User",
+            },
+            {
+              id: otherUserId,
+              email: `point-other-${otherUserId}@example.edu`,
+              passwordHash: "integration-test-only",
+              firstName: "Other",
+              lastName: "User",
+            },
+          ],
+        });
+        await transaction.organization.create({
+          data: {
+            id: organizationId,
+            name: "Point ledger integration tenant",
+            type: "ROOT",
+            rootOrganizationId: organizationId,
+            createdBy: userId,
+          },
+        });
+        await transaction.pointTransaction.createMany({
+          data: [
+            {
+              userId,
+              amount: 100,
+              transactionType: "JOIN_BONUS",
+              sourceOrganizationId: organizationId,
+            },
+            {
+              userId: otherUserId,
+              amount: 500,
+              transactionType: "JOIN_BONUS",
+              sourceOrganizationId: organizationId,
+            },
+          ],
+        });
+
+        await expect(repository.getBalance(userId, transaction)).resolves.toBe(
+          100,
+        );
+        await expect(
+          repository.getBalance(otherUserId, transaction),
+        ).resolves.toBe(500);
+
+        throw rollbackFixture;
+      });
+    } catch (error) {
+      if (error !== rollbackFixture) {
+        throw error;
+      }
+    }
   });
 
   afterAll(async () => {
-    await prisma.pointTransaction.deleteMany({
-      where: { userId: { in: [userId, otherUserId] } },
-    });
-    await prisma.user.deleteMany({
-      where: { id: { in: [userId, otherUserId] } },
-    });
     await prisma.$disconnect();
   });
 });

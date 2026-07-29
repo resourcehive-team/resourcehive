@@ -4,6 +4,7 @@ import { NotificationPersistenceService } from "./notification-persistence.servi
 import { NotificationRepository } from "./notification.repository";
 import { NotificationReadService } from "./notification-read.service";
 import { NotificationsController } from "./notifications.controller";
+import { NotificationGateway } from "../websocket/notification.gateway";
 
 @Module({
   imports: [ServiceAuthModule],
@@ -12,6 +13,7 @@ import { NotificationsController } from "./notifications.controller";
     NotificationRepository,
     NotificationPersistenceService,
     NotificationReadService,
+    NotificationGateway,
   ],
   exports: [NotificationPersistenceService, NotificationReadService],
 })

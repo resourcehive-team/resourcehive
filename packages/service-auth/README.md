@@ -13,6 +13,11 @@ create repeated code and could make each service behave differently.
 Each service imports the package and uses it on routes that require a logged-in
 user.
 
+The package also exports `AccessTokenVerifier` for approved non-HTTP
+transports, such as the Notification Service Socket.IO handshake. This keeps
+signature, expiry, claim validation, and error behavior consistent without
+forcing a WebSocket connection through an HTTP guard.
+
 ## The simple idea
 
 ```text
@@ -68,6 +73,11 @@ When adding a protected endpoint to a ResourceHive service:
 4. Use `CurrentUser` when the endpoint needs the authenticated user's ID.
 5. Write the service's own authorization checks after authentication.
 6. Keep health checks and other intentionally public endpoints unprotected.
+
+For an approved non-HTTP transport, inject `AccessTokenVerifier` and pass only
+the extracted token to `verify()`. Transport-specific token extraction,
+connection rejection, active-account checks, and authorization remain the
+consuming service's responsibility.
 
 You can ask your AI coding agent:
 

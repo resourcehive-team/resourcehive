@@ -32,14 +32,28 @@ describe("SlotRepository", () => {
       rootOrganizationId: "tenant-id",
     });
 
-    expect(resourceSlot.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: {
-          id: "slot-id",
-          resource: { rootOrganizationId: "tenant-id" },
+    expect(resourceSlot.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: "slot-id",
+        resource: { rootOrganizationId: "tenant-id" },
+      },
+      include: {
+        resource: {
+          select: {
+            id: true,
+            name: true,
+            status: true,
+            rootOrganizationId: true,
+            ownerOrganizationId: true,
+            pointCost: true,
+          },
         },
-      }),
-    );
+        bookings: {
+          where: { status: { not: "CANCELLED" } },
+          select: { id: true },
+        },
+      },
+    });
   });
 
   it("lists slots with tenant, date, pagination, and stable ordering", async () => {
