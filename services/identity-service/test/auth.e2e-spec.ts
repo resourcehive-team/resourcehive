@@ -9,6 +9,25 @@ interface LoginResponse {
   message: string;
 }
 
+interface CurrentUserResponse {
+  user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    displayName: string;
+    emailVerified: boolean;
+    status: string;
+    platformRole: string;
+    createdAt: string;
+    passwordHash?: string;
+  };
+  organizationContext: {
+    organizationId: string | null;
+    role: string | null;
+  };
+}
+
 interface RegistrationResponse {
   developmentVerificationUrl: string;
   user: {
@@ -104,6 +123,38 @@ describe('Authentication Flow (e2e)', () => {
     expect(response.headers['x-tenant-id']).toBeDefined();
     expect(response.headers['x-user-role']).toBe('member');
     expect(response.headers['x-user-email']).toBe(testEmail);
+  });
+
+  it('returns the current user without exposing private account data', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/auth/me')
+      .set('Cookie', authenticationCookie)
+      .expect(200);
+
+    const body = response.body as CurrentUserResponse;
+    expect(response.headers['cache-control']).toBe('private, no-store');
+    expect(body).toMatchObject({
+      user: {
+        email: testEmail,
+        firstName: 'Demo',
+        lastName: 'User',
+        displayName: 'Demo User',
+        emailVerified: true,
+        status: 'ACTIVE',
+        platformRole: 'USER',
+      },
+      organizationContext: {
+        role: 'member',
+      },
+    });
+    expect(typeof body.user.id).toBe('string');
+    expect(Number.isNaN(Date.parse(body.user.createdAt))).toBe(false);
+    expect(typeof body.organizationContext.organizationId).toBe('string');
+    expect(body.user).not.toHaveProperty('passwordHash');
+  });
+
+  it('rejects current-user requests without an authentication cookie', async () => {
+    await request(app.getHttpServer()).get('/auth/me').expect(401);
   });
 
   it('rejects an invalid JWT', async () => {

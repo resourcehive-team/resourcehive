@@ -2,11 +2,13 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   HttpCode,
   HttpStatus,
   Post,
   Req,
   Res,
+  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
 import type { Response } from 'express';
@@ -58,6 +60,35 @@ export class AuthController {
     clearAccessTokenCookie(response);
   }
 
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  @Header('Cache-Control', 'private, no-store')
+  me(@Req() request: AuthenticatedRequest) {
+    const user = request.user;
+
+    if (!user) {
+      throw new UnauthorizedException('Authentication is required');
+    }
+
+    return {
+      user: {
+        id: user.userId,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        displayName: `${user.firstName} ${user.lastName}`.trim(),
+        emailVerified: user.emailVerifiedAt !== null,
+        status: user.status,
+        platformRole: user.platformRole,
+        createdAt: user.createdAt.toISOString(),
+      },
+      organizationContext: {
+        organizationId: user.tenantId || null,
+        role: user.role || null,
+      },
+    };
+  }
+
   @Get('validate')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
@@ -68,8 +99,8 @@ export class AuthController {
     }
 
     res.setHeader('X-User-Id', user.userId);
-    res.setHeader('X-Tenant-Id', user.tenantId);
-    res.setHeader('X-User-Role', user.role);
+    res.setHeader('X-Tenant-Id', user.tenantId ?? '');
+    res.setHeader('X-User-Role', user.role ?? '');
     res.setHeader('X-User-Email', user.email);
     return res.send();
   }

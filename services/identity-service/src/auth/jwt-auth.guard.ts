@@ -11,9 +11,15 @@ import { Request } from 'express';
 
 export interface AuthenticatedUser {
   userId: string;
-  tenantId: string;
-  role: string;
+  tenantId: string | null;
+  role: string | null;
   email: string;
+  firstName: string;
+  lastName: string;
+  status: string;
+  platformRole: string;
+  emailVerifiedAt: Date | null;
+  createdAt: Date;
 }
 
 export type AuthenticatedRequest = Request & {
@@ -56,6 +62,16 @@ export class JwtAuthGuard implements CanActivate {
           id: payload.sub,
           status: 'ACTIVE',
         },
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          status: true,
+          platformRole: true,
+          emailVerifiedAt: true,
+          createdAt: true,
+        },
       });
 
       if (!user) {
@@ -72,9 +88,15 @@ export class JwtAuthGuard implements CanActivate {
 
       request.user = {
         userId: user.id,
-        tenantId: membership?.organizationId ?? '',
-        role: membership?.role.toLowerCase() ?? 'member',
+        tenantId: membership?.organizationId ?? null,
+        role: membership?.role.toLowerCase() ?? null,
         email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        status: user.status,
+        platformRole: user.platformRole,
+        emailVerifiedAt: user.emailVerifiedAt,
+        createdAt: user.createdAt,
       };
     } catch {
       throw new UnauthorizedException('Invalid or expired token');
