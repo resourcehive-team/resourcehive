@@ -5,7 +5,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { login, LoginError } from "@/lib/auth-api";
-import { storeAccessToken } from "@/lib/auth-storage";
+import {
+  markSignupEmailVerified,
+  storeAccessToken,
+} from "@/lib/auth-storage";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -49,6 +52,7 @@ export function LoginForm({
     try {
       const response = await login({ email, password });
       storeAccessToken(response.token);
+      markSignupEmailVerified(email);
       router.replace(redirectTo);
     } catch (loginError) {
       setError(
