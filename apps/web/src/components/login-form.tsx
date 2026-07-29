@@ -18,6 +18,7 @@ import {
 import {
   Field,
   FieldDescription,
+  FieldError,
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field";
@@ -67,41 +68,62 @@ export function LoginForm({
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
         <CardHeader>
-          <CardTitle>Login to your account</CardTitle>
+          <CardTitle>Welcome back</CardTitle>
           <CardDescription>
-            Enter your email below to login to your account
+            Enter your institutional email to continue to ResourceHive.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit}>
+          <p className="mb-4 text-xs text-muted-foreground">
+            <span className="text-destructive" aria-hidden="true">
+              *
+            </span>{" "}
+            Required fields
+          </p>
+          <form onSubmit={handleSubmit} aria-busy={isSubmitting}>
             <FieldGroup>
-              <Field>
-                <FieldLabel htmlFor="email">Institutional email</FieldLabel>
+              <Field data-invalid={error ? "true" : undefined}>
+                <FieldLabel htmlFor="email">
+                  Institutional email
+                  <span className="text-destructive" aria-hidden="true">
+                    *
+                  </span>
+                </FieldLabel>
                 <Input
                   id="email"
                   name="email"
                   type="email"
                   placeholder="name@uom.lk"
                   autoComplete="email"
+                  autoFocus
+                  aria-invalid={Boolean(error)}
+                  aria-describedby={error ? "login-error" : undefined}
                   required
                 />
               </Field>
-              <Field>
-                <FieldLabel htmlFor="password">Password</FieldLabel>
+              <Field data-invalid={error ? "true" : undefined}>
+                <FieldLabel htmlFor="password">
+                  Password
+                  <span className="text-destructive" aria-hidden="true">
+                    *
+                  </span>
+                </FieldLabel>
                 <PasswordInput
                   id="password"
                   name="password"
                   autoComplete="current-password"
+                  aria-invalid={Boolean(error)}
+                  aria-describedby={error ? "login-error" : undefined}
                   required
                 />
               </Field>
               <Field>
-                {error && (
-                  <p className="text-sm text-destructive" role="alert">
-                    {error}
-                  </p>
-                )}
-                <Button type="submit" disabled={isSubmitting}>
+                <FieldError id="login-error">{error}</FieldError>
+                <Button
+                  className="w-full"
+                  type="submit"
+                  disabled={isSubmitting}
+                >
                   {isSubmitting ? "Logging in..." : "Login"}
                 </Button>
                 <FieldDescription className="text-center">
