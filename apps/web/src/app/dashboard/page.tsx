@@ -1,3 +1,4 @@
+import { LogoutButton } from "@/components/logout-button";
 import { ProtectedRoute } from "@/components/protected-route";
 import {
   Card,
@@ -19,9 +20,12 @@ export default function DashboardPage() {
                 You are signed in to ResourceHive.
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              Resource and organization tools will appear here as they are
-              added.
+            <CardContent className="grid gap-4">
+              <p>
+                Resource and organization tools will appear here as they are
+                added.
+              </p>
+              <LogoutButton />
             </CardContent>
           </Card>
         </div>
