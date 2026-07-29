@@ -1,12 +1,7 @@
+import { AccountMembershipCard } from "@/components/account-membership-card";
 import { AccountProfileCard } from "@/components/account-profile-card";
 import { AccountStatusCard } from "@/components/account-status-card";
 import { SiteHeader } from "@/components/site-header";
-import {
-  Card,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import {
   Tabs,
   TabsContent,
@@ -32,14 +27,7 @@ export default function AccountPage() {
             </TabsContent>
 
             <TabsContent value="membership">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Membership</CardTitle>
-                  <CardDescription>
-                    Your organization access and membership status.
-                  </CardDescription>
-                </CardHeader>
-              </Card>
+              <AccountMembershipCard />
             </TabsContent>
           </Tabs>
         </div>
