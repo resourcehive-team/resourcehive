@@ -3,7 +3,6 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 
-import { NavDocuments } from "@/components/nav-documents";
 import { NavMain } from "@/components/nav-main";
 import { NavSecondary } from "@/components/nav-secondary";
 import { NavUser } from "@/components/nav-user";
@@ -17,18 +16,14 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import {
+  BellIcon,
+  BookOpenIcon,
+  Building2Icon,
+  CalendarDaysIcon,
   ChartBarIcon,
   CircleHelpIcon,
   CommandIcon,
-  DatabaseIcon,
-  FileChartColumnIcon,
-  FileIcon,
-  FolderIcon,
   LayoutDashboardIcon,
-  ListIcon,
-  SearchIcon,
-  Settings2Icon,
-  UsersIcon,
 } from "lucide-react";
 import {
   AuthenticationRequiredError,
@@ -51,56 +46,34 @@ const data = {
     {
       title: "Resources",
       url: "#",
-      icon: <ListIcon />,
+      icon: <BookOpenIcon />,
     },
     {
       title: "Organizations",
       url: "#",
-      icon: <ChartBarIcon />,
+      icon: <Building2Icon />,
     },
     {
-      title: "Bookings",
+      title: "My bookings",
       url: "#",
-      icon: <FolderIcon />,
+      icon: <CalendarDaysIcon />,
     },
     {
       title: "Notifications",
       url: "#",
-      icon: <UsersIcon />,
+      icon: <BellIcon />,
+    },
+    {
+      title: "Points",
+      url: "#",
+      icon: <ChartBarIcon />,
     },
   ],
   navSecondary: [
     {
-      title: "Settings",
-      url: "#",
-      icon: <Settings2Icon />,
-    },
-    {
       title: "Get Help",
       url: "#",
       icon: <CircleHelpIcon />,
-    },
-    {
-      title: "Search",
-      url: "#",
-      icon: <SearchIcon />,
-    },
-  ],
-  documents: [
-    {
-      name: "Availability slots",
-      url: "#",
-      icon: <DatabaseIcon />,
-    },
-    {
-      name: "Memberships",
-      url: "#",
-      icon: <FileChartColumnIcon />,
-    },
-    {
-      name: "Reports",
-      url: "#",
-      icon: <FileIcon />,
     },
   ],
 };
@@ -154,7 +127,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={data.navMain} />
-        <NavDocuments items={data.documents} />
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
