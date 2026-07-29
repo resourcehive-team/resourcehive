@@ -59,7 +59,7 @@ export function SignupForm({
         password,
       });
       storeSignupDebugData(response);
-      router.replace("/dashboard");
+      router.replace("/signup/status");
     } catch (registrationError) {
       setError(
         registrationError instanceof RegistrationError

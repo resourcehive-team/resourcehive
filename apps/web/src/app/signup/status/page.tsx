@@ -19,7 +19,7 @@ function subscribeToSignupDebugData() {
   return () => undefined;
 }
 
-export default function DashboardPage() {
+export default function SignupStatusPage() {
   const storedSignup = useSyncExternalStore(
     subscribeToSignupDebugData,
     getSignupDebugDataSnapshot,
@@ -35,7 +35,7 @@ export default function DashboardPage() {
       <div className="w-full max-w-sm">
         <Card>
           <CardHeader>
-            <CardTitle>Development dashboard</CardTitle>
+            <CardTitle>Signup status</CardTitle>
             <CardDescription>
               Temporary signup details for development and debugging.
             </CardDescription>
