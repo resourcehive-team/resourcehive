@@ -20,6 +20,7 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/password-input";
 import { register, RegistrationError } from "@/lib/auth-api";
 import { storeSignupDebugData } from "@/lib/auth-storage";
 import { cn } from "@/lib/utils";
@@ -117,10 +118,9 @@ export function SignupForm({
               </Field>
               <Field>
                 <FieldLabel htmlFor="password">Password</FieldLabel>
-                <Input
+                <PasswordInput
                   id="password"
                   name="password"
-                  type="password"
                   autoComplete="new-password"
                   minLength={8}
                   required
@@ -134,10 +134,9 @@ export function SignupForm({
                 <FieldLabel htmlFor="confirmPassword">
                   Confirm password
                 </FieldLabel>
-                <Input
+                <PasswordInput
                   id="confirmPassword"
                   name="confirmPassword"
-                  type="password"
                   autoComplete="new-password"
                   minLength={8}
                   required
