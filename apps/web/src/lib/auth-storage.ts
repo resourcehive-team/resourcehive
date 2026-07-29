@@ -9,6 +9,49 @@ export function storeAccessToken(token: string) {
   localStorage.setItem(accessTokenKey, token);
 }
 
+export function getAccessToken(): string | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  return localStorage.getItem(accessTokenKey);
+}
+
+export function clearAccessToken() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  localStorage.removeItem(accessTokenKey);
+}
+
+export function isAccessTokenUsable(token: string | null): token is string {
+  if (!token) {
+    return false;
+  }
+
+  const tokenParts = token.split(".");
+  if (tokenParts.length !== 3) {
+    return false;
+  }
+
+  try {
+    const encodedPayload = tokenParts[1]
+      .replaceAll("-", "+")
+      .replaceAll("_", "/");
+    const padding = "=".repeat((4 - (encodedPayload.length % 4)) % 4);
+    const payload = JSON.parse(atob(encodedPayload + padding)) as {
+      exp?: unknown;
+    };
+
+    return (
+      typeof payload.exp === "number" && payload.exp * 1000 > Date.now()
+    );
+  } catch {
+    return false;
+  }
+}
+
 export function storeSignupDebugData(data: RegistrationResponse) {
   sessionStorage.setItem(signupDebugDataKey, JSON.stringify(data));
 }
