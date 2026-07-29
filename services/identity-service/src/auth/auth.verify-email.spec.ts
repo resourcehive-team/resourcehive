@@ -30,6 +30,7 @@ describe('AuthService email verification', () => {
   const findDomainConfiguration = jest.fn();
   const findAllowlistEntries = jest.fn();
   const markAllowlistEntriesUsed = jest.fn();
+  const findMemberships = jest.fn();
   const upsertMembership = jest.fn<
     Promise<unknown>,
     [UpsertMembershipRequest]
@@ -48,6 +49,7 @@ describe('AuthService email verification', () => {
       updateMany: markAllowlistEntriesUsed,
     },
     organizationMembership: {
+      findMany: findMemberships,
       upsert: upsertMembership,
     },
     user: {
@@ -74,6 +76,7 @@ describe('AuthService email verification', () => {
         email: 'alex@example.edu',
         firstName: 'Alex',
         lastName: 'Student',
+        status: 'ACTIVE',
         emailVerifiedAt: null,
       },
     });
@@ -98,6 +101,7 @@ describe('AuthService email verification', () => {
     ]);
     upsertMembership.mockResolvedValue({ id: 'membership-id' });
     markAllowlistEntriesUsed.mockResolvedValue({ count: 1 });
+    findMemberships.mockResolvedValue([]);
     updateUser.mockResolvedValue({
       id: 'user-id',
       email: 'alex@example.edu',
@@ -162,6 +166,64 @@ describe('AuthService email verification', () => {
       service.verifyEmail('verification-token'),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(claimVerificationToken).not.toHaveBeenCalled();
+  });
+
+  it('reports an already verified user from the database', async () => {
+    const verifiedAt = new Date(Date.now() - 60_000);
+    findVerificationToken.mockResolvedValue({
+      id: 'verification-token-id',
+      usedAt: verifiedAt,
+      expiresAt: new Date(Date.now() - 30_000),
+      user: {
+        id: 'user-id',
+        email: 'alex@example.edu',
+        firstName: 'Alex',
+        lastName: 'Student',
+        status: 'ACTIVE',
+        emailVerifiedAt: verifiedAt,
+      },
+    });
+    findMemberships.mockResolvedValue([
+      {
+        role: 'MEMBER',
+        status: 'APPROVED',
+        organization: {
+          id: 'root-organization-id',
+          name: 'Example University',
+        },
+      },
+    ]);
+
+    await expect(service.verifyEmail('verification-token')).resolves.toEqual({
+      message: 'Email is already verified. You can log in.',
+      user: {
+        id: 'user-id',
+        email: 'alex@example.edu',
+        firstName: 'Alex',
+        lastName: 'Student',
+        status: 'ACTIVE',
+        emailVerifiedAt: verifiedAt,
+        emailVerified: true,
+        organizations: [
+          {
+            id: 'root-organization-id',
+            name: 'Example University',
+            role: 'MEMBER',
+            status: 'APPROVED',
+          },
+        ],
+      },
+    });
+    expect(findMemberships).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          userId: 'user-id',
+          status: 'APPROVED',
+        },
+      }),
+    );
+    expect(claimVerificationToken).not.toHaveBeenCalled();
+    expect(updateUser).not.toHaveBeenCalled();
   });
 
   it('rejects a verification link claimed by another request', async () => {

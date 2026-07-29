@@ -160,6 +160,28 @@ describe('Authentication Flow (e2e)', () => {
     ]);
   });
 
+  it('reports success when the verified signup link is opened again', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/auth/verify-email')
+      .send({ token: verificationToken })
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      message: 'Email is already verified. You can log in.',
+      user: {
+        email: signupEmail,
+        emailVerified: true,
+        organizations: [
+          expect.objectContaining({
+            name: 'Demo Organization',
+            role: 'MEMBER',
+            status: 'APPROVED',
+          }),
+        ],
+      },
+    });
+  });
+
   afterAll(async () => {
     const signupUser = await prisma.user.findUnique({
       where: { email: signupEmail },

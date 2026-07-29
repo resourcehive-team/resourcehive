@@ -194,18 +194,53 @@ export class AuthService {
                 email: true,
                 firstName: true,
                 lastName: true,
+                status: true,
                 emailVerifiedAt: true,
               },
             },
           },
         });
 
-      if (
-        !verificationToken ||
-        verificationToken.usedAt ||
-        verificationToken.expiresAt <= now ||
-        verificationToken.user.emailVerifiedAt
-      ) {
+      if (!verificationToken) {
+        throw new BadRequestException(
+          'Verification link is invalid or has expired',
+        );
+      }
+
+      if (verificationToken.user.emailVerifiedAt) {
+        const memberships = await transaction.organizationMembership.findMany({
+          where: {
+            userId: verificationToken.user.id,
+            status: 'APPROVED',
+          },
+          select: {
+            role: true,
+            status: true,
+            organization: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+          orderBy: { joinedAt: 'asc' },
+        });
+
+        return {
+          message: 'Email is already verified. You can log in.',
+          user: {
+            ...verificationToken.user,
+            emailVerified: true,
+            organizations: memberships.map((membership) => ({
+              ...membership.organization,
+              role: membership.role,
+              status: membership.status,
+            })),
+          },
+        };
+      }
+
+      if (verificationToken.usedAt || verificationToken.expiresAt <= now) {
         throw new BadRequestException(
           'Verification link is invalid or has expired',
         );
