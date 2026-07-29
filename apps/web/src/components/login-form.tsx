@@ -24,9 +24,10 @@ import {
 import { Input } from "@/components/ui/input";
 
 export function LoginForm({
+  redirectTo = "/dashboard",
   className,
   ...props
-}: React.ComponentProps<"div">) {
+}: React.ComponentProps<"div"> & { redirectTo?: string }) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -48,7 +49,7 @@ export function LoginForm({
     try {
       const response = await login({ email, password });
       storeAccessToken(response.token);
-      router.replace("/");
+      router.replace(redirectTo);
     } catch (loginError) {
       setError(
         loginError instanceof LoginError
