@@ -13,11 +13,8 @@ import {
 import {
   getSignupDebugDataSnapshot,
   parseSignupDebugData,
+  subscribeToSignupDebugData,
 } from "@/lib/auth-storage";
-
-function subscribeToSignupDebugData() {
-  return () => undefined;
-}
 
 export default function SignupStatusPage() {
   const storedSignup = useSyncExternalStore(

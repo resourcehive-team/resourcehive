@@ -2,7 +2,9 @@ import type { RegistrationResponse } from "@/lib/auth-api";
 
 const accessTokenKey = "resourcehive_access_token";
 const signupDebugDataKey = "resourcehive_signup_debug_data";
+const verifiedSignupEmailKey = "resourcehive_verified_signup_email";
 const accessTokenChangedEvent = "resourcehive:access-token-changed";
+const signupDebugDataChangedEvent = "resourcehive:signup-debug-data-changed";
 
 // Temporary until the backend supports an HttpOnly cookie session.
 // localStorage tokens can be read by JavaScript if the page has an XSS flaw.
@@ -72,7 +74,9 @@ export function isAccessTokenUsable(token: string | null): token is string {
 }
 
 export function storeSignupDebugData(data: RegistrationResponse) {
-  sessionStorage.setItem(signupDebugDataKey, JSON.stringify(data));
+  localStorage.setItem(signupDebugDataKey, JSON.stringify(data));
+  sessionStorage.removeItem(signupDebugDataKey);
+  window.dispatchEvent(new Event(signupDebugDataChangedEvent));
 }
 
 export function markSignupEmailVerified(verifiedEmail: string) {
@@ -80,11 +84,15 @@ export function markSignupEmailVerified(verifiedEmail: string) {
     return;
   }
 
+  const normalizedEmail = verifiedEmail.toLowerCase();
+  localStorage.setItem(verifiedSignupEmailKey, normalizedEmail);
+
   const signup = parseSignupDebugData(getSignupDebugDataSnapshot());
   if (
     !signup ||
-    signup.user.email.toLowerCase() !== verifiedEmail.toLowerCase()
+    signup.user.email.toLowerCase() !== normalizedEmail
   ) {
+    window.dispatchEvent(new Event(signupDebugDataChangedEvent));
     return;
   }
 
@@ -98,7 +106,50 @@ export function markSignupEmailVerified(verifiedEmail: string) {
 }
 
 export function getSignupDebugDataSnapshot(): string | null {
-  return sessionStorage.getItem(signupDebugDataKey);
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const storedData =
+    localStorage.getItem(signupDebugDataKey) ??
+    sessionStorage.getItem(signupDebugDataKey);
+  const signup = parseSignupDebugData(storedData);
+  const verifiedEmail = localStorage.getItem(verifiedSignupEmailKey);
+
+  if (
+    signup &&
+    verifiedEmail === signup.user.email.toLowerCase() &&
+    !signup.user.emailVerified
+  ) {
+    return JSON.stringify({
+      ...signup,
+      user: {
+        ...signup.user,
+        emailVerified: true,
+      },
+    });
+  }
+
+  return storedData;
+}
+
+export function subscribeToSignupDebugData(onStoreChange: () => void) {
+  function handleStorage(event: StorageEvent) {
+    if (
+      event.key === signupDebugDataKey ||
+      event.key === verifiedSignupEmailKey
+    ) {
+      onStoreChange();
+    }
+  }
+
+  window.addEventListener("storage", handleStorage);
+  window.addEventListener(signupDebugDataChangedEvent, onStoreChange);
+
+  return () => {
+    window.removeEventListener("storage", handleStorage);
+    window.removeEventListener(signupDebugDataChangedEvent, onStoreChange);
+  };
 }
 
 export function parseSignupDebugData(
