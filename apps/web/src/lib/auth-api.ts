@@ -7,7 +7,6 @@ export interface LoginRequest {
 
 export interface LoginResponse {
   message: "user login successfully";
-  token: string;
 }
 
 export interface RegistrationRequest {
@@ -89,6 +88,7 @@ export async function login(credentials: LoginRequest): Promise<LoginResponse> {
   try {
     response = await fetch(`${identityApiUrl}/auth/login`, {
       method: "POST",
+      credentials: "include",
       headers: {
         "Content-Type": "application/json",
       },
@@ -116,17 +116,25 @@ export async function login(credentials: LoginRequest): Promise<LoginResponse> {
     !data ||
     typeof data !== "object" ||
     !("message" in data) ||
-    data.message !== "user login successfully" ||
-    !("token" in data) ||
-    typeof data.token !== "string"
+    data.message !== "user login successfully"
   ) {
     throw new LoginError("The login service returned an invalid response.");
   }
 
   return {
     message: "user login successfully",
-    token: data.token,
   };
+}
+
+export async function logout(): Promise<void> {
+  const response = await fetch(`${identityApiUrl}/auth/logout`, {
+    method: "POST",
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    throw new Error("Unable to log out. Please try again.");
+  }
 }
 
 export async function register(
