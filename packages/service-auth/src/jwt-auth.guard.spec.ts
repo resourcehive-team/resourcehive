@@ -4,12 +4,13 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
+import { AccessTokenVerifier } from "./access-token-verifier";
 import { AuthenticatedRequest } from "./authenticated-user";
 import { JwtAuthGuard } from "./jwt-auth.guard";
 
 describe("JwtAuthGuard", () => {
   const jwtService = new JwtService();
-  const guard = new JwtAuthGuard(jwtService);
+  const guard = new JwtAuthGuard(new AccessTokenVerifier(jwtService));
   const jwtSecret = "resourcehive-test-secret";
   const originalSecret = process.env.JWT_SECRET;
 

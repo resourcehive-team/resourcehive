@@ -38,3 +38,31 @@ table, an approved field/index, or the chosen transport.
 WebSocket and email delivery are later milestones. Redis will be added only if
 its coordination/pub-sub role is justified and approved; it will not replace
 PostgreSQL persistence.
+
+## Authenticated WebSocket foundation
+
+Status: **approved by Person C for Week 4.**
+
+- namespace: `/notifications`;
+- public Socket.IO path: `/notifications/socket.io`;
+- transport: WebSocket;
+- access token: `handshake.auth.token`;
+- authenticated room: server-derived `user:<userId>`;
+- multiple sockets per user are allowed;
+- missing, invalid, expired, or suspended-user connections receive the generic
+  `Authentication failed` rejection;
+- no client may choose a recipient or room;
+- no Redis is required for the single-instance Week 4 foundation.
+
+After joining its private room, a connection receives:
+
+```json
+{
+  "eventType": "notification.connection.ready",
+  "eventVersion": 1,
+  "occurredAt": "2026-08-01T09:55:00.000Z"
+}
+```
+
+This readiness event contains no JWT or user data. Business notification
+delivery remains a later milestone.

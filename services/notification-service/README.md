@@ -3,11 +3,12 @@
 Person B owns this NestJS service for persistent, real-time, and fallback
 notifications.
 
-Week 2 adds validated notification creation persistence and recipient-scoped
-repository retrieval. Public read APIs, WebSockets, and email delivery remain
-later milestones.
+The service currently provides persistent notification creation,
+recipient-scoped read APIs, and the authenticated WebSocket connection
+foundation. Business-event delivery and email fallback remain later
+milestones.
 
-Proposed contracts requiring Person C approval:
+Approved contracts:
 
 - [Notification API](docs/api-contract.md)
 - [Consumed booking events](docs/event-contracts.md)
@@ -24,6 +25,9 @@ pnpm --filter notification-service run start:dev
 - Internal port: `3003`
 - Readiness: `GET /health`
 - Swagger UI: `GET /docs`
+- Socket.IO namespace: `/notifications`
+- Socket.IO path: `/notifications/socket.io`
+- Socket authentication: `handshake.auth.token`
 
 Run persistence integration tests only against a migrated disposable database:
 
@@ -40,7 +44,11 @@ docker build -f services/notification-service/Dockerfile -t resourcehive-notific
 docker run --rm -p 3003:3003 -e DATABASE_URL=postgresql://... resourcehive-notification
 ```
 
-The public prefix proposed for Person C's gateway integration is
-`/notifications/*`. Future real-time delivery will require WebSocket upgrade
-support. Root Compose, Nginx, shared environment files, CI workflows, and port
-assignments require Person C approval.
+The public HTTP prefix is `/notifications/*`. Person C's gateway integration
+must proxy `/notifications/socket.io` to this service with HTTP/1.1 WebSocket
+upgrade headers and long-lived connection timeouts. Root Compose, Nginx, shared
+environment files, CI workflows, and port assignments remain Person C-owned.
+
+Redis is not required for the single-instance authentication foundation. An
+approved Socket.IO adapter or Redis coordination is required before relying on
+rooms across multiple Notification Service instances.

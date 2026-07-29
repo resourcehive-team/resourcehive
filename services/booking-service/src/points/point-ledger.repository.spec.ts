@@ -44,7 +44,7 @@ describe("PointLedgerRepository", () => {
         userId: "user-id",
         bookingId: "booking-id",
         amount: -25,
-        transactionType: "BOOKING_DEDUCTION",
+        transactionType: "BOOKING",
         description: undefined,
       },
     });

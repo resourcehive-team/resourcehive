@@ -95,6 +95,25 @@ constraint remains the final concurrency protection.
 
 Expected responses: `201`, `400`, `401`, `403`, `404`, `409`, `422`, `500`.
 
+## Week 4 booking validation boundary
+
+Week 4 adds an internal validation use case without creating a booking or
+writing a point transaction. It derives the user and tenant from authenticated
+server context, then verifies:
+
+- the account and selected organization membership remain active and approved;
+- the slot belongs to the authenticated root tenant;
+- the resource is active and accessible to an approved user organization;
+- the slot has not started;
+- no non-cancelled booking currently occupies the slot;
+- the server-owned resource point cost is a non-negative integer;
+- the authenticated user's append-only ledger balance is sufficient.
+
+Successful validation returns a server-derived context containing the user,
+tenant, resource, slot, time range, and point cost. Week 5 must repeat these
+checks inside the booking transaction because validation alone is not a
+concurrency guarantee.
+
 ## Week 3 internal point ledger boundary
 
 Week 3 adds no public points endpoint. Booking Service provides an internal
