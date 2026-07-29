@@ -6,6 +6,7 @@ import { PrismaModule } from '@resourcehive/database';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { AuthModule } from './auth/auth.module';
 import { MembershipsModule } from './memberships/memberships.module';
+import { ResourcesModule } from './resources/resources.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { MembershipsModule } from './memberships/memberships.module';
     OrganizationsModule,
     AuthModule,
     MembershipsModule,
+    ResourcesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
