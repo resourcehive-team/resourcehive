@@ -25,7 +25,7 @@ Identity Service
     creates a JWT when the user logs in
 
 Client
-    sends that JWT with a request
+    automatically sends the HttpOnly authentication cookie
 
 Resource, Booking, or Notification Service
     uses this package to verify the JWT
@@ -39,6 +39,9 @@ Service for every request.
 ## What the package handles
 
 - Finds the JWT in the request.
+- Accepts the ResourceHive HttpOnly cookie used by the web application.
+- Continues accepting `Authorization: Bearer <token>` for tests, Swagger, and
+  non-browser clients.
 - Checks that the JWT was created using the ResourceHive secret.
 - Checks that the JWT has not expired.
 - Identifies the user from the JWT.
@@ -88,6 +91,14 @@ You can ask your AI coding agent:
 Do not ask the AI agent to create another JWT guard inside the service. The
 shared package already provides it.
 
+Existing services that already use `ServiceAuthModule` and `JwtAuthGuard` do
+not need controller changes for cookie authentication. Updating this package
+updates their authentication behavior.
+
+At the current baseline, Booking and Notification already use this package.
+Resource Service still has its own Passport JWT strategy, so it must migrate to
+this package once; a package update cannot change code that does not import it.
+
 ## What the service needs
 
 The service must receive the same `JWT_SECRET` used by the Identity Service.
@@ -98,11 +109,26 @@ JWT_SECRET=your-private-resourcehive-secret
 
 Never commit the real secret to Git.
 
-The client must send the JWT using:
+The ResourceHive web application receives this cookie from the Identity
+Service:
+
+```text
+resourcehive_access_token
+```
+
+The browser stores and sends it automatically. Frontend JavaScript cannot read
+it because it is HttpOnly.
+
+Swagger, automated tests, and trusted non-browser integrations with an issued
+token may continue sending:
 
 ```text
 Authorization: Bearer <token>
 ```
+
+When a browser calls services through another origin, the request must include
+credentials and the gateway must forward the `Cookie` header. This is shared
+deployment configuration, not work that should be repeated in each controller.
 
 ## Small usage example
 

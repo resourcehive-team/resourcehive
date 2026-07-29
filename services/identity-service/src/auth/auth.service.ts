@@ -162,7 +162,7 @@ export class AuthService {
         sub: user.id,
         email: user.email,
         organizationId: membership?.organizationId ?? null,
-        role: membership?.role.toLowerCase() ?? 'member',
+        role: membership?.role.toLowerCase() ?? null,
       },
       {
         secret: this.getJwtSecret(),

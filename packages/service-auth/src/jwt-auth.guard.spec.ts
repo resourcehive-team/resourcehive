@@ -64,7 +64,43 @@ describe("JwtAuthGuard", () => {
     });
   });
 
-  it("rejects a request without a Bearer token", async () => {
+  it("accepts a valid token from the ResourceHive authentication cookie", async () => {
+    const token = await jwtService.signAsync(
+      {
+        sub: "561d85d2-8ada-44f7-8743-2719c3905dc5",
+        email: "member@example.edu",
+        organizationId: "ca1892ee-8552-408a-9b20-fdbed7152ddd",
+        role: "member",
+      },
+      { secret: jwtSecret, expiresIn: "1h" },
+    );
+    const { context, request } = createContext({
+      cookie: `another_cookie=value; resourcehive_access_token=${token}`,
+    });
+
+    await expect(guard.canActivate(context)).resolves.toBe(true);
+    expect(request.user).toMatchObject({
+      userId: "561d85d2-8ada-44f7-8743-2719c3905dc5",
+      email: "member@example.edu",
+    });
+  });
+
+  it("accepts a cookie parsed by framework middleware", async () => {
+    const token = await jwtService.signAsync(
+      {
+        sub: "561d85d2-8ada-44f7-8743-2719c3905dc5",
+        email: "member@example.edu",
+      },
+      { secret: jwtSecret, expiresIn: "1h" },
+    );
+    const { context } = createContext({
+      cookies: { resourcehive_access_token: token },
+    });
+
+    await expect(guard.canActivate(context)).resolves.toBe(true);
+  });
+
+  it("rejects a request without a Bearer token or authentication cookie", async () => {
     const { context } = createContext();
 
     await expect(guard.canActivate(context)).rejects.toBeInstanceOf(
@@ -73,7 +109,9 @@ describe("JwtAuthGuard", () => {
   });
 
   it("rejects a malformed Authorization header", async () => {
-    const { context } = createContext("not-a-bearer-token");
+    const { context } = createContext({
+      authorization: "not-a-bearer-token",
+    });
 
     await expect(guard.canActivate(context)).rejects.toBeInstanceOf(
       UnauthorizedException,
@@ -132,12 +170,27 @@ describe("JwtAuthGuard", () => {
   });
 });
 
-function createContext(authorization?: string): {
+function createContext(
+  input?:
+    | string
+    | {
+        authorization?: string;
+        cookie?: string;
+        cookies?: Record<string, unknown>;
+      },
+): {
   context: ExecutionContext;
   request: AuthenticatedRequest;
 } {
+  const options = typeof input === "string" ? { authorization: input } : input;
   const request: AuthenticatedRequest = {
-    headers: authorization ? { authorization } : {},
+    headers: {
+      ...(options?.authorization
+        ? { authorization: options.authorization }
+        : {}),
+      ...(options?.cookie ? { cookie: options.cookie } : {}),
+    },
+    ...(options?.cookies ? { cookies: options.cookies } : {}),
   };
   const context = {
     switchToHttp: () => ({

@@ -7,7 +7,24 @@ export interface LoginRequest {
 
 export interface LoginResponse {
   message: "user login successfully";
-  token: string;
+}
+
+export interface CurrentUserResponse {
+  user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    displayName: string;
+    emailVerified: boolean;
+    status: string;
+    platformRole: string;
+    createdAt: string;
+  };
+  organizationContext: {
+    organizationId: string | null;
+    role: string | null;
+  };
 }
 
 export interface RegistrationRequest {
@@ -69,6 +86,13 @@ export class LoginError extends Error {
   }
 }
 
+export class AuthenticationRequiredError extends Error {
+  constructor() {
+    super("Your session has expired. Log in again.");
+    this.name = "AuthenticationRequiredError";
+  }
+}
+
 export class RegistrationError extends Error {
   constructor(message: string) {
     super(message);
@@ -89,6 +113,7 @@ export async function login(credentials: LoginRequest): Promise<LoginResponse> {
   try {
     response = await fetch(`${identityApiUrl}/auth/login`, {
       method: "POST",
+      credentials: "include",
       headers: {
         "Content-Type": "application/json",
       },
@@ -116,17 +141,56 @@ export async function login(credentials: LoginRequest): Promise<LoginResponse> {
     !data ||
     typeof data !== "object" ||
     !("message" in data) ||
-    data.message !== "user login successfully" ||
-    !("token" in data) ||
-    typeof data.token !== "string"
+    data.message !== "user login successfully"
   ) {
     throw new LoginError("The login service returned an invalid response.");
   }
 
   return {
     message: "user login successfully",
-    token: data.token,
   };
+}
+
+export async function logout(): Promise<void> {
+  const response = await fetch(`${identityApiUrl}/auth/logout`, {
+    method: "POST",
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    throw new Error("Unable to log out. Please try again.");
+  }
+}
+
+export async function getCurrentUser(
+  signal?: AbortSignal,
+): Promise<CurrentUserResponse> {
+  let response: Response;
+
+  try {
+    response = await fetch(`${identityApiUrl}/auth/me`, {
+      credentials: "include",
+      cache: "no-store",
+      signal,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw error;
+    }
+
+    throw new Error("Unable to load the current user.");
+  }
+
+  if (response.status === 401) {
+    throw new AuthenticationRequiredError();
+  }
+
+  const data: unknown = await response.json().catch(() => null);
+  if (!response.ok || !isCurrentUserResponse(data)) {
+    throw new Error("The identity service returned an invalid user.");
+  }
+
+  return data;
 }
 
 export async function register(
@@ -251,6 +315,51 @@ function getApiErrorMessage(data: unknown, fallback: string): string {
   }
 
   return fallback;
+}
+
+function isCurrentUserResponse(data: unknown): data is CurrentUserResponse {
+  if (
+    !data ||
+    typeof data !== "object" ||
+    !("user" in data) ||
+    !data.user ||
+    typeof data.user !== "object" ||
+    !("organizationContext" in data) ||
+    !data.organizationContext ||
+    typeof data.organizationContext !== "object"
+  ) {
+    return false;
+  }
+
+  const user = data.user;
+  const organizationContext = data.organizationContext;
+
+  return (
+    "id" in user &&
+    typeof user.id === "string" &&
+    "email" in user &&
+    typeof user.email === "string" &&
+    "firstName" in user &&
+    typeof user.firstName === "string" &&
+    "lastName" in user &&
+    typeof user.lastName === "string" &&
+    "displayName" in user &&
+    typeof user.displayName === "string" &&
+    "emailVerified" in user &&
+    typeof user.emailVerified === "boolean" &&
+    "status" in user &&
+    typeof user.status === "string" &&
+    "platformRole" in user &&
+    typeof user.platformRole === "string" &&
+    "createdAt" in user &&
+    typeof user.createdAt === "string" &&
+    "organizationId" in organizationContext &&
+    (typeof organizationContext.organizationId === "string" ||
+      organizationContext.organizationId === null) &&
+    "role" in organizationContext &&
+    (typeof organizationContext.role === "string" ||
+      organizationContext.role === null)
+  );
 }
 
 function isRegistrationResponse(data: unknown): data is RegistrationResponse {

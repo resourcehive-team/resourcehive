@@ -8,6 +8,8 @@ export interface AuthenticatedUser {
 export interface AuthenticatedRequest {
   headers: {
     authorization?: string | string[];
+    cookie?: string | string[];
   };
+  cookies?: Record<string, unknown>;
   user?: AuthenticatedUser;
 }

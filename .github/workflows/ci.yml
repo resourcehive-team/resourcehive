@@ -41,6 +41,9 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build Shared Authentication Package
+        run: pnpm --filter @resourcehive/service-auth run build
+
       - name: Initialize Temporary PostgreSQL Database
         run: pnpm run db:init
         env:

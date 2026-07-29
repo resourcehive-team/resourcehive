@@ -7,7 +7,25 @@ import { AppModule } from './../src/app.module';
 
 interface LoginResponse {
   message: string;
-  token: string;
+}
+
+interface CurrentUserResponse {
+  user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    displayName: string;
+    emailVerified: boolean;
+    status: string;
+    platformRole: string;
+    createdAt: string;
+    passwordHash?: string;
+  };
+  organizationContext: {
+    organizationId: string | null;
+    role: string | null;
+  };
 }
 
 interface RegistrationResponse {
@@ -23,7 +41,7 @@ describe('Authentication Flow (e2e)', () => {
   jest.setTimeout(30000);
   let app: INestApplication<App>;
   let prisma: PrismaService;
-  let jwtToken: string;
+  let authenticationCookie: string;
   let verificationToken: string;
   const testEmail = process.env.DEMO_USER_EMAIL ?? 'demo@example.edu';
   const testPassword = process.env.DEMO_USER_PASSWORD ?? 'DemoPassword123!';
@@ -68,7 +86,7 @@ describe('Authentication Flow (e2e)', () => {
       .expect(401);
   });
 
-  it('logs in the seeded demo user and returns a JWT', async () => {
+  it('logs in the seeded demo user and issues an HttpOnly cookie', async () => {
     const response = await request(app.getHttpServer())
       .post('/auth/login')
       .send({
@@ -79,16 +97,25 @@ describe('Authentication Flow (e2e)', () => {
 
     const body = response.body as LoginResponse;
     expect(body.message).toBe('user login successfully');
-    expect(body.token).toBeDefined();
-    expect(typeof body.token).toBe('string');
+    expect(response.body).not.toHaveProperty('token');
 
-    jwtToken = body.token;
+    const setCookie = response.headers['set-cookie'] as unknown;
+    expect(Array.isArray(setCookie)).toBe(true);
+    const accessTokenCookie = (setCookie as string[]).find((cookie) =>
+      cookie.startsWith('resourcehive_access_token='),
+    );
+    expect(accessTokenCookie).toContain('HttpOnly');
+    expect(accessTokenCookie).toContain('SameSite=Lax');
+    expect(accessTokenCookie).toContain('Path=/');
+
+    authenticationCookie = accessTokenCookie?.split(';')[0] ?? '';
+    expect(authenticationCookie).not.toBe('');
   });
 
-  it('validates the JWT and returns identity headers', async () => {
+  it('validates the cookie JWT and returns identity headers', async () => {
     const response = await request(app.getHttpServer())
       .get('/auth/validate')
-      .set('Authorization', `Bearer ${jwtToken}`)
+      .set('Cookie', authenticationCookie)
       .expect(200);
 
     // NGINX uses this endpoint to capture headers
@@ -98,11 +125,56 @@ describe('Authentication Flow (e2e)', () => {
     expect(response.headers['x-user-email']).toBe(testEmail);
   });
 
+  it('returns the current user without exposing private account data', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/auth/me')
+      .set('Cookie', authenticationCookie)
+      .expect(200);
+
+    const body = response.body as CurrentUserResponse;
+    expect(response.headers['cache-control']).toBe('private, no-store');
+    expect(body).toMatchObject({
+      user: {
+        email: testEmail,
+        firstName: 'Demo',
+        lastName: 'User',
+        displayName: 'Demo User',
+        emailVerified: true,
+        status: 'ACTIVE',
+        platformRole: 'USER',
+      },
+      organizationContext: {
+        role: 'member',
+      },
+    });
+    expect(typeof body.user.id).toBe('string');
+    expect(Number.isNaN(Date.parse(body.user.createdAt))).toBe(false);
+    expect(typeof body.organizationContext.organizationId).toBe('string');
+    expect(body.user).not.toHaveProperty('passwordHash');
+  });
+
+  it('rejects current-user requests without an authentication cookie', async () => {
+    await request(app.getHttpServer()).get('/auth/me').expect(401);
+  });
+
   it('rejects an invalid JWT', async () => {
     await request(app.getHttpServer())
       .get('/auth/validate')
       .set('Authorization', 'Bearer invalid-token')
       .expect(401);
+  });
+
+  it('clears the authentication cookie during logout', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/auth/logout')
+      .set('Cookie', authenticationCookie)
+      .expect(204);
+
+    const setCookie = response.headers['set-cookie'] as unknown;
+    expect(Array.isArray(setCookie)).toBe(true);
+    expect((setCookie as string[])[0]).toContain('resourcehive_access_token=;');
+    expect((setCookie as string[])[0]).toContain('HttpOnly');
+    expect((setCookie as string[])[0]).toContain('Path=/');
   });
 
   it('registers an unverified user from an approved email domain', async () => {

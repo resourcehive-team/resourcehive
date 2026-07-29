@@ -2,14 +2,17 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   HttpCode,
   HttpStatus,
   Post,
   Req,
   Res,
+  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
-import { Response } from 'express';
+import type { Response } from 'express';
+import { clearAccessTokenCookie, setAccessTokenCookie } from './auth-cookie';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -39,8 +42,51 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  async login(@Body() loginData: LoginDto) {
-    return this.authService.login(loginData);
+  async login(
+    @Body() loginData: LoginDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const login = await this.authService.login(loginData);
+    setAccessTokenCookie(response, login.token);
+
+    return {
+      message: login.message,
+    };
+  }
+
+  @Post('logout')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  logout(@Res({ passthrough: true }) response: Response) {
+    clearAccessTokenCookie(response);
+  }
+
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  @Header('Cache-Control', 'private, no-store')
+  me(@Req() request: AuthenticatedRequest) {
+    const user = request.user;
+
+    if (!user) {
+      throw new UnauthorizedException('Authentication is required');
+    }
+
+    return {
+      user: {
+        id: user.userId,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        displayName: `${user.firstName} ${user.lastName}`.trim(),
+        emailVerified: user.emailVerifiedAt !== null,
+        status: user.status,
+        platformRole: user.platformRole,
+        createdAt: user.createdAt.toISOString(),
+      },
+      organizationContext: {
+        organizationId: user.tenantId || null,
+        role: user.role || null,
+      },
+    };
   }
 
   @Get('validate')
@@ -53,8 +99,8 @@ export class AuthController {
     }
 
     res.setHeader('X-User-Id', user.userId);
-    res.setHeader('X-Tenant-Id', user.tenantId);
-    res.setHeader('X-User-Role', user.role);
+    res.setHeader('X-Tenant-Id', user.tenantId ?? '');
+    res.setHeader('X-User-Role', user.role ?? '');
     res.setHeader('X-User-Email', user.email);
     return res.send();
   }

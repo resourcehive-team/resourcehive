@@ -82,19 +82,36 @@ export function SignupForm({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit}>
+          <p className="mb-4 text-xs text-muted-foreground">
+            <span className="text-destructive" aria-hidden="true">
+              *
+            </span>{" "}
+            Required fields
+          </p>
+          <form onSubmit={handleSubmit} aria-busy={isSubmitting}>
             <FieldGroup>
               <Field>
-                <FieldLabel htmlFor="firstName">First name</FieldLabel>
+                <FieldLabel htmlFor="firstName">
+                  First name
+                  <span className="text-destructive" aria-hidden="true">
+                    *
+                  </span>
+                </FieldLabel>
                 <Input
                   id="firstName"
                   name="firstName"
                   autoComplete="given-name"
+                  autoFocus
                   required
                 />
               </Field>
               <Field>
-                <FieldLabel htmlFor="lastName">Last name</FieldLabel>
+                <FieldLabel htmlFor="lastName">
+                  Last name
+                  <span className="text-destructive" aria-hidden="true">
+                    *
+                  </span>
+                </FieldLabel>
                 <Input
                   id="lastName"
                   name="lastName"
@@ -103,7 +120,12 @@ export function SignupForm({
                 />
               </Field>
               <Field>
-                <FieldLabel htmlFor="email">Institutional email</FieldLabel>
+                <FieldLabel htmlFor="email">
+                  Institutional email
+                  <span className="text-destructive" aria-hidden="true">
+                    *
+                  </span>
+                </FieldLabel>
                 <Input
                   id="email"
                   name="email"
@@ -117,7 +139,12 @@ export function SignupForm({
                 </FieldDescription>
               </Field>
               <Field>
-                <FieldLabel htmlFor="password">Password</FieldLabel>
+                <FieldLabel htmlFor="password">
+                  Password
+                  <span className="text-destructive" aria-hidden="true">
+                    *
+                  </span>
+                </FieldLabel>
                 <PasswordInput
                   id="password"
                   name="password"
@@ -130,21 +157,38 @@ export function SignupForm({
                   character.
                 </FieldDescription>
               </Field>
-              <Field>
+              <Field
+                data-invalid={
+                  error === "Passwords do not match." ? "true" : undefined
+                }
+              >
                 <FieldLabel htmlFor="confirmPassword">
                   Confirm password
+                  <span className="text-destructive" aria-hidden="true">
+                    *
+                  </span>
                 </FieldLabel>
                 <PasswordInput
                   id="confirmPassword"
                   name="confirmPassword"
                   autoComplete="new-password"
                   minLength={8}
+                  aria-invalid={error === "Passwords do not match."}
+                  aria-describedby={
+                    error === "Passwords do not match."
+                      ? "signup-error"
+                      : undefined
+                  }
                   required
                 />
               </Field>
               <Field>
-                <FieldError>{error}</FieldError>
-                <Button type="submit" disabled={isSubmitting}>
+                <FieldError id="signup-error">{error}</FieldError>
+                <Button
+                  className="w-full"
+                  type="submit"
+                  disabled={isSubmitting}
+                >
                   {isSubmitting ? "Creating account..." : "Create account"}
                 </Button>
                 <FieldDescription className="text-center">

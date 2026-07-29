@@ -6,13 +6,20 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '@resourcehive/database';
+import { extractAccessToken } from '@resourcehive/service-auth';
 import { Request } from 'express';
 
 export interface AuthenticatedUser {
   userId: string;
-  tenantId: string;
-  role: string;
+  tenantId: string | null;
+  role: string | null;
   email: string;
+  firstName: string;
+  lastName: string;
+  status: string;
+  platformRole: string;
+  emailVerifiedAt: Date | null;
+  createdAt: Date;
 }
 
 export type AuthenticatedRequest = Request & {
@@ -41,17 +48,7 @@ export class JwtAuthGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
-    const authHeader = request.headers.authorization;
-
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new UnauthorizedException('Token not found or invalid format');
-    }
-
-    const token = authHeader.split(' ')[1];
-
-    if (!token) {
-      throw new UnauthorizedException('Token not found');
-    }
+    const token = extractAccessToken(request);
 
     try {
       const payload = await this.jwtService.verifyAsync<AccessTokenPayload>(
@@ -64,6 +61,16 @@ export class JwtAuthGuard implements CanActivate {
         where: {
           id: payload.sub,
           status: 'ACTIVE',
+        },
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          status: true,
+          platformRole: true,
+          emailVerifiedAt: true,
+          createdAt: true,
         },
       });
 
@@ -81,9 +88,15 @@ export class JwtAuthGuard implements CanActivate {
 
       request.user = {
         userId: user.id,
-        tenantId: membership?.organizationId ?? '',
-        role: membership?.role.toLowerCase() ?? 'member',
+        tenantId: membership?.organizationId ?? null,
+        role: membership?.role.toLowerCase() ?? null,
         email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        status: user.status,
+        platformRole: user.platformRole,
+        emailVerifiedAt: user.emailVerifiedAt,
+        createdAt: user.createdAt,
       };
     } catch {
       throw new UnauthorizedException('Invalid or expired token');
