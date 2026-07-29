@@ -29,11 +29,11 @@ const slotWithResource = {
 export class SlotRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  findById({
-    slotId,
-    rootOrganizationId,
-  }: SlotLookup): Promise<SlotRecord | null> {
-    return this.prisma.resourceSlot.findFirst({
+  findById(
+    { slotId, rootOrganizationId }: SlotLookup,
+    client: Pick<Prisma.TransactionClient, "resourceSlot"> = this.prisma,
+  ): Promise<SlotRecord | null> {
+    return client.resourceSlot.findFirst({
       where: {
         id: slotId,
         resource: { rootOrganizationId },
@@ -94,8 +94,12 @@ export class SlotRepository {
     resourceId: string,
     userId: string,
     rootOrganizationId: string,
+    client: Pick<
+      Prisma.TransactionClient,
+      "resource" | "organizationMembership" | "organization"
+    > = this.prisma,
   ): Promise<boolean> {
-    const resource = await this.prisma.resource.findFirst({
+    const resource = await client.resource.findFirst({
       where: { id: resourceId, rootOrganizationId, status: "ACTIVE" },
       select: {
         ownerOrganizationId: true,
@@ -108,7 +112,7 @@ export class SlotRepository {
       resource.ownerOrganizationId,
       ...resource.allowedOrganizations.map((item) => item.organizationId),
     ];
-    const membership = await this.prisma.organizationMembership.findFirst({
+    const membership = await client.organizationMembership.findFirst({
       where: {
         userId,
         status: "APPROVED",

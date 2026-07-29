@@ -3,8 +3,9 @@
 Person B owns this NestJS service for slots, availability, bookings, and
 booking-related point transactions.
 
-Week 2 adds a tenant-scoped Prisma slot repository. Public slot and booking
-controllers are intentionally not implemented yet.
+Implemented domain capabilities include tenant-scoped slots and availability,
+atomic booking creation, append-only booking point deductions, and database
+conflict handling for competing bookings.
 
 Proposed contracts requiring Person C approval:
 
@@ -43,5 +44,6 @@ The public prefixes proposed for Person C's gateway integration are
 `/bookings/*` and `/points/*`. Root Compose, Nginx, shared environment files,
 CI workflows, and port assignments require Person C approval.
 
-The additional `/slots/*` route is a Week 2 proposal and is not an approved
-gateway route yet.
+Booking creation is `POST /bookings`. Slot availability also requires the
+`/slots/*` and `/resources/:resourceId/slots` routes. No new environment
+variables are introduced by atomic booking creation.

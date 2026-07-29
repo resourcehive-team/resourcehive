@@ -1,10 +1,11 @@
 # Booking Service API Contract Proposal
 
-Status: **approved by Person C for Week 3 implementation.**
+Status: **Week 3 contract approved; Week 5 booking creation implemented against
+the approved database baseline.**
 
-This document defines the agreed HTTP surface. Week 3 implements the slot
-endpoints while later booking and public points endpoints remain scheduled for
-their stated milestones.
+This document defines the agreed HTTP surface. Slot endpoints and atomic booking
+creation are implemented while booking history, cancellation, completion, and
+public points endpoints remain scheduled for their stated milestones.
 
 ## Common rules
 
@@ -26,7 +27,7 @@ their stated milestones.
 | `GET` | `/resources/{resourceId}/slots` | List tenant-visible slots in a time window | Week 3 |
 | `GET` | `/slots/{slotId}` | Read one tenant-visible slot | Week 3 |
 | `POST` | `/slots` | Create a slot for an authorized resource | Week 3 |
-| `POST` | `/bookings` | Atomically book a slot and deduct points | Week 5 |
+| `POST` | `/bookings` | Atomically book a slot and deduct points | Implemented |
 | `GET` | `/bookings` | List the authenticated user's bookings | Later booking-history work |
 | `GET` | `/bookings/{bookingId}` | Read an authorized booking | Later booking-history work |
 | `POST` | `/bookings/{bookingId}/cancel` | Cancel and apply an eligible refund | Week 6 |
@@ -84,8 +85,7 @@ Expected responses: `201`, `400`, `401`, `403`, `404`, `409`, `500`.
 
 ```json
 {
-  "resourceSlotId": "uuid",
-  "idempotencyKey": "client-generated-value"
+  "resourceSlotId": "uuid"
 }
 ```
 
@@ -93,9 +93,49 @@ The user ID and tenant are never accepted in the body. Booking creation and
 point deduction must be one PostgreSQL transaction. The active-slot uniqueness
 constraint remains the final concurrency protection.
 
-Expected responses: `201`, `400`, `401`, `403`, `404`, `409`, `422`, `500`.
+Rules:
 
-## Week 4 booking validation boundary
+- the authenticated account and selected organization membership must be active
+  and approved;
+- the slot and active resource must belong to the authenticated root tenant;
+- the user must have approved access through the owner or an allowed
+  organization;
+- the slot must be in the future and have no active booking;
+- the server-owned resource point cost must be valid;
+- the user's append-only balance must cover the complete point cost;
+- validation, booking insertion, and point deduction run in one serializable
+  PostgreSQL transaction;
+- serialization failures are retried up to three times;
+- the database `bookings_active_slot_unique` index remains authoritative and a
+  competing request receives `409`;
+- a zero-cost booking creates no zero-value ledger row.
+
+Successful response:
+
+```json
+{
+  "id": "uuid",
+  "resourceSlotId": "uuid",
+  "resourceId": "uuid",
+  "resourceName": "Projector",
+  "userId": "uuid",
+  "status": "CONFIRMED",
+  "startsAt": "2030-08-01T10:00:00.000Z",
+  "endsAt": "2030-08-01T11:00:00.000Z",
+  "pointsDeducted": 25,
+  "createdAt": "2026-08-01T09:00:00.000Z"
+}
+```
+
+Expected responses: `201`, `400`, `401`, `403`, `404`, `409`, `500`.
+
+An idempotency key is not accepted in this milestone because the approved
+database baseline has no durable idempotency-key field. Adding one would require
+Person C's schema-change approval. Database uniqueness and serializable
+transactions provide concurrency correctness but do not provide replayable
+idempotency semantics.
+
+## Booking validation boundary
 
 Week 4 adds an internal validation use case without creating a booking or
 writing a point transaction. It derives the user and tenant from authenticated
@@ -110,9 +150,9 @@ server context, then verifies:
 - the authenticated user's append-only ledger balance is sufficient.
 
 Successful validation returns a server-derived context containing the user,
-tenant, resource, slot, time range, and point cost. Week 5 must repeat these
-checks inside the booking transaction because validation alone is not a
-concurrency guarantee.
+tenant, resource, slot, time range, and point cost. Booking creation repeats
+these checks inside its serializable transaction because validation alone is
+not a concurrency guarantee.
 
 ## Week 3 internal point ledger boundary
 
