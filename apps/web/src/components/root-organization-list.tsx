@@ -177,7 +177,9 @@ function OrganizationListError({
   onRetry: () => void;
 }) {
   const message = getErrorMessage(error);
-  const canRetry = !(error instanceof ApiAuthenticationError);
+  const canRetry =
+    !(error instanceof ApiAuthenticationError) &&
+    !(error instanceof ApiError && error.status === 403);
 
   return (
     <Card role="alert">
