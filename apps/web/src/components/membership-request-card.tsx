@@ -8,7 +8,7 @@ import {
   LoaderCircleIcon,
 } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
+import { MembershipStatusBadge } from "@/components/membership-status-badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -23,7 +23,6 @@ import {
   ApiNetworkError,
 } from "@/lib/api-client";
 import { requestOrganizationMembership } from "@/lib/resource-service/membership-api";
-import { formatOrganizationLabel } from "@/lib/resource-service/organization-format";
 import type { Membership } from "@/lib/resource-service/types";
 
 type RequestState =
@@ -100,9 +99,7 @@ export function MembershipRequestCard({
               <p className="text-sm text-muted-foreground">
                 Your request is waiting for an organization administrator.
               </p>
-              <Badge variant="secondary">
-                {formatOrganizationLabel(state.membership.status)}
-              </Badge>
+              <MembershipStatusBadge status={state.membership.status} />
             </div>
           </div>
         ) : null}

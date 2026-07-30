@@ -9,8 +9,8 @@ import {
   UsersIcon,
 } from "lucide-react";
 
+import { MembershipStatusBadge } from "@/components/membership-status-badge";
 import { RequestErrorCard } from "@/components/request-error-card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -115,9 +115,7 @@ function MembershipCard({
           {formatOrganizationLabel(membership.organization.type)}
         </CardDescription>
         <CardAction>
-          <Badge variant={membershipStatusVariant(normalizedStatus)}>
-            {formatOrganizationLabel(membership.status)}
-          </Badge>
+          <MembershipStatusBadge status={membership.status} />
         </CardAction>
       </CardHeader>
       <CardContent>
@@ -214,22 +212,4 @@ function CurrentMembershipListSkeleton() {
       ))}
     </div>
   );
-}
-
-function membershipStatusVariant(
-  status: string,
-): "default" | "secondary" | "destructive" | "outline" {
-  if (status === "APPROVED") {
-    return "default";
-  }
-
-  if (status === "PENDING") {
-    return "secondary";
-  }
-
-  if (status === "REJECTED") {
-    return "destructive";
-  }
-
-  return "outline";
 }
