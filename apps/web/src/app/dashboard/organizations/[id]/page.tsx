@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { OrganizationDetailsView } from "@/components/organization-details-view";
 import { SiteHeader } from "@/components/site-header";
 import {
   Breadcrumb,
@@ -10,7 +11,13 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 
-export default function OrganizationDetailsPage() {
+export default async function OrganizationDetailsPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+
   return (
     <>
       <SiteHeader title="Organization details" />
@@ -34,15 +41,7 @@ export default function OrganizationDetailsPage() {
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
-            <div className="space-y-1">
-              <h2 className="text-2xl font-semibold tracking-tight">
-                Organization details
-              </h2>
-              <p className="text-muted-foreground">
-                View this organization and the organizations directly beneath
-                it.
-              </p>
-            </div>
+            <OrganizationDetailsView organizationId={id} />
           </div>
         </div>
       </div>
