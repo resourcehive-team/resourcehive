@@ -55,8 +55,7 @@ direct hostname for `DATABASE_URL_UNPOOLED`.
 Open `apps/web/.env.local` and confirm:
 
 ```env
-NEXT_PUBLIC_IDENTITY_API_URL=http://localhost:3001
-NEXT_PUBLIC_API_GATEWAY_URL=http://localhost:8000
+NEXT_PUBLIC_API_URL=http://localhost:8000
 JWT_SECRET=replace-with-the-same-secret-used-in-the-root-env
 ```
 
@@ -69,9 +68,6 @@ pnpm run dev:setup
 ```
 
 ## Run the application
-
-Do not run the Identity Service separately when using Docker Compose. If it is
-already running in another terminal, stop it first to free port `3001`.
 
 Start all backend services and the Nginx API gateway:
 
@@ -89,13 +85,12 @@ The backend is now available through:
 
 | Component | Address |
 | --- | --- |
-| Identity Service | `http://localhost:3001` |
 | Nginx API gateway | `http://localhost:8000` |
 | Next.js frontend | `http://localhost:3000` |
 
-The Resource, Booking, and Notification services are private Docker services.
-Browser requests reach them through the API gateway instead of their internal
-ports.
+The Identity, Resource, Booking, and Notification services are private Docker
+services. Browser requests reach every backend service through the API gateway
+instead of their internal ports.
 
 In a separate terminal, start the frontend:
 

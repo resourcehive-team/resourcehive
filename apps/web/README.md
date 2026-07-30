@@ -1,7 +1,7 @@
 # ResourceHive Web Application
 
 This is the ResourceHive application frontend. It is built with Next.js and
-uses the ResourceHive API gateway to reach the Resource, Booking, and
+uses the ResourceHive API gateway to reach the Identity, Resource, Booking, and
 Notification services.
 
 ## Run the frontend
@@ -16,24 +16,26 @@ pnpm run dev:web
 
 Open <http://localhost:3000>.
 
-The Identity Service and API gateway must also be running when the frontend
+The API gateway and its backend services must also be running when the frontend
 needs backend data.
 
 ## Frontend environment
 
-The example environment contains two public backend URLs:
+The example environment contains one public backend URL:
 
 ```env
-NEXT_PUBLIC_IDENTITY_API_URL=http://localhost:3001
-NEXT_PUBLIC_API_GATEWAY_URL=http://localhost:8000
+NEXT_PUBLIC_API_URL=http://localhost:8000
 ```
 
-- `NEXT_PUBLIC_IDENTITY_API_URL` is used for signup, verification, login,
-  logout, and the current-user request.
-- `NEXT_PUBLIC_API_GATEWAY_URL` is used for Resource, Booking, and Notification
-  requests.
+`NEXT_PUBLIC_API_URL` is the Nginx API gateway. It is used for Identity,
+Resource, Booking, and Notification requests. The frontend must not use private
+service URLs.
 
-These URLs are public configuration, not secrets.
+This URL is public configuration, not a secret.
+
+Existing deployments may temporarily continue using
+`NEXT_PUBLIC_API_GATEWAY_URL` as a compatibility fallback. New and updated
+environments must use `NEXT_PUBLIC_API_URL`.
 
 `JWT_SECRET` is server-only. It must use the same value as the Identity
 Service so the Next.js proxy can protect frontend routes. Never prefix this
@@ -120,7 +122,8 @@ The underlying shared client:
 Future Booking and Notification modules should follow the same pattern and
 call `apiRequest` instead of calling `fetch` directly.
 
-Identity operations remain in `src/lib/auth-api.ts`.
+Identity operations remain in `src/lib/auth-api.ts`, but they use the same
+public API gateway as the other domain modules.
 
 ## Handling an expired session
 
