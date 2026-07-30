@@ -84,6 +84,15 @@ const resources = await getAccessibleResources(organizationId, {
 });
 ```
 
+The resource catalogue is available at `/dashboard/resources`. It:
+
+- offers organizations from the current user's approved memberships;
+- asks the Resource Service to authorize every selected organization;
+- searches only by resource name;
+- requests ten resources per page;
+- displays owned and shared resources without inventing owner names;
+- handles loading, empty, authorization, network, and pagination states.
+
 The Resource Service modules:
 
 - use the public API gateway;
@@ -93,9 +102,10 @@ The Resource Service modules:
 - support only the filters the backend currently provides;
 - accept an optional `AbortSignal` so screens can cancel stale requests.
 
-The organization-member list is intentionally not included. Its current
-backend response can expose private user fields and its authorization is not
-yet restricted to administrators. Read the contract review before adding it.
+The membership module also provides the administrator-only organization-member
+list. Its response contains an explicit safe user summary and does not include
+password hashes. The Resource Service remains responsible for verifying
+administrator access.
 
 The underlying shared client:
 
@@ -133,6 +143,7 @@ try {
 From the repository root:
 
 ```bash
+pnpm run test:web
 pnpm --filter frontend run lint
 pnpm --filter frontend run build
 ```

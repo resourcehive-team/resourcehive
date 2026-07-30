@@ -28,6 +28,23 @@ export interface MembershipWithOrganization extends Membership {
   organization: Organization;
 }
 
+export interface OrganizationMemberUser {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  status: string;
+}
+
+export interface OrganizationMember {
+  userId: string;
+  organizationId: string;
+  role: string;
+  status: string;
+  joinedAt: string;
+  user: OrganizationMemberUser;
+}
+
 export interface AllowedOrganization {
   resourceId: string;
   organizationId: string;

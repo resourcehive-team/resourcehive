@@ -47,7 +47,7 @@ const data = {
     },
     {
       title: "Resources",
-      url: "#",
+      url: "/dashboard/resources",
       icon: <BookOpenIcon />,
     },
     {

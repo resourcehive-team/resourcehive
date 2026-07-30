@@ -3,10 +3,14 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRightIcon, Building2Icon } from "lucide-react";
+import {
+  ArrowRightIcon,
+  Building2Icon,
+  UsersIcon,
+} from "lucide-react";
 
+import { MembershipStatusBadge } from "@/components/membership-status-badge";
 import { RequestErrorCard } from "@/components/request-error-card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -111,9 +115,7 @@ function MembershipCard({
           {formatOrganizationLabel(membership.organization.type)}
         </CardDescription>
         <CardAction>
-          <Badge variant={membershipStatusVariant(normalizedStatus)}>
-            {formatOrganizationLabel(membership.status)}
-          </Badge>
+          <MembershipStatusBadge status={membership.status} />
         </CardAction>
       </CardHeader>
       <CardContent>
@@ -136,7 +138,7 @@ function MembershipCard({
           </div>
         </dl>
       </CardContent>
-      <CardFooter>
+      <CardFooter className="gap-2">
         <Button
           variant="outline"
           render={
@@ -148,6 +150,20 @@ function MembershipCard({
           View organization
           <ArrowRightIcon data-icon="inline-end" />
         </Button>
+        {normalizedStatus === "APPROVED" &&
+        membership.role.toUpperCase() === "ADMIN" ? (
+          <Button
+            variant="outline"
+            render={
+              <Link
+                href={`/dashboard/organizations/${encodeURIComponent(membership.organizationId)}/members`}
+              />
+            }
+          >
+            <UsersIcon data-icon="inline-start" />
+            View members
+          </Button>
+        ) : null}
       </CardFooter>
     </Card>
   );
@@ -196,22 +212,4 @@ function CurrentMembershipListSkeleton() {
       ))}
     </div>
   );
-}
-
-function membershipStatusVariant(
-  status: string,
-): "default" | "secondary" | "destructive" | "outline" {
-  if (status === "APPROVED") {
-    return "default";
-  }
-
-  if (status === "PENDING") {
-    return "secondary";
-  }
-
-  if (status === "REJECTED") {
-    return "destructive";
-  }
-
-  return "outline";
 }

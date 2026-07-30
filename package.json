@@ -16,7 +16,8 @@
     "db:validate": "pnpm -F @resourcehive/database run validate",
     "dev:identity": "pnpm -F identity-service run start:dev",
     "dev:setup": "pnpm run db:init && pnpm run db:seed:demo",
-    "dev:web": "pnpm -F frontend run dev"
+    "dev:web": "pnpm -F frontend run dev",
+    "test:web": "pnpm -F frontend run test"
   },
   "devDependencies": {
     "@prisma/client": "^5.22.0",
