@@ -3,7 +3,11 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRightIcon, Building2Icon } from "lucide-react";
+import {
+  ArrowRightIcon,
+  Building2Icon,
+  UsersIcon,
+} from "lucide-react";
 
 import { RequestErrorCard } from "@/components/request-error-card";
 import { Badge } from "@/components/ui/badge";
@@ -136,7 +140,7 @@ function MembershipCard({
           </div>
         </dl>
       </CardContent>
-      <CardFooter>
+      <CardFooter className="gap-2">
         <Button
           variant="outline"
           render={
@@ -148,6 +152,20 @@ function MembershipCard({
           View organization
           <ArrowRightIcon data-icon="inline-end" />
         </Button>
+        {normalizedStatus === "APPROVED" &&
+        membership.role.toUpperCase() === "ADMIN" ? (
+          <Button
+            variant="outline"
+            render={
+              <Link
+                href={`/dashboard/organizations/${encodeURIComponent(membership.organizationId)}/members`}
+              />
+            }
+          >
+            <UsersIcon data-icon="inline-start" />
+            View members
+          </Button>
+        ) : null}
       </CardFooter>
     </Card>
   );
