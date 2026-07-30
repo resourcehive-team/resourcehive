@@ -22,60 +22,63 @@ describeWithDatabase("PointLedgerRepository integration", () => {
 
   it("calculates balance from only the requested user's append-only entries", async () => {
     try {
-      await prisma.$transaction(async (transaction) => {
-        await transaction.user.createMany({
-          data: [
-            {
-              id: userId,
-              email: `point-user-${userId}@example.edu`,
-              passwordHash: "integration-test-only",
-              firstName: "Point",
-              lastName: "User",
+      await prisma.$transaction(
+        async (transaction) => {
+          await transaction.user.createMany({
+            data: [
+              {
+                id: userId,
+                email: `point-user-${userId}@example.edu`,
+                passwordHash: "integration-test-only",
+                firstName: "Point",
+                lastName: "User",
+              },
+              {
+                id: otherUserId,
+                email: `point-other-${otherUserId}@example.edu`,
+                passwordHash: "integration-test-only",
+                firstName: "Other",
+                lastName: "User",
+              },
+            ],
+          });
+          await transaction.organization.create({
+            data: {
+              id: organizationId,
+              name: "Point ledger integration tenant",
+              type: "ROOT",
+              rootOrganizationId: organizationId,
+              createdBy: userId,
             },
-            {
-              id: otherUserId,
-              email: `point-other-${otherUserId}@example.edu`,
-              passwordHash: "integration-test-only",
-              firstName: "Other",
-              lastName: "User",
-            },
-          ],
-        });
-        await transaction.organization.create({
-          data: {
-            id: organizationId,
-            name: "Point ledger integration tenant",
-            type: "ROOT",
-            rootOrganizationId: organizationId,
-            createdBy: userId,
-          },
-        });
-        await transaction.pointTransaction.createMany({
-          data: [
-            {
-              userId,
-              amount: 100,
-              transactionType: "JOIN_BONUS",
-              sourceOrganizationId: organizationId,
-            },
-            {
-              userId: otherUserId,
-              amount: 500,
-              transactionType: "JOIN_BONUS",
-              sourceOrganizationId: organizationId,
-            },
-          ],
-        });
+          });
+          await transaction.pointTransaction.createMany({
+            data: [
+              {
+                userId,
+                amount: 100,
+                transactionType: "JOIN_BONUS",
+                sourceOrganizationId: organizationId,
+              },
+              {
+                userId: otherUserId,
+                amount: 500,
+                transactionType: "JOIN_BONUS",
+                sourceOrganizationId: organizationId,
+              },
+            ],
+          });
 
-        await expect(repository.getBalance(userId, transaction)).resolves.toBe(
-          100,
-        );
-        await expect(
-          repository.getBalance(otherUserId, transaction),
-        ).resolves.toBe(500);
+          await expect(
+            repository.getBalance(userId, transaction),
+          ).resolves.toBe(100);
+          await expect(
+            repository.getBalance(otherUserId, transaction),
+          ).resolves.toBe(500);
 
-        throw rollbackFixture;
-      });
+          throw rollbackFixture;
+        },
+        { maxWait: 10000, timeout: 30000 },
+      );
     } catch (error) {
       if (error !== rollbackFixture) {
         throw error;

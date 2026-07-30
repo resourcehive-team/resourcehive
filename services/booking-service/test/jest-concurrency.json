@@ -2,8 +2,8 @@
   "moduleFileExtensions": ["js", "json", "ts"],
   "rootDir": ".",
   "testEnvironment": "node",
-  "testRegex": ".integration-spec.ts$",
-  "testTimeout": 30000,
+  "testRegex": ".concurrency-spec.ts$",
+  "testTimeout": 60000,
   "globalSetup": "<rootDir>/require-test-database.cjs",
   "transform": {
     "^.+\\.ts$": "ts-jest"
