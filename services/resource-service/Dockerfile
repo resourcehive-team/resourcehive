@@ -15,6 +15,9 @@ RUN pnpm install --frozen-lockfile
 # Generate the Prisma client and build the database package.
 RUN pnpm --filter @resourcehive/database run build
 
+# Build the shared authentication package used by protected routes.
+RUN pnpm --filter @resourcehive/service-auth run build
+
 # Build the resource-service
 RUN pnpm --filter resource-service run build
 
@@ -31,7 +34,7 @@ RUN npm install -g pnpm@10.34.5
 COPY --from=builder /app /app
 
 # Expose the port the NestJS app runs on
-EXPOSE 3002
+EXPOSE 3004
 
 # Start the application using the production build
 CMD ["pnpm", "--filter", "resource-service", "run", "start:prod"]

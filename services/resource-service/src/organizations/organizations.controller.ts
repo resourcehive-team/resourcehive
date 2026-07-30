@@ -1,14 +1,22 @@
-import { Body, Controller, Delete, Get, Param, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { OrganizationsService } from './organizations.service';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { AuthGuard } from '@nestjs/passport';
+import { CurrentUser, JwtAuthGuard } from '@resourcehive/service-auth';
+import type { AuthenticatedUser } from '@resourcehive/service-auth';
 import { TenantGuard } from '../auth/tenant.guard';
 import { AdminGuard } from '../auth/admin.guard';
-import { CurrentUser } from '../auth/current-user.decorator';
 
 @ApiTags('Organizations')
 @ApiBearerAuth()
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(JwtAuthGuard)
 @Controller('organizations')
 export class OrganizationsController {
   constructor(private readonly orgsService: OrganizationsService) {}
@@ -43,7 +51,7 @@ export class OrganizationsController {
   addEmailDomain(
     @Param('organizationId') orgId: string,
     @Body('domain') domain: string,
-    @Body('autoJoin') autoJoin?: boolean
+    @Body('autoJoin') autoJoin?: boolean,
   ) {
     return this.orgsService.addEmailDomain(orgId, domain, autoJoin);
   }
@@ -52,7 +60,7 @@ export class OrganizationsController {
   @ApiOperation({ summary: 'Remove an email domain' })
   removeEmailDomain(
     @Param('organizationId') orgId: string,
-    @Param('domainId') domainId: string
+    @Param('domainId') domainId: string,
   ) {
     return this.orgsService.removeEmailDomain(orgId, domainId);
   }
@@ -68,7 +76,7 @@ export class OrganizationsController {
   addToAllowlist(
     @Param('organizationId') orgId: string,
     @Body('email') email: string,
-    @CurrentUser() user: any
+    @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.orgsService.addToAllowlist(orgId, email, user.userId);
   }
@@ -77,7 +85,7 @@ export class OrganizationsController {
   @ApiOperation({ summary: 'Remove email from allowlist' })
   removeFromAllowlist(
     @Param('organizationId') orgId: string,
-    @Param('allowlistId') allowlistId: string
+    @Param('allowlistId') allowlistId: string,
   ) {
     return this.orgsService.removeFromAllowlist(orgId, allowlistId);
   }
