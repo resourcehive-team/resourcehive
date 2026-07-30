@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { OrganizationMemberList } from "@/components/organization-member-list";
 import { SiteHeader } from "@/components/site-header";
 import {
   Breadcrumb,
@@ -47,14 +48,7 @@ export default async function OrganizationMembersPage({
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
-            <div className="space-y-1">
-              <h2 className="text-2xl font-semibold tracking-tight">
-                Organization members
-              </h2>
-              <p className="text-muted-foreground">
-                Review members and membership requests for this organization.
-              </p>
-            </div>
+            <OrganizationMemberList key={id} organizationId={id} />
           </div>
         </div>
       </div>
