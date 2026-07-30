@@ -25,6 +25,7 @@ import {
   CircleHelpIcon,
   CommandIcon,
   LayoutDashboardIcon,
+  UsersIcon,
 } from "lucide-react";
 import {
   AuthenticationRequiredError,
@@ -53,6 +54,11 @@ const data = {
       title: "Organizations",
       url: "/dashboard/organizations",
       icon: <Building2Icon />,
+    },
+    {
+      title: "My memberships",
+      url: "/dashboard/memberships",
+      icon: <UsersIcon />,
     },
     {
       title: "My bookings",
