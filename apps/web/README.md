@@ -93,9 +93,10 @@ The Resource Service modules:
 - support only the filters the backend currently provides;
 - accept an optional `AbortSignal` so screens can cancel stale requests.
 
-The organization-member list is intentionally not included. Its current
-backend response can expose private user fields and its authorization is not
-yet restricted to administrators. Read the contract review before adding it.
+The membership module also provides the administrator-only organization-member
+list. Its response contains an explicit safe user summary and does not include
+password hashes. The Resource Service remains responsible for verifying
+administrator access.
 
 The underlying shared client:
 

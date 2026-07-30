@@ -228,9 +228,32 @@ Current behavior:
 GET /memberships/organization/:organizationId
 ```
 
-The current response contains membership records with a nested user record.
-The frontend must not integrate this response until the safety issues in the
-readiness section are resolved.
+Response:
+
+```ts
+interface OrganizationMember {
+  userId: string;
+  organizationId: string;
+  role: string;
+  status: string;
+  joinedAt: string;
+  user: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    status: string;
+  };
+}
+```
+
+Current behavior:
+
+- Requires administrator access through `TenantGuard` and `AdminGuard`.
+- Returns membership records for the requested organization.
+- Includes only the safe user fields shown above.
+- Never returns password hashes.
+- Has no pagination, filtering, or guaranteed ordering.
 
 ## Resource catalogue endpoints
 
@@ -351,46 +374,17 @@ will therefore require one agreed solution:
 This is gateway/deployment integration work. It should not be reimplemented
 inside every frontend API function.
 
-### 3. Organization member responses expose unsafe user data
+### 3. Organization member response safety is resolved
 
-`GET /memberships/organization/:organizationId` currently uses:
+The endpoint now selects only user ID, first name, last name, email, and
+account status. Full database user records and password hashes are not
+returned.
 
-```ts
-include: { user: true }
-```
+### 4. Organization member authorization is resolved
 
-The database user record contains `passwordHash` and other fields the member
-list does not need. The frontend must not call or display this endpoint until
-the service selects an explicit safe user shape, such as:
-
-```ts
-interface OrganizationMember {
-  id: string;
-  userId: string;
-  organizationId: string;
-  role: string;
-  status: string;
-  joinedAt: string;
-  user: {
-    id: string;
-    email: string;
-    firstName: string;
-    lastName: string;
-    status: string;
-  };
-}
-```
-
-The service must never return password hashes.
-
-### 4. Organization member authorization is too broad
-
-The issue requires the organization member list for authorized
-administrators. The current endpoint uses `TenantGuard` but not `AdminGuard`.
-An approved regular member can currently request the member list.
-
-The service owner must confirm and enforce the intended administrator-only
-contract before this screen is integrated.
+The endpoint now uses both `TenantGuard` and `AdminGuard`. The frontend still
+handles `403 Forbidden`, and it does not treat a hidden or visible navigation
+link as an authorization decision.
 
 ### 5. Request validation is not active
 
@@ -473,9 +467,9 @@ The typed frontend API modules now exist in
 
 The frontend should not work around an unsafe or incomplete backend contract.
 
-The prepared modules intentionally omit the organization-member endpoint.
-They implement only the reviewed organization, current-user membership,
-membership-request, resource-list, and resource-details operations.
+The prepared modules include the reviewed organization, current-user
+membership, membership-request, administrator member-list, resource-list, and
+resource-details operations.
 
 ## Frontend contract rules
 
