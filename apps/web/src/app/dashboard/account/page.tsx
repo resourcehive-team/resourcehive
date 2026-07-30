@@ -1,6 +1,5 @@
-import { AccountMembershipCard } from "@/components/account-membership-card";
-import { AccountProfileCard } from "@/components/account-profile-card";
-import { AccountStatusCard } from "@/components/account-status-card";
+import { AccountDetails } from "@/components/account-details";
+import { CurrentMembershipList } from "@/components/current-membership-list";
 import { SiteHeader } from "@/components/site-header";
 import {
   Tabs,
@@ -22,12 +21,11 @@ export default function AccountPage() {
             </TabsList>
 
             <TabsContent value="profile" className="grid gap-4">
-              <AccountProfileCard />
-              <AccountStatusCard />
+              <AccountDetails />
             </TabsContent>
 
             <TabsContent value="membership">
-              <AccountMembershipCard />
+              <CurrentMembershipList />
             </TabsContent>
           </Tabs>
         </div>
