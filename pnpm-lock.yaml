@@ -524,6 +524,12 @@ importers:
       '@resourcehive/database':
         specifier: workspace:*
         version: link:../../packages/database
+      class-transformer:
+        specifier: ^0.5.1
+        version: 0.5.1
+      class-validator:
+        specifier: ^0.14.4
+        version: 0.14.4
       passport:
         specifier: ^0.7.0
         version: 0.7.0
