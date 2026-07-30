@@ -306,6 +306,173 @@ The service also contains endpoints for:
 Those operations are not required by the current Week 4 regular-member
 frontend. They should not be added to the UI as part of issue #32.
 
+## Integration readiness
+
+The endpoint paths are known, but the current service is **not ready for the
+browser integration required by issue #32**.
+
+The following items must be resolved or explicitly agreed before the later
+frontend API and screen branches are considered complete.
+
+### 1. Browser authentication is incompatible
+
+The shared frontend `apiRequest` client sends the ResourceHive HttpOnly cookie.
+The Resource Service currently reads only:
+
+```http
+Authorization: Bearer <token>
+```
+
+Browser JavaScript cannot read the HttpOnly cookie to create that header.
+Therefore, protected Resource Service requests from the current web
+application will receive `401 Unauthorized`.
+
+The Resource Service owner should migrate the service to
+`@resourcehive/service-auth`, which already accepts the ResourceHive cookie and
+bearer tokens. The frontend must not restore local-storage tokens or implement
+another authentication method.
+
+### 2. The local gateway browser CORS contract is missing
+
+The current frontend and gateway use different local origins:
+
+```text
+Frontend: http://localhost:3000
+Gateway:  http://localhost:8000
+```
+
+The Nginx gateway does not currently add CORS response headers, and the
+Resource Service does not enable CORS. Browser requests to the public gateway
+will therefore require one agreed solution:
+
+- configure CORS once at the public gateway; or
+- expose the gateway through the same public origin as the frontend.
+
+This is gateway/deployment integration work. It should not be reimplemented
+inside every frontend API function.
+
+### 3. Organization member responses expose unsafe user data
+
+`GET /memberships/organization/:organizationId` currently uses:
+
+```ts
+include: { user: true }
+```
+
+The database user record contains `passwordHash` and other fields the member
+list does not need. The frontend must not call or display this endpoint until
+the service selects an explicit safe user shape, such as:
+
+```ts
+interface OrganizationMember {
+  id: string;
+  userId: string;
+  organizationId: string;
+  role: string;
+  status: string;
+  joinedAt: string;
+  user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    status: string;
+  };
+}
+```
+
+The service must never return password hashes.
+
+### 4. Organization member authorization is too broad
+
+The issue requires the organization member list for authorized
+administrators. The current endpoint uses `TenantGuard` but not `AdminGuard`.
+An approved regular member can currently request the member list.
+
+The service owner must confirm and enforce the intended administrator-only
+contract before this screen is integrated.
+
+### 5. Request validation is not active
+
+The Resource Service DTOs contain `class-validator` decorators, but the
+application does not install a global `ValidationPipe`. The decorators do not
+currently create a reliable HTTP validation contract.
+
+The service should enable validation and publish stable `400 Bad Request`
+responses before the frontend builds forms for resource administration. The
+Week 4 regular-member screens should still validate their own query and form
+inputs for user experience, but client validation cannot replace server
+validation.
+
+### 6. Pagination limits are not bounded
+
+`page` and `limit` are parsed as integers, but the service does not currently
+enforce:
+
+- `page >= 1`;
+- `limit >= 1`;
+- a maximum allowed `limit`.
+
+The frontend should initially use `page >= 1` and `limit = 10`, but the service
+should publish and enforce an approved maximum before the pagination contract
+is treated as final.
+
+### 7. Archived resources are included
+
+The resource catalogue query does not filter by resource status. Archived
+resources can therefore appear in the regular-member catalogue.
+
+The service owner should confirm whether the member catalogue returns only
+`ACTIVE` resources or whether status must be an explicit supported filter.
+The frontend should not guess this behavior.
+
+### 8. Response schemas are implicit
+
+Swagger documents endpoint names and request DTOs, but the controllers do not
+declare explicit response DTOs. The response shapes currently depend on raw
+Prisma query results.
+
+The TypeScript shapes in this review describe the current implementation, but
+they are not yet a versioned public contract. Backend changes to Prisma
+`include` or `select` clauses could otherwise break the frontend silently.
+
+### 9. Organization child semantics need stable naming
+
+`GET /organizations/:id/children` is described as a child endpoint, but its
+implementation returns all non-root descendants for a root ID.
+
+For Week 4:
+
+- use `GET /organizations/:id` for direct children;
+- treat `/organizations/:id/children` as a root-descendant endpoint;
+- do not build a nested hierarchy from it until the backend contract is
+  clarified.
+
+### 10. Catalogue items do not include the owner name
+
+The paginated resource list contains `ownerOrganizationId` but not the owner
+organization record. A catalogue that displays owner names must either:
+
+- use organization data already loaded by the page; or
+- receive an agreed safe owner summary from the Resource Service.
+
+The frontend should not perform one extra organization request for every
+resource card.
+
+## Recommended next-step boundary
+
+The later frontend branches can safely prepare UI structure and error states,
+but live integration should follow this order:
+
+1. Resource Service accepts the shared HttpOnly cookie authentication.
+2. The public gateway browser-origin strategy is confirmed.
+3. Safe organization-member authorization and response fields are implemented.
+4. Pagination, resource status behavior, and response shapes are confirmed.
+5. Person C creates `organization-api.ts`, `membership-api.ts`, and
+   `resource-api.ts` using the shared `apiRequest` client.
+
+The frontend should not work around an unsafe or incomplete backend contract.
+
 ## Frontend contract rules
 
 Future frontend API modules must:
