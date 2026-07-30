@@ -41,8 +41,8 @@ secret with `NEXT_PUBLIC_`.
 
 ## Authenticated service requests
 
-Use `apiRequest` from `src/lib/api-client.ts` for protected Resource, Booking,
-and Notification requests.
+Use the domain API modules in `src/lib/resource-service` for Resource Service
+requests. These modules already use the shared `apiRequest` client.
 
 Before adding Resource Service calls, read
 [`docs/resource-service-contract.md`](docs/resource-service-contract.md). It
@@ -53,24 +53,51 @@ Do not write another authentication wrapper and do not try to read the JWT.
 The JWT is stored in an HttpOnly cookie, so browser JavaScript cannot access
 it. The shared client tells the browser to send the cookie automatically.
 
-Example GET request:
+Example organization request:
 
 ```ts
-import { apiRequest } from "@/lib/api-client";
+import { getRootOrganizations } from
+  "@/lib/resource-service/organization-api";
 
-const organizations =
-  await apiRequest<Organization[]>("/organizations/roots");
+const organizations = await getRootOrganizations();
 ```
 
-Example POST request:
+Example membership request:
 
 ```ts
-await apiRequest(`/memberships/${organizationId}/request`, {
-  method: "POST",
+import { requestOrganizationMembership } from
+  "@/lib/resource-service/membership-api";
+
+await requestOrganizationMembership(organizationId);
+```
+
+Example resource catalogue request:
+
+```ts
+import { getAccessibleResources } from
+  "@/lib/resource-service/resource-api";
+
+const resources = await getAccessibleResources(organizationId, {
+  page: 1,
+  limit: 10,
+  search: "laboratory",
 });
 ```
 
-The shared client:
+The Resource Service modules:
+
+- use the public API gateway;
+- use the shared authenticated browser client;
+- define the current response types in `resource-service/types.ts`;
+- safely encode organization and resource IDs;
+- support only the filters the backend currently provides;
+- accept an optional `AbortSignal` so screens can cancel stale requests.
+
+The organization-member list is intentionally not included. Its current
+backend response can expose private user fields and its authorization is not
+yet restricted to administrators. Read the contract review before adding it.
+
+The underlying shared client:
 
 - sends requests through the API gateway;
 - includes the authentication cookie;
@@ -80,9 +107,8 @@ The shared client:
 - reports an expired session with `ApiAuthenticationError`;
 - prevents requests to arbitrary external URLs.
 
-Each domain should place its endpoint functions in a small file such as
-`resource-api.ts`, `booking-api.ts`, or `notification-api.ts`. Those functions
-should call `apiRequest` instead of calling `fetch` directly.
+Future Booking and Notification modules should follow the same pattern and
+call `apiRequest` instead of calling `fetch` directly.
 
 Identity operations remain in `src/lib/auth-api.ts`.
 

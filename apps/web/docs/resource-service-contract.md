@@ -461,17 +461,21 @@ resource card.
 
 ## Recommended next-step boundary
 
-The later frontend branches can safely prepare UI structure and error states,
-but live integration should follow this order:
+The typed frontend API modules now exist in
+`src/lib/resource-service`. Live screen integration should follow this order:
 
 1. Resource Service accepts the shared HttpOnly cookie authentication.
 2. The public gateway browser-origin strategy is confirmed.
 3. Safe organization-member authorization and response fields are implemented.
 4. Pagination, resource status behavior, and response shapes are confirmed.
-5. Person C creates `organization-api.ts`, `membership-api.ts`, and
-   `resource-api.ts` using the shared `apiRequest` client.
+5. Person C connects the screens to the prepared modules after the required
+   backend contracts are safe.
 
 The frontend should not work around an unsafe or incomplete backend contract.
+
+The prepared modules intentionally omit the organization-member endpoint.
+They implement only the reviewed organization, current-user membership,
+membership-request, resource-list, and resource-details operations.
 
 ## Frontend contract rules
 
