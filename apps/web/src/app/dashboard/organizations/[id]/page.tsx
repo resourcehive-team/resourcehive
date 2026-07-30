@@ -41,7 +41,7 @@ export default async function OrganizationDetailsPage({
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
-            <OrganizationDetailsView organizationId={id} />
+            <OrganizationDetailsView key={id} organizationId={id} />
           </div>
         </div>
       </div>
