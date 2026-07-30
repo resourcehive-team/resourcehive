@@ -1,56 +1,68 @@
 # ResourceHive
 
-ResourceHive currently provides a PostgreSQL database baseline, a NestJS
-identity API, and a Next.js login page. Signup is intentionally not available
-yet.
+ResourceHive is a monorepo containing:
+
+- a Next.js frontend;
+- an Nginx API gateway;
+- Identity, Resource, Booking, and Notification services;
+- a shared Prisma database package;
+- a shared service authentication package.
+
+The backend services and API gateway run with Docker Compose. The frontend runs
+locally with pnpm.
 
 ## Requirements
 
-- Node.js 20 or newer
-- pnpm 10.34.5
-- An empty PostgreSQL 15 database
-- `psql` only when running the database integrity tests
+Install these before starting:
+
+- Node.js 20 or newer;
+- pnpm 10.34.5;
+- Docker with Docker Compose;
+- access to a PostgreSQL 15 database.
 
 Run all commands from the repository root.
 
 ## First-time setup
 
-Install dependencies:
+Install the workspace dependencies:
 
 ```bash
 pnpm install --frozen-lockfile
 ```
 
-Create local environment files without overwriting existing ones:
+Create the local environment files without replacing existing files:
 
 ```bash
 test -f .env || cp .env.example .env
 test -f apps/web/.env.local || cp apps/web/.env.example apps/web/.env.local
 ```
 
-Edit `.env` and set both PostgreSQL connection strings. The database user must
-be able to create tables, indexes, triggers, and the `btree_gist` extension.
-The provider can be local PostgreSQL, Neon, or another PostgreSQL-compatible
-host.
-
-For Neon, use the pooled hostname containing `-pooler` for application queries:
+Open `.env` and configure:
 
 ```env
-DATABASE_URL="postgresql://USER:PASSWORD@ENDPOINT-pooler.REGION.aws.neon.tech/DATABASE?sslmode=require&connect_timeout=30&pool_timeout=30"
+DATABASE_URL="postgresql://USER:PASSWORD@POOLED_HOST:5432/DATABASE?sslmode=require"
+DATABASE_URL_UNPOOLED="postgresql://USER:PASSWORD@DIRECT_HOST:5432/DATABASE?sslmode=require"
+JWT_SECRET="replace-with-a-private-secret"
 ```
 
-Use the direct hostname for migrations:
+`DATABASE_URL` is used by the running services. `DATABASE_URL_UNPOOLED` is used
+for migrations. They may contain the same URL when the PostgreSQL provider does
+not offer separate pooled and direct connections.
+
+For Neon, use the hostname containing `-pooler` for `DATABASE_URL` and the
+direct hostname for `DATABASE_URL_UNPOOLED`.
+
+Open `apps/web/.env.local` and confirm:
 
 ```env
-DATABASE_URL_UNPOOLED="postgresql://USER:PASSWORD@ENDPOINT.REGION.aws.neon.tech/DATABASE?sslmode=require&connect_timeout=30"
+NEXT_PUBLIC_IDENTITY_API_URL=http://localhost:3001
+NEXT_PUBLIC_API_GATEWAY_URL=http://localhost:8000
+JWT_SECRET=replace-with-the-same-secret-used-in-the-root-env
 ```
 
-For local PostgreSQL and providers without pooling, both variables can contain
-the same URL. Remove `channel_binding=require` if Neon included it. Keep
-`JWT_SECRET` private and replace the development value before deploying.
+The `JWT_SECRET` value must match in `.env` and `apps/web/.env.local`.
 
-Apply migrations, build the shared Prisma package, and create the repeatable
-demo login:
+Initialize the database and create the repeatable demo account:
 
 ```bash
 pnpm run dev:setup
@@ -58,52 +70,96 @@ pnpm run dev:setup
 
 ## Run the application
 
-Start the NestJS identity service:
+Do not run the Identity Service separately when using Docker Compose. If it is
+already running in another terminal, stop it first to free port `3001`.
+
+Start all backend services and the Nginx API gateway:
 
 ```bash
-pnpm run dev:identity
+docker compose up --build -d
 ```
 
-In a second terminal, start the Next.js application:
+Confirm that the containers are running:
+
+```bash
+docker compose ps
+```
+
+The backend is now available through:
+
+| Component | Address |
+| --- | --- |
+| Identity Service | `http://localhost:3001` |
+| Nginx API gateway | `http://localhost:8000` |
+| Next.js frontend | `http://localhost:3000` |
+
+The Resource, Booking, and Notification services are private Docker services.
+Browser requests reach them through the API gateway instead of their internal
+ports.
+
+In a separate terminal, start the frontend:
 
 ```bash
 pnpm run dev:web
 ```
 
-Open <http://localhost:3000/login> and sign in with:
+Open:
+
+```text
+http://localhost:3000
+```
+
+Use the demo account:
 
 ```text
 Email: demo@example.edu
 Password: DemoPassword123!
 ```
 
-Successful login returns to the home page. The demo seed is safe to run again.
+The demo seed creates a user, an approved membership, and a demo organization.
+It does not create resources, so the resource catalogue may correctly display
+an empty state.
 
-## Verify the running service
+## View backend logs
 
-Check the NestJS service:
-
-```bash
-curl http://localhost:3001/
-```
-
-Expected response:
-
-```text
-Identity Service is running
-```
-
-Test login directly:
+Follow the gateway and Resource Service logs:
 
 ```bash
-curl -X POST http://localhost:3001/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"demo@example.edu","password":"DemoPassword123!"}'
+docker compose logs -f api-gateway resource-service
 ```
 
-The response contains `user login successfully` and a JWT.
+Follow all backend logs:
 
-## Database and test commands
+```bash
+docker compose logs -f
+```
+
+Press `Ctrl+C` to stop following logs. This does not stop the containers.
+
+## Rebuild after backend changes
+
+When backend source code or backend dependencies change, rebuild the services:
+
+```bash
+docker compose up --build -d
+```
+
+Frontend source changes are handled automatically by the Next.js development
+server.
+
+## Stop the application
+
+Stop and remove the application containers:
+
+```bash
+docker compose down
+```
+
+This command does not delete the configured PostgreSQL database.
+
+Stop the frontend by pressing `Ctrl+C` in its terminal.
+
+## Useful database commands
 
 Validate the Prisma schema:
 
@@ -117,11 +173,40 @@ Check migration status:
 pnpm run db:migrate:status
 ```
 
-Run identity service tests after `pnpm run dev:setup`:
+Apply existing migrations and build the database package:
+
+```bash
+pnpm run db:init
+```
+
+Create a migration after intentionally changing the Prisma schema:
+
+```bash
+pnpm run db:migrate:create
+```
+
+Do not use `prisma db push`. Committed migrations are the database source of
+truth.
+
+## Tests
+
+Run the frontend component tests:
+
+```bash
+pnpm run test:web
+```
+
+Run Identity Service tests:
 
 ```bash
 pnpm --filter identity-service run test
 pnpm --filter identity-service run test:e2e
+```
+
+Run Resource Service end-to-end tests:
+
+```bash
+pnpm --filter resource-service run test:e2e
 ```
 
 Run database integrity and concurrent-booking tests only against a clean,
@@ -131,12 +216,3 @@ disposable PostgreSQL 15 database:
 TEST_DATABASE_URL="postgresql://user:password@host:5432/database" \
 bash db/schema/tests/run.sh
 ```
-
-Create a migration after intentionally changing the Prisma schema:
-
-```bash
-pnpm run db:migrate:create
-```
-
-Do not use `prisma db push`; committed migrations are the database source of
-truth.
