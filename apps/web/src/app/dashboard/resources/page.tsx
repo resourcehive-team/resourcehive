@@ -1,3 +1,4 @@
+import { ResourceCatalogue } from "@/components/resource-catalogue";
 import { SiteHeader } from "@/components/site-header";
 
 export default function ResourcesPage() {
@@ -15,6 +16,7 @@ export default function ResourcesPage() {
                 Browse resources available through your organizations.
               </p>
             </div>
+            <ResourceCatalogue />
           </div>
         </div>
       </div>
