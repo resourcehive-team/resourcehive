@@ -15,7 +15,7 @@ INSERT INTO users (
 VALUES
     (
         'd1000000-0000-4000-8000-000000000001',
-        'platform.admin@resourcehive.test',
+        'platform.admin@demo.uni',
         '$2b$12$p.th4EyYA8LVaK7SA8w1Y.BFGeWCo8EXsLsjX.I136NuhNRuxb/k2',
         'Priya',
         'Platform',
@@ -25,7 +25,7 @@ VALUES
     ),
     (
         'd1000000-0000-4000-8000-000000000002',
-        'tenant.admin@resourcehive.test',
+        'tenant.admin@demo.uni',
         '$2b$12$p.th4EyYA8LVaK7SA8w1Y.BFGeWCo8EXsLsjX.I136NuhNRuxb/k2',
         'Tania',
         'Administrator',
@@ -35,7 +35,7 @@ VALUES
     ),
     (
         'd1000000-0000-4000-8000-000000000003',
-        'engineering.admin@resourcehive.test',
+        'engineering.admin@demo.uni',
         '$2b$12$p.th4EyYA8LVaK7SA8w1Y.BFGeWCo8EXsLsjX.I136NuhNRuxb/k2',
         'Eshan',
         'Engineer',
@@ -45,7 +45,7 @@ VALUES
     ),
     (
         'd1000000-0000-4000-8000-000000000004',
-        'computing.admin@resourcehive.test',
+        'computing.admin@demo.uni',
         '$2b$12$p.th4EyYA8LVaK7SA8w1Y.BFGeWCo8EXsLsjX.I136NuhNRuxb/k2',
         'Chamara',
         'Computing',
@@ -55,7 +55,7 @@ VALUES
     ),
     (
         'd1000000-0000-4000-8000-000000000005',
-        'student.alice@resourcehive.test',
+        'student.alice@demo.uni',
         '$2b$12$p.th4EyYA8LVaK7SA8w1Y.BFGeWCo8EXsLsjX.I136NuhNRuxb/k2',
         'Alice',
         'Perera',
@@ -65,7 +65,7 @@ VALUES
     ),
     (
         'd1000000-0000-4000-8000-000000000006',
-        'student.bob@resourcehive.test',
+        'student.bob@demo.uni',
         '$2b$12$p.th4EyYA8LVaK7SA8w1Y.BFGeWCo8EXsLsjX.I136NuhNRuxb/k2',
         'Bob',
         'Fernando',
@@ -75,7 +75,7 @@ VALUES
     ),
     (
         'd1000000-0000-4000-8000-000000000007',
-        'science.member@resourcehive.test',
+        'science.member@demo.uni',
         '$2b$12$p.th4EyYA8LVaK7SA8w1Y.BFGeWCo8EXsLsjX.I136NuhNRuxb/k2',
         'Samira',
         'Science',
@@ -85,7 +85,7 @@ VALUES
     ),
     (
         'd1000000-0000-4000-8000-000000000008',
-        'pending.member@resourcehive.test',
+        'pending.member@demo.uni',
         '$2b$12$p.th4EyYA8LVaK7SA8w1Y.BFGeWCo8EXsLsjX.I136NuhNRuxb/k2',
         'Penny',
         'Pending',
@@ -95,7 +95,7 @@ VALUES
     ),
     (
         'd1000000-0000-4000-8000-000000000009',
-        'suspended.member@resourcehive.test',
+        'suspended.member@demo.uni',
         '$2b$12$p.th4EyYA8LVaK7SA8w1Y.BFGeWCo8EXsLsjX.I136NuhNRuxb/k2',
         'Suresh',
         'Suspended',
@@ -105,7 +105,7 @@ VALUES
     ),
     (
         'd1000000-0000-4000-8000-000000000010',
-        'rejected.member@resourcehive.test',
+        'rejected.member@demo.uni',
         '$2b$12$p.th4EyYA8LVaK7SA8w1Y.BFGeWCo8EXsLsjX.I136NuhNRuxb/k2',
         'Ravi',
         'Rejected',
@@ -206,7 +206,7 @@ INSERT INTO organization_email_domains (
 VALUES (
     'd8000000-0000-4000-8000-000000000001',
     'd2000000-0000-4000-8000-000000000001',
-    'resourcehive.test',
+    'demo.uni',
     TRUE
 );
 

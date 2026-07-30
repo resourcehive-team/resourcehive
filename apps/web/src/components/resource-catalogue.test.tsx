@@ -119,6 +119,12 @@ describe("ResourceCatalogue", () => {
     expect(
       await screen.findByText("Electronics Laboratory"),
     ).toBeDefined();
+    expect(screen.getByRole("combobox").textContent).toContain(
+      "Engineering Faculty",
+    );
+    expect(screen.getByRole("combobox").textContent).not.toContain(
+      "organization-1",
+    );
     expect(screen.getByText("25 points")).toBeDefined();
     expect(screen.getByText("Owned by this organization")).toBeDefined();
     expect(resourcesMock).toHaveBeenCalledWith("organization-1", {
