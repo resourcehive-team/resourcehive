@@ -2,8 +2,9 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircleIcon, Building2Icon, RefreshCwIcon } from "lucide-react";
+import { AlertCircleIcon, RefreshCwIcon } from "lucide-react";
 
+import { OrganizationSummaryCard } from "@/components/organization-summary-card";
 import {
   ApiAuthenticationError,
   ApiError,
@@ -11,11 +12,9 @@ import {
 } from "@/lib/api-client";
 import { getRootOrganizations } from "@/lib/resource-service/organization-api";
 import type { Organization } from "@/lib/resource-service/types";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
-  CardAction,
   CardContent,
   CardDescription,
   CardHeader,
@@ -88,61 +87,12 @@ export function RootOrganizationList() {
   return (
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       {organizations.map((organization) => (
-        <OrganizationCard
+        <OrganizationSummaryCard
           key={organization.id}
           organization={organization}
         />
       ))}
     </div>
-  );
-}
-
-function OrganizationCard({
-  organization,
-}: {
-  organization: Organization;
-}) {
-  const status = formatLabel(organization.status);
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Building2Icon className="size-4" />
-          {organization.name}
-        </CardTitle>
-        <CardDescription>{formatLabel(organization.type)}</CardDescription>
-        <CardAction>
-          <Badge
-            variant={
-              organization.status.toUpperCase() === "ACTIVE"
-                ? "default"
-                : "outline"
-            }
-          >
-            {status}
-          </Badge>
-        </CardAction>
-      </CardHeader>
-      <CardContent>
-        <dl className="grid gap-3">
-          <div className="flex items-center justify-between gap-4">
-            <dt className="text-muted-foreground">Joining bonus</dt>
-            <dd className="font-medium">
-              {formatPoints(organization.joinBonusPoints)} points
-            </dd>
-          </div>
-          <div className="flex items-center justify-between gap-4">
-            <dt className="text-muted-foreground">Added</dt>
-            <dd className="font-medium">
-              <time dateTime={organization.createdAt}>
-                {formatDate(organization.createdAt)}
-              </time>
-            </dd>
-          </div>
-        </dl>
-      </CardContent>
-    </Card>
   );
 }
 
@@ -233,30 +183,4 @@ function getErrorMessage(error: unknown): {
     title: "Organizations could not be loaded",
     description: "Please try again. If the problem continues, contact support.",
   };
-}
-
-function formatLabel(value: string): string {
-  const label = value.trim().replaceAll(/[_-]+/g, " ").toLowerCase();
-
-  if (!label) {
-    return "Unknown";
-  }
-
-  return label.charAt(0).toUpperCase() + label.slice(1);
-}
-
-function formatPoints(points: number): string {
-  return new Intl.NumberFormat().format(points);
-}
-
-function formatDate(value: string): string {
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return "Unknown";
-  }
-
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-  }).format(date);
 }
