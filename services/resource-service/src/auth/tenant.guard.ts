@@ -35,27 +35,32 @@ export class TenantGuard implements CanActivate {
       throw new ForbiddenException('You do not have access to this organization.');
     }
 
-    // check if user an admin of the root organization
-    if (targetOrg.rootOrganizationId !== organizationId) {
-      const rootMembership = await this.prisma.organizationMembership.findUnique({
-        where: { userId_organizationId: { userId: user.userId, organizationId: targetOrg.rootOrganizationId } }
+    // Trace ancestors up to the root to find an inherited ADMIN membership
+    let currentOrgId: string | null = targetOrg.parentId;
+
+    while (currentOrgId) {
+      // Fetch the current ancestor organization to ensure we stay within the tenant
+      const currentOrg = await this.prisma.organization.findUnique({
+        where: { id: currentOrgId }
       });
 
-      if (rootMembership && rootMembership.status === 'APPROVED' && rootMembership.role === 'ADMIN') {
-        request.membership = rootMembership; 
-        return true;
+      // Break if org is missing or if we somehow cross tenant boundaries
+      if (!currentOrg || currentOrg.rootOrganizationId !== targetOrg.rootOrganizationId) {
+        break;
       }
-    }
 
-    // check if user an admin of the immediate parent organization
-    if (targetOrg.parentId) {
-      const parentMembership = await this.prisma.organizationMembership.findUnique({
-        where: { userId_organizationId: { userId: user.userId, organizationId: targetOrg.parentId } }
+      // Check if user is an ADMIN of this ancestor organization
+      const ancestorMembership = await this.prisma.organizationMembership.findUnique({
+        where: { userId_organizationId: { userId: user.userId, organizationId: currentOrgId } }
       });
-      if (parentMembership && parentMembership.status === 'APPROVED' && parentMembership.role === 'ADMIN') {
-        request.membership = parentMembership;
+
+      if (ancestorMembership && ancestorMembership.status === 'APPROVED' && ancestorMembership.role === 'ADMIN') {
+        request.membership = ancestorMembership;
         return true;
       }
+
+      // Move up to the next parent
+      currentOrgId = currentOrg.parentId;
     }
     
 

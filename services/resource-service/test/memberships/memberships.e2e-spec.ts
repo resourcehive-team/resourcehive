@@ -11,6 +11,7 @@ describe('MembershipsController (e2e)', () => {
   jest.setTimeout(60000);
   let app: INestApplication<App>;
   let jwtToken: string;
+  let filePrisma: PrismaService;
 
   const demoUserId = '00000000-0000-4000-8000-000000000001';
   const demoOrganizationId = '00000000-0000-4000-8000-000000000002';
@@ -27,6 +28,7 @@ describe('MembershipsController (e2e)', () => {
     const secret = configService.get<string>('JWT_SECRET') || 'development-only-resourcehive-secret-change-before-production';
     const jwtService = app.get(JwtService);
     const prisma = app.get(PrismaService);
+    filePrisma = prisma;
 
     // Ensure demo user is an ADMIN for these tests, as the routes require AdminGuard
     await prisma.organizationMembership.updateMany({
@@ -47,6 +49,8 @@ describe('MembershipsController (e2e)', () => {
   });
 
   it('gets my memberships', async () => {
+    const prisma = app.get(PrismaService);
+    await prisma.$executeRawUnsafe(`SELECT 1`);
     const response = await request(app.getHttpServer())
       .get('/memberships/my-memberships')
       .set('Authorization', `Bearer ${jwtToken}`)
@@ -134,5 +138,81 @@ describe('MembershipsController (e2e)', () => {
       where: { id: targetUserId }
     });
 
-  }, 30000); 
+  });
+
+  it('allows access via deep ancestor administrator inheritance', async () => {
+    const { PrismaClient } = require('@resourcehive/database');
+    const freshPrisma = new PrismaClient();
+    await freshPrisma.$connect();
+
+    const deepRootId = '00000000-0000-4000-8000-000000000100';
+    const deepChildId = '00000000-0000-4000-8000-000000000101';
+    const deepGrandchildId = '00000000-0000-4000-8000-000000000102';
+
+    // Cleanup any leftovers from previous failed runs first!
+    await freshPrisma.organizationMembership.deleteMany({
+      where: { organizationId: { in: [deepRootId, deepChildId, deepGrandchildId] } }
+    });
+    await freshPrisma.organization.deleteMany({
+      where: { id: { in: [deepGrandchildId, deepChildId, deepRootId] } }
+    });
+
+    // 1. Create a deep hierarchy
+    await freshPrisma.organization.create({
+      data: {
+        id: deepRootId,
+        name: 'Deep Root Org',
+        type: 'UNIVERSITY',
+        rootOrganizationId: deepRootId,
+        createdBy: demoUserId,
+      }
+    });
+
+    await freshPrisma.organization.create({
+      data: {
+        id: deepChildId,
+        name: 'Deep Child Org',
+        type: 'FACULTY',
+        parentId: deepRootId,
+        rootOrganizationId: deepRootId,
+        createdBy: demoUserId,
+      }
+    });
+
+    await freshPrisma.organization.create({
+      data: {
+        id: deepGrandchildId,
+        name: 'Deep Grandchild Org',
+        type: 'DEPARTMENT',
+        parentId: deepChildId,
+        rootOrganizationId: deepRootId,
+        createdBy: demoUserId,
+      }
+    });
+
+    // 2. Grant demo user ADMIN role ONLY on the Root
+    await freshPrisma.organizationMembership.create({
+      data: {
+        userId: demoUserId,
+        organizationId: deepRootId,
+        role: 'ADMIN',
+        status: 'APPROVED',
+      }
+    });
+
+    // 3. Verify user can access Grandchild endpoint (inherited from Root -> Child -> Grandchild)
+    await request(app.getHttpServer())
+      .get(`/memberships/organization/${deepGrandchildId}`)
+      .set('Authorization', `Bearer ${jwtToken}`)
+      .expect(200);
+
+    // Cleanup
+    await freshPrisma.organizationMembership.delete({
+      where: { userId_organizationId: { userId: demoUserId, organizationId: deepRootId } }
+    });
+    await freshPrisma.organization.deleteMany({
+      where: { id: { in: [deepGrandchildId, deepChildId, deepRootId] } }
+    });
+    await freshPrisma.$disconnect();
+  });
 });
