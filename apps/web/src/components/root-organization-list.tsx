@@ -2,17 +2,12 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircleIcon, RefreshCwIcon } from "lucide-react";
 
 import { OrganizationSummaryCard } from "@/components/organization-summary-card";
-import {
-  ApiAuthenticationError,
-  ApiError,
-  ApiNetworkError,
-} from "@/lib/api-client";
+import { RequestErrorCard } from "@/components/request-error-card";
+import { ApiAuthenticationError } from "@/lib/api-client";
 import { getRootOrganizations } from "@/lib/resource-service/organization-api";
 import type { Organization } from "@/lib/resource-service/types";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -62,7 +57,11 @@ export function RootOrganizationList() {
 
   if (error) {
     return (
-      <OrganizationListError error={error} onRetry={retryRequest} />
+      <RequestErrorCard
+        error={error}
+        subject="Organizations"
+        onRetry={retryRequest}
+      />
     );
   }
 
@@ -117,70 +116,4 @@ function RootOrganizationListSkeleton() {
       ))}
     </div>
   );
-}
-
-function OrganizationListError({
-  error,
-  onRetry,
-}: {
-  error: unknown;
-  onRetry: () => void;
-}) {
-  const message = getErrorMessage(error);
-  const canRetry =
-    !(error instanceof ApiAuthenticationError) &&
-    !(error instanceof ApiError && error.status === 403);
-
-  return (
-    <Card role="alert">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <AlertCircleIcon className="size-4" />
-          {message.title}
-        </CardTitle>
-        <CardDescription>{message.description}</CardDescription>
-      </CardHeader>
-      {canRetry ? (
-        <CardContent>
-          <Button variant="outline" onClick={onRetry}>
-            <RefreshCwIcon data-icon="inline-start" />
-            Try again
-          </Button>
-        </CardContent>
-      ) : null}
-    </Card>
-  );
-}
-
-function getErrorMessage(error: unknown): {
-  title: string;
-  description: string;
-} {
-  if (error instanceof ApiAuthenticationError) {
-    return {
-      title: "Your session has expired",
-      description: "Redirecting you to the login page.",
-    };
-  }
-
-  if (error instanceof ApiError && error.status === 403) {
-    return {
-      title: "Organizations are unavailable",
-      description:
-        "Your account does not have permission to view these organizations.",
-    };
-  }
-
-  if (error instanceof ApiNetworkError) {
-    return {
-      title: "ResourceHive could not be reached",
-      description:
-        "Check your connection and make sure the API gateway is running.",
-    };
-  }
-
-  return {
-    title: "Organizations could not be loaded",
-    description: "Please try again. If the problem continues, contact support.",
-  };
 }
