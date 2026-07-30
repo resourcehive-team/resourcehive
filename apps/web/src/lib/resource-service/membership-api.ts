@@ -5,6 +5,7 @@ import { apiPathSegment } from "@/lib/resource-service/path";
 import type {
   Membership,
   MembershipWithOrganization,
+  OrganizationMember,
 } from "@/lib/resource-service/types";
 
 export function requestOrganizationMembership(
@@ -24,6 +25,18 @@ export function getCurrentUserMemberships(
 ): Promise<MembershipWithOrganization[]> {
   return apiRequest<MembershipWithOrganization[]>(
     "/memberships/my-memberships",
+    { signal },
+  );
+}
+
+export function getOrganizationMembers(
+  organizationId: string,
+  signal?: AbortSignal,
+): Promise<OrganizationMember[]> {
+  const id = apiPathSegment(organizationId, "Organization ID");
+
+  return apiRequest<OrganizationMember[]>(
+    `/memberships/organization/${id}`,
     { signal },
   );
 }
