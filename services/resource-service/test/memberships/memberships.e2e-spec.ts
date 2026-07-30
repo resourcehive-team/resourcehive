@@ -26,6 +26,13 @@ describe('MembershipsController (e2e)', () => {
     const configService = app.get(ConfigService);
     const secret = configService.get<string>('JWT_SECRET') || 'development-only-resourcehive-secret-change-before-production';
     const jwtService = app.get(JwtService);
+    const prisma = app.get(PrismaService);
+
+    // Ensure demo user is an ADMIN for these tests, as the routes require AdminGuard
+    await prisma.organizationMembership.updateMany({
+      where: { userId: demoUserId, organizationId: demoOrganizationId },
+      data: { role: 'ADMIN' }
+    });
     
     jwtToken = jwtService.sign({
       sub: demoUserId,
