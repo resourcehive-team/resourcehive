@@ -65,29 +65,32 @@ export class SlotRepository {
   }
 
   create(input: CreateSlotInput): Promise<SlotRecord> {
-    return this.prisma.$transaction(async (transaction) => {
-      const resource = await transaction.resource.findFirst({
-        where: {
-          id: input.resourceId,
-          rootOrganizationId: input.rootOrganizationId,
-          status: "ACTIVE",
-        },
-        select: { id: true },
-      });
+    return this.prisma.$transaction(
+      async (transaction) => {
+        const resource = await transaction.resource.findFirst({
+          where: {
+            id: input.resourceId,
+            rootOrganizationId: input.rootOrganizationId,
+            status: "ACTIVE",
+          },
+          select: { id: true },
+        });
 
-      if (!resource) {
-        throw new SlotResourceNotFoundError();
-      }
+        if (!resource) {
+          throw new SlotResourceNotFoundError();
+        }
 
-      return transaction.resourceSlot.create({
-        data: {
-          resourceId: resource.id,
-          startsAt: input.startsAt,
-          endsAt: input.endsAt,
-        },
-        include: slotWithResource,
-      });
-    });
+        return transaction.resourceSlot.create({
+          data: {
+            resourceId: resource.id,
+            startsAt: input.startsAt,
+            endsAt: input.endsAt,
+          },
+          include: slotWithResource,
+        });
+      },
+      { maxWait: 10000, timeout: 30000 },
+    );
   }
 
   async canAccessResource(

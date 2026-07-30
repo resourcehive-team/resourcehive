@@ -108,6 +108,8 @@ describe("BookingCreationService", () => {
     );
     expect(runTransaction).toHaveBeenCalledWith(expect.any(Function), {
       isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      maxWait: 10000,
+      timeout: 30000,
     });
   });
 
