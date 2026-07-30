@@ -50,7 +50,7 @@ export class MembershipsController {
     return this.membershipsService.getUserMemberships(user.userId);
   }
 
-  @UseGuards(TenantGuard)
+  @UseGuards(TenantGuard, AdminGuard)
   @Get('organization/:organizationId')
   @ApiOperation({ summary: 'Get all members of an organization' })
   getOrganizationMembers(@Param('organizationId') orgId: string) {
