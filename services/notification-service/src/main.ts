@@ -10,7 +10,10 @@ async function bootstrap(): Promise<void> {
     .map((origin) => origin.trim())
     .filter(Boolean);
 
-  app.enableCors({ origin: allowedOrigins });
+  app.enableCors({
+    origin: allowedOrigins,
+    credentials: true,
+  });
   app.useGlobalPipes(
     new ValidationPipe({
       transform: true,

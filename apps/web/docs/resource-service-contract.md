@@ -331,31 +331,24 @@ frontend. They should not be added to the UI as part of issue #32.
 
 ## Integration readiness
 
-The endpoint paths are known, but the current service is **not ready for the
-browser integration required by issue #32**.
+The endpoint paths, browser authentication, and local CORS contract are now
+connected through the public API gateway.
 
-The following items must be resolved or explicitly agreed before the later
-frontend API and screen branches are considered complete.
-
-### 1. Browser authentication is incompatible
+### 1. Browser authentication
 
 The shared frontend `apiRequest` client sends the ResourceHive HttpOnly cookie.
-The Resource Service currently reads only:
+The Resource Service uses `@resourcehive/service-auth`, which accepts that
+cookie. It also continues to accept:
 
 ```http
 Authorization: Bearer <token>
 ```
 
-Browser JavaScript cannot read the HttpOnly cookie to create that header.
-Therefore, protected Resource Service requests from the current web
-application will receive `401 Unauthorized`.
+Bearer authentication remains available for Swagger, automated tests, and
+trusted non-browser clients. The frontend must not read the cookie, restore
+local-storage tokens, or implement another authentication method.
 
-The Resource Service owner should migrate the service to
-`@resourcehive/service-auth`, which already accepts the ResourceHive cookie and
-bearer tokens. The frontend must not restore local-storage tokens or implement
-another authentication method.
-
-### 2. The local gateway browser CORS contract is missing
+### 2. Local browser CORS contract
 
 The current frontend and gateway use different local origins:
 
@@ -364,15 +357,10 @@ Frontend: http://localhost:3000
 Gateway:  http://localhost:8000
 ```
 
-The Nginx gateway does not currently add CORS response headers, and the
-Resource Service does not enable CORS. Browser requests to the public gateway
-will therefore require one agreed solution:
-
-- configure CORS once at the public gateway; or
-- expose the gateway through the same public origin as the frontend.
-
-This is gateway/deployment integration work. It should not be reimplemented
-inside every frontend API function.
+NestJS services own CORS and use the explicit `CORS_ORIGINS` allowlist with
+credentials enabled. Nginx forwards requests and responses without adding a
+second, conflicting CORS policy. CORS must not be reimplemented inside
+frontend API functions.
 
 ### 3. Organization member response safety is resolved
 
@@ -455,16 +443,13 @@ resource card.
 
 ## Recommended next-step boundary
 
-The typed frontend API modules and catalogue screen now exist. Live
-end-to-end requests still depend on the unresolved infrastructure items below:
+The typed frontend API modules and catalogue screen now use the public gateway
+with the shared HttpOnly cookie. Remaining domain work should preserve:
 
-1. Resource Service accepts the shared HttpOnly cookie authentication.
-2. The public gateway browser-origin strategy is confirmed.
-3. Safe organization-member authorization and response fields are implemented.
-4. Pagination, resource status behavior, and response shapes are confirmed.
-5. Person C connects the screens to the prepared modules after the required
-   backend contracts are safe. The current organization, membership, and
-   catalogue screens are implemented with explicit failure states.
+1. Safe organization-member authorization and response fields.
+2. Confirmed pagination, resource status behavior, and response shapes.
+3. Explicit loading, empty, authorization, and failure states in the current
+   organization, membership, and catalogue screens.
 
 The frontend should not work around an unsafe or incomplete backend contract.
 

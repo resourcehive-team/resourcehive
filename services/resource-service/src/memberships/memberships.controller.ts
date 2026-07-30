@@ -1,14 +1,14 @@
 import { Controller, Get, Post, Param, UseGuards, Patch } from '@nestjs/common';
 import { MembershipsService } from './memberships.service';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { AuthGuard } from '@nestjs/passport';
-import { CurrentUser } from '../auth/current-user.decorator';
+import { CurrentUser, JwtAuthGuard } from '@resourcehive/service-auth';
+import type { AuthenticatedUser } from '@resourcehive/service-auth';
 import { TenantGuard } from '../auth/tenant.guard';
 import { AdminGuard } from '../auth/admin.guard';
 
 @ApiTags('Memberships')
 @ApiBearerAuth()
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(JwtAuthGuard)
 @Controller('memberships')
 export class MembershipsController {
   constructor(private readonly membershipsService: MembershipsService) {}
@@ -17,7 +17,7 @@ export class MembershipsController {
   @ApiOperation({ summary: 'Request membership to an organization' })
   requestMembership(
     @Param('organizationId') orgId: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.membershipsService.requestMembership(user.userId, orgId);
   }
@@ -28,9 +28,14 @@ export class MembershipsController {
   approveMembership(
     @Param('organizationId') orgId: string,
     @Param('userId') targetUserId: string,
-    @CurrentUser() user: any
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.membershipsService.updateMembershipStatus(targetUserId, orgId, 'APPROVED', user.userId);
+    return this.membershipsService.updateMembershipStatus(
+      targetUserId,
+      orgId,
+      'APPROVED',
+      user.userId,
+    );
   }
 
   @UseGuards(TenantGuard, AdminGuard)
@@ -39,14 +44,19 @@ export class MembershipsController {
   rejectMembership(
     @Param('organizationId') orgId: string,
     @Param('userId') targetUserId: string,
-    @CurrentUser() user: any
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.membershipsService.updateMembershipStatus(targetUserId, orgId, 'REJECTED', user.userId);
+    return this.membershipsService.updateMembershipStatus(
+      targetUserId,
+      orgId,
+      'REJECTED',
+      user.userId,
+    );
   }
 
   @Get('my-memberships')
   @ApiOperation({ summary: 'Get memberships for the current user' })
-  getMyMemberships(@CurrentUser() user: any) {
+  getMyMemberships(@CurrentUser() user: AuthenticatedUser) {
     return this.membershipsService.getUserMemberships(user.userId);
   }
 

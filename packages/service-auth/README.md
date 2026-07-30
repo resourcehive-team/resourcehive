@@ -95,9 +95,9 @@ Existing services that already use `ServiceAuthModule` and `JwtAuthGuard` do
 not need controller changes for cookie authentication. Updating this package
 updates their authentication behavior.
 
-At the current baseline, Booking and Notification already use this package.
-Resource Service still has its own Passport JWT strategy, so it must migrate to
-this package once; a package update cannot change code that does not import it.
+Booking, Resource, and Notification use this package. New protected routes in
+those services must continue using the shared guard instead of adding another
+JWT strategy.
 
 ## What the service needs
 

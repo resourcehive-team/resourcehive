@@ -1,4 +1,4 @@
-import { identityApiUrl } from "@/lib/config";
+import { apiUrl } from "@/lib/config";
 
 export interface LoginRequest {
   email: string;
@@ -111,7 +111,7 @@ export async function login(credentials: LoginRequest): Promise<LoginResponse> {
   let response: Response;
 
   try {
-    response = await fetch(`${identityApiUrl}/auth/login`, {
+    response = await fetch(`${apiUrl}/auth/login`, {
       method: "POST",
       credentials: "include",
       headers: {
@@ -152,7 +152,7 @@ export async function login(credentials: LoginRequest): Promise<LoginResponse> {
 }
 
 export async function logout(): Promise<void> {
-  const response = await fetch(`${identityApiUrl}/auth/logout`, {
+  const response = await fetch(`${apiUrl}/auth/logout`, {
     method: "POST",
     credentials: "include",
   });
@@ -168,7 +168,7 @@ export async function getCurrentUser(
   let response: Response;
 
   try {
-    response = await fetch(`${identityApiUrl}/auth/me`, {
+    response = await fetch(`${apiUrl}/auth/me`, {
       credentials: "include",
       cache: "no-store",
       signal,
@@ -199,7 +199,7 @@ export async function register(
   let response: Response;
 
   try {
-    response = await fetch(`${identityApiUrl}/auth/register`, {
+    response = await fetch(`${apiUrl}/auth/register`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -233,7 +233,7 @@ export async function verifyEmail(
   let response: Response;
 
   try {
-    response = await fetch(`${identityApiUrl}/auth/verify-email`, {
+    response = await fetch(`${apiUrl}/auth/verify-email`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -270,7 +270,7 @@ export async function getEmailVerificationStatus(
   let response: Response;
 
   try {
-    response = await fetch(`${identityApiUrl}/auth/verification-status`, {
+    response = await fetch(`${apiUrl}/auth/verification-status`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

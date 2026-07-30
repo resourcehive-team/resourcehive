@@ -1,6 +1,6 @@
 import "client-only";
 
-import { apiGatewayUrl } from "@/lib/config";
+import { apiUrl } from "@/lib/config";
 
 type ApiRequestOptions = Omit<RequestInit, "body" | "credentials"> &
   (
@@ -95,7 +95,7 @@ function createApiUrl(path: string): string {
     throw new Error("API request paths must start with a single forward slash");
   }
 
-  return new URL(path.slice(1), `${apiGatewayUrl.replace(/\/+$/, "")}/`).href;
+  return new URL(path.slice(1), `${apiUrl.replace(/\/+$/, "")}/`).href;
 }
 
 function prepareRequestBody(
