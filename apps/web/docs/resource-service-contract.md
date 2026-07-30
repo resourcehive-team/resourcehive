@@ -455,15 +455,16 @@ resource card.
 
 ## Recommended next-step boundary
 
-The typed frontend API modules now exist in
-`src/lib/resource-service`. Live screen integration should follow this order:
+The typed frontend API modules and catalogue screen now exist. Live
+end-to-end requests still depend on the unresolved infrastructure items below:
 
 1. Resource Service accepts the shared HttpOnly cookie authentication.
 2. The public gateway browser-origin strategy is confirmed.
 3. Safe organization-member authorization and response fields are implemented.
 4. Pagination, resource status behavior, and response shapes are confirmed.
 5. Person C connects the screens to the prepared modules after the required
-   backend contracts are safe.
+   backend contracts are safe. The current organization, membership, and
+   catalogue screens are implemented with explicit failure states.
 
 The frontend should not work around an unsafe or incomplete backend contract.
 

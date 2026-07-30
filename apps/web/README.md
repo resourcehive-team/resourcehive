@@ -84,6 +84,15 @@ const resources = await getAccessibleResources(organizationId, {
 });
 ```
 
+The resource catalogue is available at `/dashboard/resources`. It:
+
+- offers organizations from the current user's approved memberships;
+- asks the Resource Service to authorize every selected organization;
+- searches only by resource name;
+- requests ten resources per page;
+- displays owned and shared resources without inventing owner names;
+- handles loading, empty, authorization, network, and pagination states.
+
 The Resource Service modules:
 
 - use the public API gateway;
