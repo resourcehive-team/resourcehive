@@ -255,6 +255,13 @@ function CatalogueControls({
   onSearchInputChange: (value: string) => void;
   onSearchSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
 }) {
+  const organizationLabels = Object.fromEntries(
+    memberships.map((membership) => [
+      membership.organizationId,
+      membership.organization.name,
+    ]),
+  );
+
   return (
     <Card>
       <CardHeader>
@@ -268,6 +275,7 @@ function CatalogueControls({
         <div className="space-y-2">
           <Label htmlFor="resource-organization">Organization</Label>
           <Select
+            items={organizationLabels}
             value={selectedOrganizationId}
             onValueChange={(value) => {
               if (typeof value === "string") {
