@@ -143,6 +143,7 @@ try {
 From the repository root:
 
 ```bash
+pnpm run test:web
 pnpm --filter frontend run lint
 pnpm --filter frontend run build
 ```

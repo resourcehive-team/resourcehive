@@ -44,6 +44,9 @@ jobs:
       - name: Build Shared Authentication Package
         run: pnpm --filter @resourcehive/service-auth run build
 
+      - name: Run Frontend Component Tests
+        run: pnpm run test:web
+
       - name: Initialize Temporary PostgreSQL Database
         run: pnpm run db:init
         env:
