@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 import {
   SidebarGroup,
@@ -20,6 +21,8 @@ export function NavMain({
     icon?: React.ReactNode;
   }[];
 }) {
+  const pathname = usePathname();
+
   return (
     <SidebarGroup>
       <SidebarGroupLabel>Workspace</SidebarGroupLabel>
@@ -28,6 +31,12 @@ export function NavMain({
           {items.map((item) => (
             <SidebarMenuItem key={item.title}>
               <SidebarMenuButton
+                isActive={
+                  item.url === "/dashboard"
+                    ? pathname === item.url
+                    : pathname === item.url ||
+                      pathname.startsWith(`${item.url}/`)
+                }
                 tooltip={item.title}
                 render={<Link href={item.url} />}
               >
