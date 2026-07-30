@@ -1,3 +1,4 @@
+import { CurrentMembershipList } from "@/components/current-membership-list";
 import { SiteHeader } from "@/components/site-header";
 
 export default function MembershipsPage() {
@@ -15,6 +16,7 @@ export default function MembershipsPage() {
                 View your organization memberships and pending requests.
               </p>
             </div>
+            <CurrentMembershipList />
           </div>
         </div>
       </div>
