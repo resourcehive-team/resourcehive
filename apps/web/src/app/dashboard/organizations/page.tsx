@@ -1,3 +1,4 @@
+import { RootOrganizationList } from "@/components/root-organization-list";
 import { SiteHeader } from "@/components/site-header";
 
 export default function OrganizationsPage() {
@@ -15,6 +16,7 @@ export default function OrganizationsPage() {
                 Browse the organizations available in ResourceHive.
               </p>
             </div>
+            <RootOrganizationList />
           </div>
         </div>
       </div>
