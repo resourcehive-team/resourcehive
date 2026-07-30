@@ -365,6 +365,17 @@ function CatalogueResults({
               : "This organization does not have accessible resources yet."}
           </CardDescription>
         </CardHeader>
+        {catalogue.page > 1 ? (
+          <CardContent>
+            <Button
+              variant="outline"
+              onClick={() => onPageChange(catalogue.page - 1)}
+            >
+              <ChevronLeftIcon data-icon="inline-start" />
+              Previous page
+            </Button>
+          </CardContent>
+        ) : null}
       </Card>
     );
   }
