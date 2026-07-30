@@ -51,7 +51,7 @@ const data = {
     },
     {
       title: "Organizations",
-      url: "#",
+      url: "/dashboard/organizations",
       icon: <Building2Icon />,
     },
     {
