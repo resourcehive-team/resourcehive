@@ -1,5 +1,5 @@
-import { AccountMembershipCard } from "@/components/account-membership-card";
 import { AccountDetails } from "@/components/account-details";
+import { CurrentMembershipList } from "@/components/current-membership-list";
 import { SiteHeader } from "@/components/site-header";
 import {
   Tabs,
@@ -25,7 +25,7 @@ export default function AccountPage() {
             </TabsContent>
 
             <TabsContent value="membership">
-              <AccountMembershipCard />
+              <CurrentMembershipList />
             </TabsContent>
           </Tabs>
         </div>
