@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeftIcon } from "lucide-react";
 
+import { MembershipRequestCard } from "@/components/membership-request-card";
 import { OrganizationSummaryCard } from "@/components/organization-summary-card";
 import { RequestErrorCard } from "@/components/request-error-card";
 import { Badge } from "@/components/ui/badge";
@@ -100,6 +101,10 @@ export function OrganizationDetailsView({
   return (
     <div className="flex flex-col gap-8">
       <OrganizationOverview organization={state.organization} />
+      <MembershipRequestCard
+        organizationId={state.organization.id}
+        organizationName={state.organization.name}
+      />
       <ChildOrganizationList organizations={state.organization.children} />
     </div>
   );
