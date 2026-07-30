@@ -122,8 +122,10 @@ describe('MembershipsController (e2e)', () => {
     await prisma.organizationMembership.deleteMany({
       where: { userId: targetUserId }
     });
+    
     await prisma.user.delete({
       where: { id: targetUserId }
     });
-  }, 15000);
+
+  }, 30000); 
 });

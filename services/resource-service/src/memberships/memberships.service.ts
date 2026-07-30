@@ -49,10 +49,29 @@ export class MembershipsService {
 
   // for getting all members in an organization
   async getOrganizationMembers(organizationId: string) {
-    return this.prisma.organizationMembership.findMany({
+    const memberships = await this.prisma.organizationMembership.findMany({
       where: { organizationId },
-      include: { user: true },
+      include: { 
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            status: true
+          }
+        } 
+      },
     });
+
+    return memberships.map(membership => ({
+      userId: membership.userId,
+      organizationId: membership.organizationId,
+      role: membership.role,
+      status: membership.status,
+      joinedAt: membership.joinedAt,
+      user: membership.user
+    }));
   }
 
 }
