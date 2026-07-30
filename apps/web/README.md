@@ -44,6 +44,11 @@ secret with `NEXT_PUBLIC_`.
 Use `apiRequest` from `src/lib/api-client.ts` for protected Resource, Booking,
 and Notification requests.
 
+Before adding Resource Service calls, read
+[`docs/resource-service-contract.md`](docs/resource-service-contract.md). It
+records the current public paths, response shapes, and unresolved integration
+blockers.
+
 Do not write another authentication wrapper and do not try to read the JWT.
 The JWT is stored in an HttpOnly cookie, so browser JavaScript cannot access
 it. The shared client tells the browser to send the cookie automatically.
@@ -53,17 +58,15 @@ Example GET request:
 ```ts
 import { apiRequest } from "@/lib/api-client";
 
-const organizations = await apiRequest<Organization[]>("/organizations");
+const organizations =
+  await apiRequest<Organization[]>("/organizations/roots");
 ```
 
 Example POST request:
 
 ```ts
-await apiRequest("/memberships", {
+await apiRequest(`/memberships/${organizationId}/request`, {
   method: "POST",
-  json: {
-    organizationId,
-  },
 });
 ```
 
