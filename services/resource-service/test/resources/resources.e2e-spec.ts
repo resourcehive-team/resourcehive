@@ -155,4 +155,45 @@ describe('ResourcesController (e2e)', () => {
     expect(res.body.data.length).toBe(1);
     expect(res.body.data[0].name).toBe('E2E Test Conference Room');
   });
+
+  it('should verify booking access for an active resource', async () => {
+    const res = await request(app.getHttpServer())
+      .get(`/resources/organization/${demoOrganizationId}/${createdResourceId}/access-check`)
+      .set('Authorization', `Bearer ${adminJwtToken}`)
+      .expect(200);
+      
+    expect(res.body.bookable).toBe(true);
+    expect(res.body.resourceId).toBe(createdResourceId);
+
+    const res2 = await request(app.getHttpServer())
+    .get(`/resources/organization/${demoOrganizationId}/${createdResourceId}/access-check`)
+    .set('Authorization', `Bearer ${jwtToken}`)
+    .expect(200);
+
+    expect(res2.body.bookable).toBe(true);
+    expect(res2.body.resourceId).toBe(createdResourceId);
+  });
+
+  it('should reject booking access for an inactive resource', async () => {
+    // First, inactivate using the Admin Token
+    await request(app.getHttpServer())
+      .delete(`/resources/organization/${demoOrganizationId}/${createdResourceId}`)
+      .set('Authorization', `Bearer ${adminJwtToken}`)
+      .expect(200);
+
+    // Then, attempt to check access for booking
+    const res = await request(app.getHttpServer())
+      .get(`/resources/organization/${demoOrganizationId}/${createdResourceId}/access-check`)
+      .set('Authorization', `Bearer ${adminJwtToken}`)
+      .expect(403);
+      
+    expect(res.body.message).toBe('This resource is not active and cannot be booked');
+
+    const res2 = await request(app.getHttpServer())
+      .get(`/resources/organization/${demoOrganizationId}/${createdResourceId}/access-check`)
+      .set('Authorization', `Bearer ${jwtToken}`)
+      .expect(403);
+
+    expect(res2.body.message).toBe('This resource is not active and cannot be booked');
+  });
 });

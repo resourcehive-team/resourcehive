@@ -120,7 +120,7 @@ export class ResourcesService {
     }
     return this.prisma.resource.update({
       where: { id: resourceId },
-      data: { status: 'ARCHIVED' }
+      data: { status: 'INACTIVE' }
     });
   }
 
