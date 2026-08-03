@@ -123,4 +123,20 @@ export class ResourcesService {
       data: { status: 'ARCHIVED' }
     });
   }
+
+  async checkBookingAccess(organizationId: string, resourceId: string) {
+    const resource = await this.findOne(organizationId, resourceId);
+    
+    if (resource.status !== 'ACTIVE') {
+      throw new ForbiddenException('This resource is not active and cannot be booked');
+    }
+    
+    return {
+      bookable: true,
+      resourceId: resource.id,
+      name: resource.name,
+      pointCost: resource.pointCost,
+      ownerOrganizationId: resource.ownerOrganizationId
+    };
+  }
 }
