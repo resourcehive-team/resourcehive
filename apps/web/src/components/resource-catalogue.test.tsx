@@ -127,12 +127,30 @@ describe("ResourceCatalogue", () => {
     );
     expect(screen.getByText("25 points")).toBeDefined();
     expect(screen.getByText("Owned by this organization")).toBeDefined();
+    expect(
+      screen.queryByRole("button", { name: "Create resource" }),
+    ).toBeNull();
     expect(resourcesMock).toHaveBeenCalledWith("organization-1", {
       page: 1,
       limit: 10,
       search: "",
       signal: expect.any(AbortSignal),
     });
+  });
+
+  it("links approved administrators to resource creation", async () => {
+    membershipsMock.mockResolvedValueOnce([
+      { ...approvedMembership, role: "ADMIN" },
+    ]);
+
+    render(<ResourceCatalogue />);
+    await screen.findByText("Electronics Laboratory");
+
+    expect(
+      screen.getByRole("button", { name: "Create resource" }).getAttribute(
+        "href",
+      ),
+    ).toBe("/dashboard/resources/new");
   });
 
   it("shows an understandable authorization failure", async () => {

@@ -7,6 +7,7 @@ import {
   ArrowRightIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  PlusIcon,
   SearchIcon,
 } from "lucide-react";
 
@@ -15,6 +16,7 @@ import { ResourceCatalogueCard } from "@/components/resource-catalogue-card";
 import { Button } from "@/components/ui/button";
 import {
   Card,
+  CardAction,
   CardContent,
   CardDescription,
   CardHeader,
@@ -217,6 +219,9 @@ export function ResourceCatalogue() {
     <div className="flex flex-col gap-6">
       <CatalogueControls
         appliedSearch={appliedSearch}
+        canCreateResources={membershipsState.memberships.some(
+          (membership) => membership.role.toUpperCase() === "ADMIN",
+        )}
         memberships={membershipsState.memberships}
         searchInput={searchInput}
         selectedOrganizationId={selectedOrganizationId}
@@ -238,6 +243,7 @@ export function ResourceCatalogue() {
 
 function CatalogueControls({
   appliedSearch,
+  canCreateResources,
   memberships,
   searchInput,
   selectedOrganizationId,
@@ -247,6 +253,7 @@ function CatalogueControls({
   onSearchSubmit,
 }: {
   appliedSearch: string;
+  canCreateResources: boolean;
   memberships: MembershipWithOrganization[];
   searchInput: string;
   selectedOrganizationId: string;
@@ -270,6 +277,17 @@ function CatalogueControls({
           Choose one of your approved organizations and search by resource
           name.
         </CardDescription>
+        {canCreateResources ? (
+          <CardAction>
+            <Button
+              nativeButton={false}
+              render={<Link href="/dashboard/resources/new" />}
+            >
+              <PlusIcon data-icon="inline-start" />
+              Create resource
+            </Button>
+          </CardAction>
+        ) : null}
       </CardHeader>
       <CardContent className="grid gap-4 lg:grid-cols-2">
         <div className="space-y-2">
