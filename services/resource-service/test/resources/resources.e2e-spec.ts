@@ -93,6 +93,9 @@ describe('ResourcesController (e2e)', () => {
   afterAll(async () => {
     // Cleanup the resources we created during tests
     if (createdResourceId) {
+      await prisma.resourceAllowedOrganization.deleteMany({
+        where: { resourceId: createdResourceId },
+      });
       await prisma.resource.deleteMany({ where: { id: createdResourceId }});
     }
     await app.close();
@@ -115,12 +118,40 @@ describe('ResourcesController (e2e)', () => {
       .send({
         name: 'E2E Test Conference Room',
         description: 'Testing pagination and CRUD',
-        pointCost: 10
+        pointCost: 10,
+        allowedOrganizationIds: [demoOrganizationId],
       })
       .expect(201);
       
     createdResourceId = res.body.id;
     expect(res.body.name).toBe('E2E Test Conference Room');
+    expect(res.body.allowedOrganizations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          organizationId: demoOrganizationId,
+          rootOrganizationId: demoOrganizationId,
+        }),
+      ]),
+    );
+  });
+
+  it('should preserve the owner when updating allowed organizations', async () => {
+    const res = await request(app.getHttpServer())
+      .patch(
+        `/resources/organization/${demoOrganizationId}/${createdResourceId}`,
+      )
+      .set('Authorization', `Bearer ${adminJwtToken}`)
+      .send({ allowedOrganizationIds: [] })
+      .expect(200);
+
+    expect(res.body.allowedOrganizations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          organizationId: demoOrganizationId,
+          rootOrganizationId: demoOrganizationId,
+        }),
+      ]),
+    );
   });
 
   it('should fetch paginated resources', async () => {
