@@ -231,7 +231,10 @@ export function ResourceCreationForm() {
           </CardDescription>
         </CardHeader>
         <CardFooter className="gap-2">
-          <Button render={<Link href="/dashboard/resources" />}>
+          <Button
+            nativeButton={false}
+            render={<Link href="/dashboard/resources" />}
+          >
             Back to catalogue
           </Button>
           <Button variant="outline" onClick={createAnotherResource}>
@@ -391,6 +394,7 @@ export function ResourceCreationForm() {
                 </Button>
                 <Button
                   variant="outline"
+                  nativeButton={false}
                   render={<Link href="/dashboard/resources" />}
                 >
                   <ArrowLeftIcon data-icon="inline-start" />
@@ -457,7 +461,16 @@ async function loadResourceCreationAccess(
         organizationsById,
       ),
     )
-    .sort(compareOrganizations);
+    .sort((first, second) => {
+      const firstIsDirectAdmin = adminOrganizationIds.has(first.id);
+      const secondIsDirectAdmin = adminOrganizationIds.has(second.id);
+
+      if (firstIsDirectAdmin !== secondIsDirectAdmin) {
+        return firstIsDirectAdmin ? -1 : 1;
+      }
+
+      return compareOrganizations(first, second);
+    });
 
   return { ownerOrganizations, tenantOrganizations };
 }
@@ -528,7 +541,11 @@ function NoResourceCreationAccess() {
         </CardDescription>
       </CardHeader>
       <CardFooter>
-        <Button variant="outline" render={<Link href="/dashboard/resources" />}>
+        <Button
+          variant="outline"
+          nativeButton={false}
+          render={<Link href="/dashboard/resources" />}
+        >
           <ArrowLeftIcon data-icon="inline-start" />
           Back to catalogue
         </Button>
