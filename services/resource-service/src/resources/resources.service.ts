@@ -15,16 +15,18 @@ export class ResourcesService {
 
     const rootOrgId = org.rootOrganizationId || org.id;
 
-    const allowedOrgsData = dto.allowedOrganizationIds?.map(id => ({
+    const allowedOrganizationIds = [
+      ...new Set([organizationId, ...(dto.allowedOrganizationIds ?? [])]),
+    ];
+    const allowedOrgsData = allowedOrganizationIds.map((id) => ({
       organizationId: id,
-      rootOrganizationId: rootOrgId
-    })) || [];
+    }));
 
     return this.prisma.resource.create({
       data: {
         name: dto.name,
         description: dto.description,
-        pointCost: dto.pointCost || 0,
+        pointCost: dto.pointCost ?? 0,
         ownerOrganizationId: organizationId,
         rootOrganizationId: rootOrgId,
         createdByUserId: userId,
@@ -93,12 +95,13 @@ export class ResourcesService {
 
     let allowedOrganizationsUpdate = {};
     if (allowedOrganizationIds) {
-      const rootOrgId = resource.rootOrganizationId;
+      const allowedOrganizationIdsWithOwner = [
+        ...new Set([organizationId, ...allowedOrganizationIds]),
+      ];
       allowedOrganizationsUpdate = {
         deleteMany: {},
-        create: allowedOrganizationIds.map(id => ({
+        create: allowedOrganizationIdsWithOwner.map((id) => ({
           organizationId: id,
-          rootOrganizationId: rootOrgId
         }))
       };
     }
