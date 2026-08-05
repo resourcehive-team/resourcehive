@@ -21,7 +21,7 @@ This service relies on a `.env` file for configuration. Since it shares a monore
 **Required environment variables:**
 - `PORT` (or `RESOURCE_SERVICE_PORT`): The port this service runs on (defaults to 3004).
 - `JWT_SECRET`: Used to verify tokens issued by the Identity Service.
-- `DATABASE_URL`: Connection string for PostgreSQL (via Supabase pooling).
+- `DATABASE_URL`: Connection string for PostgreSQL.
 
 ## Running the Service
 
@@ -66,4 +66,4 @@ The Resource Service is not meant to be accessed directly from the frontend. All
 - **Internal Port**: 3004
 - **Gateway Prefix**: Typically routed under `/resources/`, `/organizations/`, and `/memberships/`. 
 
-Ensure that your NGINX or API Gateway configuration proxies requests targeting resource management directly to this service's internal port. The Gateway handles the cross-origin resource sharing (CORS) and passes down the JWT token via the Authorization header.
+Ensure that your NGINX or API Gateway configuration proxies requests targeting resource management directly to this service's internal port. The Gateway handles the cross-origin resource sharing (CORS).
