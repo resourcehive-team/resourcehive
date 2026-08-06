@@ -1,4 +1,5 @@
 import { apiUrl } from "@/lib/config";
+import { fetchWithSessionRefresh } from "@/lib/session-api";
 
 export interface LoginRequest {
   email: string;
@@ -247,7 +248,7 @@ export async function getCurrentUser(
   let response: Response;
 
   try {
-    response = await fetch(`${apiUrl}/auth/me`, {
+    response = await fetchWithSessionRefresh(`${apiUrl}/auth/me`, {
       credentials: "include",
       cache: "no-store",
       signal,

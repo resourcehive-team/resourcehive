@@ -43,6 +43,7 @@ describe('Authentication Flow (e2e)', () => {
   let app: INestApplication<App>;
   let prisma: PrismaService;
   let authenticationCookie: string;
+  let refreshCookie: string;
   let verificationToken: string;
   const passwordResetToken = 'e2e-password-reset-token-value';
   const resetPassword = 'ResetPassword123!';
@@ -107,12 +108,20 @@ describe('Authentication Flow (e2e)', () => {
     const accessTokenCookie = (setCookie as string[]).find((cookie) =>
       cookie.startsWith('resourcehive_access_token='),
     );
+    const refreshTokenCookie = (setCookie as string[]).find((cookie) =>
+      cookie.startsWith('resourcehive_refresh_token='),
+    );
     expect(accessTokenCookie).toContain('HttpOnly');
     expect(accessTokenCookie).toContain('SameSite=Lax');
     expect(accessTokenCookie).toContain('Path=/');
+    expect(refreshTokenCookie).toContain('HttpOnly');
+    expect(refreshTokenCookie).toContain('SameSite=Lax');
+    expect(refreshTokenCookie).toContain('Path=/auth');
 
     authenticationCookie = accessTokenCookie?.split(';')[0] ?? '';
+    refreshCookie = refreshTokenCookie?.split(';')[0] ?? '';
     expect(authenticationCookie).not.toBe('');
+    expect(refreshCookie).not.toBe('');
   });
 
   it('validates the cookie JWT and returns identity headers', async () => {
@@ -167,17 +176,61 @@ describe('Authentication Flow (e2e)', () => {
       .expect(401);
   });
 
-  it('clears the authentication cookie during logout', async () => {
+  it('rotates the refresh cookie and issues a new access cookie', async () => {
+    const previousRefreshCookie = refreshCookie;
+    const response = await request(app.getHttpServer())
+      .post('/auth/refresh')
+      .set('Cookie', refreshCookie)
+      .expect(200);
+
+    expect(response.body).toEqual({
+      message: 'Session refreshed successfully',
+    });
+    expect(response.headers['cache-control']).toBe('no-store');
+
+    const setCookie = response.headers['set-cookie'] as unknown as string[];
+    const accessTokenCookie = setCookie.find((cookie) =>
+      cookie.startsWith('resourcehive_access_token='),
+    );
+    const refreshTokenCookie = setCookie.find((cookie) =>
+      cookie.startsWith('resourcehive_refresh_token='),
+    );
+    authenticationCookie = accessTokenCookie?.split(';')[0] ?? '';
+    refreshCookie = refreshTokenCookie?.split(';')[0] ?? '';
+
+    expect(authenticationCookie).not.toBe('');
+    expect(refreshCookie).not.toBe('');
+    expect(refreshCookie).not.toBe(previousRefreshCookie);
+
+    await request(app.getHttpServer())
+      .get('/auth/validate')
+      .set('Cookie', authenticationCookie)
+      .expect(200);
+  });
+
+  it('revokes the refresh session and clears both cookies during logout', async () => {
     const response = await request(app.getHttpServer())
       .post('/auth/logout')
-      .set('Cookie', authenticationCookie)
+      .set('Cookie', `${authenticationCookie}; ${refreshCookie}`)
       .expect(204);
 
-    const setCookie = response.headers['set-cookie'] as unknown;
+    const setCookie = response.headers['set-cookie'] as unknown as string[];
     expect(Array.isArray(setCookie)).toBe(true);
-    expect((setCookie as string[])[0]).toContain('resourcehive_access_token=;');
-    expect((setCookie as string[])[0]).toContain('HttpOnly');
-    expect((setCookie as string[])[0]).toContain('Path=/');
+    expect(
+      setCookie.some((cookie) =>
+        cookie.includes('resourcehive_access_token=;'),
+      ),
+    ).toBe(true);
+    expect(
+      setCookie.some((cookie) =>
+        cookie.includes('resourcehive_refresh_token=;'),
+      ),
+    ).toBe(true);
+
+    await request(app.getHttpServer())
+      .post('/auth/refresh')
+      .set('Cookie', refreshCookie)
+      .expect(401);
   });
 
   it('registers an unverified user from an approved email domain', async () => {
@@ -358,6 +411,9 @@ describe('Authentication Flow (e2e)', () => {
         prisma.organizationMembership.deleteMany({
           where: { userId: signupUser.id },
         }),
+        prisma.refreshToken.deleteMany({
+          where: { userId: signupUser.id },
+        }),
         prisma.passwordResetToken.deleteMany({
           where: { userId: signupUser.id },
         }),
@@ -369,6 +425,11 @@ describe('Authentication Flow (e2e)', () => {
         }),
       ]);
     }
+    await prisma.refreshToken.deleteMany({
+      where: {
+        user: { email: testEmail },
+      },
+    });
 
     await app.close();
     if (originalEmailTransport === undefined) {

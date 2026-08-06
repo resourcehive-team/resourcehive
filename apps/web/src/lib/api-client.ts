@@ -1,6 +1,7 @@
 import "client-only";
 
 import { apiUrl } from "@/lib/config";
+import { fetchWithSessionRefresh } from "@/lib/session-api";
 
 type ApiRequestOptions = Omit<RequestInit, "body" | "credentials"> &
   (
@@ -59,7 +60,7 @@ export async function apiRequest<T>(
   let response: Response;
 
   try {
-    response = await fetch(createApiUrl(path), {
+    response = await fetchWithSessionRefresh(createApiUrl(path), {
       ...requestOptions,
       body,
       credentials: "include",
