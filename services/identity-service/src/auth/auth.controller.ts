@@ -113,8 +113,11 @@ export class AuthController {
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ) {
-    await this.authService.revokeSession(extractRefreshToken(request));
-    clearAuthenticationCookies(response);
+    try {
+      await this.authService.revokeSession(extractRefreshToken(request));
+    } finally {
+      clearAuthenticationCookies(response);
+    }
   }
 
   @Get('me')
