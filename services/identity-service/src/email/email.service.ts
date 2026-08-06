@@ -9,6 +9,12 @@ export interface VerificationEmailResult {
   developmentVerificationUrl?: string;
 }
 
+interface EmailMessage {
+  to: string;
+  subject: string;
+  text: string;
+}
+
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
@@ -17,15 +23,55 @@ export class EmailService {
     email: string,
     token: string,
   ): Promise<VerificationEmailResult> {
-    const verificationUrl = this.createVerificationUrl(token);
-    const transport = process.env.EMAIL_TRANSPORT ?? 'console';
+    const verificationUrl = this.createAppUrl('/verify-email', token);
 
-    if (transport === 'console') {
+    if ((process.env.EMAIL_TRANSPORT ?? 'console') === 'console') {
       this.logger.log(`Verification email for ${email}: ${verificationUrl}`);
       return { developmentVerificationUrl: verificationUrl };
     }
 
-    if (transport !== 'smtp') {
+    await this.sendSmtpEmail({
+      to: email,
+      subject: 'Verify your ResourceHive email',
+      text: `Verify your email by opening this link: ${verificationUrl}`,
+    });
+
+    return {};
+  }
+
+  async sendPasswordResetEmail(email: string, token: string): Promise<void> {
+    const resetUrl = this.createAppUrl('/reset-password', token);
+
+    if ((process.env.EMAIL_TRANSPORT ?? 'console') === 'console') {
+      this.logger.log(`Password reset email for ${email}: ${resetUrl}`);
+      return;
+    }
+
+    await this.sendSmtpEmail({
+      to: email,
+      subject: 'Reset your ResourceHive password',
+      text: `Reset your password by opening this link: ${resetUrl}\n\nIf you did not request this change, you can ignore this email.`,
+    });
+  }
+
+  async sendPasswordChangedEmail(email: string): Promise<void> {
+    const text =
+      'Your ResourceHive password was changed. If you did not make this change, contact your organization administrator.';
+
+    if ((process.env.EMAIL_TRANSPORT ?? 'console') === 'console') {
+      this.logger.log(`Password changed email for ${email}: ${text}`);
+      return;
+    }
+
+    await this.sendSmtpEmail({
+      to: email,
+      subject: 'Your ResourceHive password was changed',
+      text,
+    });
+  }
+
+  private async sendSmtpEmail(message: EmailMessage): Promise<void> {
+    if (process.env.EMAIL_TRANSPORT !== 'smtp') {
       throw new InternalServerErrorException(
         'EMAIL_TRANSPORT must be console or smtp',
       );
@@ -53,25 +99,21 @@ export class EmailService {
 
     await transporter.sendMail({
       from: process.env.EMAIL_FROM ?? 'ResourceHive <no-reply@localhost>',
-      to: email,
-      subject: 'Verify your ResourceHive email',
-      text: `Verify your email by opening this link: ${verificationUrl}`,
+      ...message,
     });
-
-    return {};
   }
 
-  private createVerificationUrl(token: string): string {
+  private createAppUrl(path: string, token: string): string {
     const appUrl = process.env.APP_URL ?? 'http://localhost:3000';
-    let verificationUrl: URL;
+    let targetUrl: URL;
 
     try {
-      verificationUrl = new URL('/verify-email', appUrl);
+      targetUrl = new URL(path, appUrl);
     } catch {
       throw new InternalServerErrorException('APP_URL must be a valid URL');
     }
 
-    verificationUrl.searchParams.set('token', token);
-    return verificationUrl.toString();
+    targetUrl.searchParams.set('token', token);
+    return targetUrl.toString();
   }
 }

@@ -27,9 +27,13 @@ import { PasswordInput } from "@/components/password-input";
 
 export function LoginForm({
   redirectTo = "/dashboard",
+  passwordReset = false,
   className,
   ...props
-}: React.ComponentProps<"div"> & { redirectTo?: string }) {
+}: React.ComponentProps<"div"> & {
+  redirectTo?: string;
+  passwordReset?: boolean;
+}) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -74,6 +78,11 @@ export function LoginForm({
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {passwordReset && (
+            <p className="mb-4 text-sm text-muted-foreground" role="status">
+              Your password has been reset. Log in with your new password.
+            </p>
+          )}
           <p className="mb-4 text-xs text-muted-foreground">
             <span className="text-destructive" aria-hidden="true">
               *
@@ -102,12 +111,17 @@ export function LoginForm({
                 />
               </Field>
               <Field data-invalid={error ? "true" : undefined}>
-                <FieldLabel htmlFor="password">
-                  Password
-                  <span className="text-destructive" aria-hidden="true">
-                    *
-                  </span>
-                </FieldLabel>
+                <div className="flex items-center justify-between">
+                  <FieldLabel htmlFor="password">
+                    Password
+                    <span className="text-destructive" aria-hidden="true">
+                      *
+                    </span>
+                  </FieldLabel>
+                  <Link className="text-sm underline-offset-4 hover:underline" href="/forgot-password">
+                    Forgot password?
+                  </Link>
+                </div>
                 <PasswordInput
                   id="password"
                   name="password"

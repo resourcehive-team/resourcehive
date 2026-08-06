@@ -9,6 +9,19 @@ export interface LoginResponse {
   message: "user login successfully";
 }
 
+export interface ForgotPasswordRequest {
+  email: string;
+}
+
+export interface PasswordResetRequest {
+  token: string;
+  password: string;
+}
+
+export interface PasswordResetResponse {
+  message: string;
+}
+
 export interface CurrentUserResponse {
   user: {
     id: string;
@@ -107,6 +120,13 @@ export class EmailVerificationError extends Error {
   }
 }
 
+export class PasswordResetError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "PasswordResetError";
+  }
+}
+
 export async function login(credentials: LoginRequest): Promise<LoginResponse> {
   let response: Response;
 
@@ -160,6 +180,65 @@ export async function logout(): Promise<void> {
   if (!response.ok) {
     throw new Error("Unable to log out. Please try again.");
   }
+}
+
+export async function requestPasswordReset(
+  request: ForgotPasswordRequest,
+): Promise<PasswordResetResponse> {
+  let response: Response;
+
+  try {
+    response = await fetch(`${apiUrl}/auth/forgot-password`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(request),
+    });
+  } catch {
+    throw new PasswordResetError(
+      "Unable to connect to the password reset service.",
+    );
+  }
+
+  const data: unknown = await response.json().catch(() => null);
+  if (!response.ok || !isPasswordResetResponse(data)) {
+    throw new PasswordResetError(
+      getApiErrorMessage(data, "Unable to request a password reset."),
+    );
+  }
+
+  return data;
+}
+
+export async function resetPassword(
+  request: PasswordResetRequest,
+): Promise<PasswordResetResponse> {
+  let response: Response;
+
+  try {
+    response = await fetch(`${apiUrl}/auth/reset-password`, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(request),
+    });
+  } catch {
+    throw new PasswordResetError(
+      "Unable to connect to the password reset service.",
+    );
+  }
+
+  const data: unknown = await response.json().catch(() => null);
+  if (!response.ok || !isPasswordResetResponse(data)) {
+    throw new PasswordResetError(
+      getApiErrorMessage(data, "Unable to reset your password."),
+    );
+  }
+
+  return data;
 }
 
 export async function getCurrentUser(
@@ -450,5 +529,16 @@ function isEmailVerificationStatusResponse(
       data.status === "EXPIRED" ||
       data.status === "VERIFIED") &&
     typeof data.emailVerified === "boolean"
+  );
+}
+
+function isPasswordResetResponse(
+  data: unknown,
+): data is PasswordResetResponse {
+  return (
+    !!data &&
+    typeof data === "object" &&
+    "message" in data &&
+    typeof data.message === "string"
   );
 }

@@ -3,6 +3,7 @@ import { LoginForm } from "@/components/login-form";
 interface LoginPageProps {
   searchParams: Promise<{
     next?: string | string[];
+    passwordReset?: string | string[];
   }>;
 }
 
@@ -27,12 +28,14 @@ function getSafeRedirectPath(value: string | string[] | undefined) {
 }
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
-  const redirectTo = getSafeRedirectPath((await searchParams).next);
+  const query = await searchParams;
+  const redirectTo = getSafeRedirectPath(query.next);
+  const passwordReset = query.passwordReset === "success";
 
   return (
     <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
       <div className="w-full max-w-sm">
-        <LoginForm redirectTo={redirectTo} />
+        <LoginForm redirectTo={redirectTo} passwordReset={passwordReset} />
       </div>
     </div>
   );

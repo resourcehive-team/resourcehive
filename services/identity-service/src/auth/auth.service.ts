@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   InternalServerErrorException,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -10,14 +11,24 @@ import { PrismaService } from '@resourcehive/database';
 import * as bcrypt from 'bcrypt';
 import { createHash, randomBytes } from 'node:crypto';
 import { EmailService } from '../email/email.service';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 
 const DEFAULT_BCRYPT_ROUNDS = 12;
 const DEFAULT_VERIFICATION_TOKEN_LIFETIME = '24h';
+const DEFAULT_PASSWORD_RESET_TOKEN_LIFETIME = '1h';
+const PASSWORD_RESET_REQUEST_COOLDOWN_MS = 60 * 1000;
+const PASSWORD_RESET_REQUEST_MESSAGE =
+  'If an account exists for that email, a password reset link has been sent.';
+const INVALID_PASSWORD_RESET_MESSAGE =
+  'Password reset link is invalid or has expired.';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
@@ -173,6 +184,159 @@ export class AuthService {
     return {
       message: 'user login successfully',
       token,
+    };
+  }
+
+  async requestPasswordReset(request: ForgotPasswordDto) {
+    const email = request.email.trim().toLowerCase();
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      select: {
+        id: true,
+        email: true,
+        status: true,
+        emailVerifiedAt: true,
+      },
+    });
+
+    if (!user || user.status !== 'ACTIVE' || !user.emailVerifiedAt) {
+      return { message: PASSWORD_RESET_REQUEST_MESSAGE };
+    }
+
+    const mostRecentToken = await this.prisma.passwordResetToken.findFirst({
+      where: { userId: user.id },
+      select: { createdAt: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (
+      mostRecentToken &&
+      mostRecentToken.createdAt.getTime() + PASSWORD_RESET_REQUEST_COOLDOWN_MS >
+        Date.now()
+    ) {
+      return { message: PASSWORD_RESET_REQUEST_MESSAGE };
+    }
+
+    const token = randomBytes(32).toString('base64url');
+    const now = new Date();
+    const expiresAt = new Date(
+      now.getTime() + this.getPasswordResetTokenLifetimeMs(),
+    );
+
+    await this.prisma.$transaction(async (transaction) => {
+      await transaction.passwordResetToken.updateMany({
+        where: {
+          userId: user.id,
+          usedAt: null,
+          expiresAt: { gt: now },
+        },
+        data: { usedAt: now },
+      });
+      await transaction.passwordResetToken.create({
+        data: {
+          userId: user.id,
+          tokenHash: this.hashToken(token),
+          expiresAt,
+        },
+      });
+    });
+
+    try {
+      await this.emailService.sendPasswordResetEmail(user.email, token);
+    } catch (error) {
+      this.logger.error(
+        `Unable to send password reset email for user ${user.id}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+    }
+
+    return { message: PASSWORD_RESET_REQUEST_MESSAGE };
+  }
+
+  async resetPassword(reset: ResetPasswordDto) {
+    const now = new Date();
+    const passwordResetToken = await this.prisma.passwordResetToken.findUnique({
+      where: { tokenHash: this.hashToken(reset.token) },
+      select: {
+        id: true,
+        usedAt: true,
+        expiresAt: true,
+        user: {
+          select: {
+            id: true,
+            email: true,
+            passwordHash: true,
+            status: true,
+            emailVerifiedAt: true,
+          },
+        },
+      },
+    });
+
+    if (
+      !passwordResetToken ||
+      passwordResetToken.usedAt ||
+      passwordResetToken.expiresAt <= now ||
+      passwordResetToken.user.status !== 'ACTIVE' ||
+      !passwordResetToken.user.emailVerifiedAt
+    ) {
+      throw new BadRequestException(INVALID_PASSWORD_RESET_MESSAGE);
+    }
+
+    if (
+      await bcrypt.compare(reset.password, passwordResetToken.user.passwordHash)
+    ) {
+      throw new BadRequestException(
+        'New password must be different from your current password.',
+      );
+    }
+
+    const passwordHash = await bcrypt.hash(
+      reset.password,
+      this.getBcryptRounds(),
+    );
+
+    await this.prisma.$transaction(async (transaction) => {
+      const claimedToken = await transaction.passwordResetToken.updateMany({
+        where: {
+          id: passwordResetToken.id,
+          usedAt: null,
+          expiresAt: { gt: now },
+        },
+        data: { usedAt: now },
+      });
+
+      if (claimedToken.count !== 1) {
+        throw new BadRequestException(INVALID_PASSWORD_RESET_MESSAGE);
+      }
+
+      await transaction.user.update({
+        where: { id: passwordResetToken.user.id },
+        data: { passwordHash },
+      });
+      await transaction.passwordResetToken.updateMany({
+        where: {
+          userId: passwordResetToken.user.id,
+          usedAt: null,
+          expiresAt: { gt: now },
+        },
+        data: { usedAt: now },
+      });
+    });
+
+    try {
+      await this.emailService.sendPasswordChangedEmail(
+        passwordResetToken.user.email,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Unable to send password change confirmation for user ${passwordResetToken.user.id}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+    }
+
+    return {
+      message: 'Password reset successfully. Log in with your new password.',
     };
   }
 
@@ -448,13 +612,26 @@ export class AuthService {
   }
 
   private getVerificationTokenLifetimeMs(): number {
-    const value =
+    return this.parseTokenLifetime(
       process.env.EMAIL_VERIFICATION_TOKEN_EXPIRES_IN ??
-      DEFAULT_VERIFICATION_TOKEN_LIFETIME;
+        DEFAULT_VERIFICATION_TOKEN_LIFETIME,
+      'EMAIL_VERIFICATION_TOKEN_EXPIRES_IN',
+    );
+  }
+
+  private getPasswordResetTokenLifetimeMs(): number {
+    return this.parseTokenLifetime(
+      process.env.PASSWORD_RESET_TOKEN_EXPIRES_IN ??
+        DEFAULT_PASSWORD_RESET_TOKEN_LIFETIME,
+      'PASSWORD_RESET_TOKEN_EXPIRES_IN',
+    );
+  }
+
+  private parseTokenLifetime(value: string, environmentName: string): number {
     const match = value.match(/^(\d+)(m|h|d)$/);
     if (!match) {
       throw new InternalServerErrorException(
-        'EMAIL_VERIFICATION_TOKEN_EXPIRES_IN must use m, h, or d',
+        `${environmentName} must use m, h, or d`,
       );
     }
 

@@ -14,8 +14,10 @@ import {
 import type { Response } from 'express';
 import { clearAccessTokenCookie, setAccessTokenCookie } from './auth-cookie';
 import { AuthService } from './auth.service';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { AuthenticatedRequest, JwtAuthGuard } from './jwt-auth.guard';
 
@@ -52,6 +54,23 @@ export class AuthController {
     return {
       message: login.message,
     };
+  }
+
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  forgotPassword(@Body() request: ForgotPasswordDto) {
+    return this.authService.requestPasswordReset(request);
+  }
+
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  async resetPassword(
+    @Body() reset: ResetPasswordDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const result = await this.authService.resetPassword(reset);
+    clearAccessTokenCookie(response);
+    return result;
   }
 
   @Post('logout')
