@@ -1,0 +1,39 @@
+﻿@startuml
+title Figure 4. Organization, Membership, and Resource Use Cases
+left to right direction
+skinparam monochrome true
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+skinparam defaultFontSize 14
+skinparam ArrowFontSize 12
+skinparam nodesep 55
+skinparam ranksep 65
+actor Member
+actor "Organization Administrator" as Admin
+actor "Resource Manager" as Manager
+rectangle ResourceHive {
+  usecase "Discover tenant organizations" as U1
+  usecase "Request membership" as U2
+  usecase "Approve or reject membership" as U3
+  usecase "Manage organization hierarchy" as U4
+  usecase "Manage domains and allowlist" as U5
+  usecase "Create and update resource" as U6
+  usecase "Configure allowed organizations" as U7
+  usecase "Define availability slots" as U8
+  usecase "Discover permitted resources" as U9
+  usecase "View resource details" as U10
+}
+Member --> U1
+Member --> U2
+Member --> U9
+Member --> U10
+Admin --> U3
+Admin --> U4
+Admin --> U5
+Manager --> U6
+Manager --> U7
+Manager --> U8
+U6 .> U7 : <<include>>
+@enduml
+
+

@@ -1,0 +1,35 @@
+﻿@startuml
+title Figure 14. Rating and Dispute Processing
+skinparam monochrome true
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+skinparam defaultFontSize 14
+skinparam ArrowFontSize 12
+skinparam nodesep 55
+skinparam ranksep 65
+actor Member
+actor Administrator
+boundary "Next.js UI" as UI
+control "Resource Service" as RS
+control "Booking Service" as BS
+control "Notification Service" as NS
+database PostgreSQL as DB
+Member -> UI : Submit rating for completed booking
+UI -> RS : POST resource rating
+RS -> BS : Verify booking completion/ownership
+BS -> DB : Read booking and slot
+RS -> DB : Insert one rating per booking
+DB -> DB : Trigger validates user, resource, completion
+RS --> UI : Rating accepted
+Member -> UI : Open dispute with evidence
+UI -> BS : POST booking dispute
+BS -> DB : Create OPEN dispute and OPENED event
+BS -> NS : Notify tenant administrator
+Administrator -> UI : Review and resolve
+UI -> BS : Update dispute state
+BS -> DB : Update current state; append event
+BS -> NS : Notify submitting member
+@enduml
+
+
+

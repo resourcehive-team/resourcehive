@@ -1,0 +1,58 @@
+﻿@startuml
+title Figure 20. ResourceHive Target Data Model
+hide methods
+skinparam monochrome true
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+skinparam defaultFontSize 14
+skinparam ArrowFontSize 12
+skinparam nodesep 55
+skinparam ranksep 65
+entity users
+entity organizations
+entity organization_email_domains
+entity organization_email_allowlist
+entity organization_memberships
+entity resources
+entity resource_allowed_organizations
+entity resource_slots
+entity bookings
+entity point_transactions
+entity semesters
+entity email_verification_tokens
+entity password_reset_tokens
+entity refresh_tokens
+entity oauth_accounts
+entity notifications
+entity resource_ratings
+entity booking_disputes
+entity booking_dispute_events
+users ||--o{ organizations : creates
+organizations ||--o{ organizations : parent/root
+users ||--o{ organization_memberships
+organizations ||--o{ organization_memberships
+organizations ||--o{ organization_email_domains
+organizations ||--o{ organization_email_allowlist
+organizations ||--o{ resources : owns
+resources ||--o{ resource_allowed_organizations
+organizations ||--o{ resource_allowed_organizations : allowed
+resources ||--o{ resource_slots
+resource_slots ||--o{ bookings
+users ||--o{ bookings
+users ||--o{ point_transactions
+bookings |o--o{ point_transactions
+organizations |o--o{ point_transactions : source
+organizations ||--o{ semesters
+semesters |o--o{ point_transactions
+users ||--o{ email_verification_tokens
+users ||--o{ password_reset_tokens
+users ||--o{ refresh_tokens
+users ||--o{ oauth_accounts
+users ||--o{ notifications
+bookings ||--o| resource_ratings
+resources ||--o{ resource_ratings
+bookings ||--o| booking_disputes
+booking_disputes ||--|{ booking_dispute_events
+@enduml
+
+

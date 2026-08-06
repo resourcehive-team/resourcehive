@@ -1,0 +1,58 @@
+﻿@startuml
+title Figure 6. Identity, Tenant, and Membership Domain Classes
+skinparam monochrome true
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+skinparam defaultFontSize 14
+skinparam ArrowFontSize 12
+skinparam nodesep 55
+skinparam ranksep 65
+class User {
+  id: UUID
+  email: string
+  status: UserStatus
+  platformRole: PlatformRole
+}
+class Organization {
+  id: UUID
+  parentId: UUID?
+  rootOrganizationId: UUID
+  status: OrganizationStatus
+}
+class OrganizationMembership {
+  role: MembershipRole
+  status: MembershipStatus
+  approvedBy: UUID?
+}
+class OrganizationEmailDomain {
+  domain: string
+  autoJoin: boolean
+}
+class OrganizationEmailAllowlist {
+  email: string
+  usedAt: timestamp?
+}
+class EmailVerificationToken
+class PasswordResetToken
+class RefreshToken {
+  tokenFamilyId: UUID
+  revokedAt: timestamp?
+}
+class OAuthAccount {
+  provider: string
+  providerUserId: string
+}
+Organization "0..1 parent" <-- "0..* children" Organization
+Organization "1 root" <-- "0..* descendants" Organization
+User "1" -- "0..*" OrganizationMembership
+Organization "1" -- "0..*" OrganizationMembership
+Organization "1" -- "0..*" OrganizationEmailDomain
+Organization "1" -- "0..*" OrganizationEmailAllowlist
+User "1" -- "0..*" EmailVerificationToken
+User "1" -- "0..*" PasswordResetToken
+User "1" -- "0..*" RefreshToken
+User "1" -- "0..*" OAuthAccount
+@enduml
+
+
+

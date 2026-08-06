@@ -1,0 +1,52 @@
+﻿@startuml
+title Figure 7. Resource, Booking, Points, and Semester Domain Classes
+skinparam monochrome true
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+skinparam defaultFontSize 14
+skinparam ArrowFontSize 12
+skinparam nodesep 55
+skinparam ranksep 65
+class Organization
+class User
+class Resource {
+  ownerOrganizationId: UUID
+  rootOrganizationId: UUID
+  pointCost: int
+  cancellationPeriodMinutes: int
+}
+class ResourceAllowedOrganization
+class ResourceSlot {
+  startsAt: timestamp
+  endsAt: timestamp
+}
+class Booking {
+  status: BookingStatus
+  cancellationPeriodMinutes: int
+  cancelledByUserId: UUID?
+}
+class PointTransaction {
+  amount: int
+  transactionType: PointType
+}
+class Semester {
+  academicYear: string
+  semester: string
+  startsAt: timestamp
+  endsAt: timestamp
+}
+Organization "1 owner" -- "0..*" Resource
+Resource "1" -- "0..*" ResourceAllowedOrganization
+Organization "1 allowed" -- "0..*" ResourceAllowedOrganization
+Resource "1" -- "0..*" ResourceSlot
+ResourceSlot "1" -- "0..*" Booking
+User "1" -- "0..*" Booking
+User "1" -- "0..*" PointTransaction
+Booking "0..1" -- "0..*" PointTransaction
+Organization "0..1 source" -- "0..*" PointTransaction
+Organization "1 root" -- "0..*" Semester
+Semester "0..1" -- "0..*" PointTransaction
+@enduml
+
+
+

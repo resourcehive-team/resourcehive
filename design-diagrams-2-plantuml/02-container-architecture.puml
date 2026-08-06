@@ -1,0 +1,50 @@
+﻿@startuml
+title Figure 2. ResourceHive Container and Service Architecture
+left to right direction
+skinparam monochrome true
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+skinparam defaultFontSize 14
+skinparam ArrowFontSize 12
+skinparam nodesep 55
+skinparam ranksep 65
+skinparam shadowing false
+actor User
+rectangle "Frontend Hosting" {
+  component "Next.js Web Application" as Web
+}
+node "Docker-capable Backend Host" {
+  component "Nginx API Gateway" as Gateway
+  component "Identity Service\nNestJS" as Identity
+  component "Resource Service\nNestJS" as Resource
+  component "Booking Service\nNestJS" as Booking
+  component "Notification Service\nNestJS" as Notification
+  component "Shared service-auth package" as AuthPkg
+  component "Shared Prisma database package" as DbPkg
+}
+database "Shared PostgreSQL" as DB
+cloud "SMTP / OAuth Providers" as Providers
+User --> Web : HTTPS
+Web --> Gateway : HTTPS/JSON + JWT cookie/header
+Gateway --> Identity : /auth
+Gateway --> Resource : /organizations\n/memberships\n/resources
+Gateway --> Booking : /slots\n/bookings\n/points\n/disputes
+Gateway --> Notification : /notifications
+Identity ..> AuthPkg
+Resource ..> AuthPkg
+Booking ..> AuthPkg
+Notification ..> AuthPkg
+Identity ..> DbPkg
+Resource ..> DbPkg
+Booking ..> DbPkg
+Notification ..> DbPkg
+DbPkg --> DB : Prisma/SQL
+Identity --> Providers : Email and OAuth
+Notification --> Providers : Delivery adapter
+note bottom of Gateway
+Routing and transport only;
+no tenant authorization logic.
+end note
+@enduml
+
+

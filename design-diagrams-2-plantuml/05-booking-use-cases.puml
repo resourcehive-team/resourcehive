@@ -1,0 +1,42 @@
+﻿@startuml
+title Figure 5. Booking, Points, Notifications, Ratings, and Disputes
+left to right direction
+skinparam monochrome true
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+skinparam defaultFontSize 14
+skinparam ArrowFontSize 12
+skinparam nodesep 55
+skinparam ranksep 65
+actor Member
+actor "Organization Administrator" as Admin
+rectangle ResourceHive {
+  usecase "Book available slot" as B1
+  usecase "View bookings" as B2
+  usecase "Cancel booking" as B3
+  usecase "Complete resource return" as B4
+  usecase "View points ledger" as B5
+  usecase "Allocate semester points" as B6
+  usecase "Read notifications" as B7
+  usecase "Rate completed resource use" as B8
+  usecase "Open booking dispute" as B9
+  usecase "Review and resolve dispute" as B10
+  usecase "View tenant analytics" as B11
+}
+Member --> B1
+Member --> B2
+Member --> B3
+Member --> B5
+Member --> B7
+Member --> B8
+Member --> B9
+Admin --> B4
+Admin --> B6
+Admin --> B10
+Admin --> B11
+B1 .> B5 : <<include>>
+B3 .> B5 : <<include>>
+B4 .> B8 : <<extend>>
+@enduml
+
+

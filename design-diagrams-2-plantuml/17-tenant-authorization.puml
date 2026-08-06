@@ -1,0 +1,38 @@
+﻿@startuml
+title Figure 9. Tenant Boundary and Inherited Administration
+skinparam monochrome true
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+skinparam defaultFontSize 14
+skinparam ArrowFontSize 12
+skinparam nodesep 55
+skinparam ranksep 65
+top to bottom direction
+rectangle "Tenant A (root_organization_id = A)" {
+  rectangle "University A (root)" as A
+  rectangle "Faculty A1" as A1
+  rectangle "Department A1.1" as A11
+  rectangle "Club A2" as A2
+  A --> A1 : parent
+  A1 --> A11 : parent
+  A --> A2 : parent
+}
+rectangle "Tenant B (root_organization_id = B)" {
+  rectangle "University B" as B
+  rectangle "Faculty B1" as B1
+  B --> B1 : parent
+}
+actor "Administrator of Faculty A1" as Admin
+Admin --> A1 : direct APPROVED ADMIN membership
+Admin ..> A11 : inherited authority
+Admin -[#black,dashed]-> A : denied: ancestor
+Admin -[#black,dashed]-> A2 : denied: unrelated branch
+Admin -[#black,dashed]-> B1 : denied: different tenant
+note bottom
+Every tenant-sensitive request verifies root_organization_id;
+database composite keys reinforce cross-tenant integrity.
+end note
+@enduml
+
+
+
