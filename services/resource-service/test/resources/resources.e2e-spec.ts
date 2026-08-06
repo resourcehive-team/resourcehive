@@ -7,6 +7,30 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '@resourcehive/database';
 
+interface ResourceResponse {
+  id: string;
+  name: string;
+  allowedOrganizations: Array<{
+    organizationId: string;
+    rootOrganizationId: string;
+  }>;
+}
+
+interface ResourceListResponse {
+  data: ResourceResponse[];
+  total: number;
+  limit: number;
+}
+
+interface BookingAccessResponse {
+  bookable: boolean;
+  resourceId: string;
+}
+
+interface ErrorResponse {
+  message: string;
+}
+
 describe('ResourcesController (e2e)', () => {
   jest.setTimeout(30000);
   let app: INestApplication<App>;
@@ -26,7 +50,7 @@ describe('ResourcesController (e2e)', () => {
 
     app = moduleFixture.createNestApplication();
     await app.init();
-    
+
     prisma = app.get(PrismaService);
 
     // Create a dummy admin user in the database
@@ -39,7 +63,7 @@ describe('ResourcesController (e2e)', () => {
         passwordHash: 'dummy',
         firstName: 'Admin',
         lastName: 'Test',
-      }
+      },
     });
 
     // Create a dummy member user
@@ -52,41 +76,69 @@ describe('ResourcesController (e2e)', () => {
         passwordHash: 'dummy',
         firstName: 'Member',
         lastName: 'Test',
-      }
+      },
     });
 
     const configService = app.get(ConfigService);
-    const secret = configService.get<string>('JWT_SECRET') || 'development-only-resourcehive-secret-change-before-production';
+    const secret =
+      configService.get<string>('JWT_SECRET') ||
+      'development-only-resourcehive-secret-change-before-production';
     const jwtService = app.get(JwtService);
-    
+
     // Regular Member Token
-    jwtToken = jwtService.sign({
-      sub: demoUserId,
-      email: 'demo@example.edu',
-      organizationId: demoOrganizationId,
-      role: 'member',
-    }, { secret });
+    jwtToken = jwtService.sign(
+      {
+        sub: demoUserId,
+        email: 'demo@example.edu',
+        organizationId: demoOrganizationId,
+        role: 'member',
+      },
+      { secret },
+    );
 
     // Admin Token
-    adminJwtToken = jwtService.sign({
-      sub: adminUserId,
-      email: 'admin@example.edu',
-      organizationId: demoOrganizationId,
-      role: 'admin',
-    }, { secret });
-    
+    adminJwtToken = jwtService.sign(
+      {
+        sub: adminUserId,
+        email: 'admin@example.edu',
+        organizationId: demoOrganizationId,
+        role: 'admin',
+      },
+      { secret },
+    );
+
     // Make sure admin is in the org
     await prisma.organizationMembership.upsert({
-      where: { userId_organizationId: { userId: adminUserId, organizationId: demoOrganizationId } },
+      where: {
+        userId_organizationId: {
+          userId: adminUserId,
+          organizationId: demoOrganizationId,
+        },
+      },
       update: { role: 'ADMIN', status: 'APPROVED' },
-      create: { userId: adminUserId, organizationId: demoOrganizationId, role: 'ADMIN', status: 'APPROVED' }
+      create: {
+        userId: adminUserId,
+        organizationId: demoOrganizationId,
+        role: 'ADMIN',
+        status: 'APPROVED',
+      },
     });
-    
+
     // Make sure member is in the org
     await prisma.organizationMembership.upsert({
-      where: { userId_organizationId: { userId: demoUserId, organizationId: demoOrganizationId } },
+      where: {
+        userId_organizationId: {
+          userId: demoUserId,
+          organizationId: demoOrganizationId,
+        },
+      },
       update: { role: 'MEMBER', status: 'APPROVED' },
-      create: { userId: demoUserId, organizationId: demoOrganizationId, role: 'MEMBER', status: 'APPROVED' }
+      create: {
+        userId: demoUserId,
+        organizationId: demoOrganizationId,
+        role: 'MEMBER',
+        status: 'APPROVED',
+      },
     });
   });
 
@@ -96,7 +148,7 @@ describe('ResourcesController (e2e)', () => {
       await prisma.resourceAllowedOrganization.deleteMany({
         where: { resourceId: createdResourceId },
       });
-      await prisma.resource.deleteMany({ where: { id: createdResourceId }});
+      await prisma.resource.deleteMany({ where: { id: createdResourceId } });
     }
     await app.close();
   });
@@ -122,10 +174,11 @@ describe('ResourcesController (e2e)', () => {
         allowedOrganizationIds: [demoOrganizationId],
       })
       .expect(201);
-      
-    createdResourceId = res.body.id;
-    expect(res.body.name).toBe('E2E Test Conference Room');
-    expect(res.body.allowedOrganizations).toEqual(
+
+    const body = res.body as ResourceResponse;
+    createdResourceId = body.id;
+    expect(body.name).toBe('E2E Test Conference Room');
+    expect(body.allowedOrganizations).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           organizationId: demoOrganizationId,
@@ -144,7 +197,8 @@ describe('ResourcesController (e2e)', () => {
       .send({ allowedOrganizationIds: [] })
       .expect(200);
 
-    expect(res.body.allowedOrganizations).toEqual(
+    const body = res.body as ResourceResponse;
+    expect(body.allowedOrganizations).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           organizationId: demoOrganizationId,
@@ -158,23 +212,41 @@ describe('ResourcesController (e2e)', () => {
     // Create a few more dummy resources directly in DB just to test limit
     await prisma.resource.createMany({
       data: [
-        { name: 'Dummy 1', ownerOrganizationId: demoOrganizationId, rootOrganizationId: demoOrganizationId, createdByUserId: adminUserId },
-        { name: 'Dummy 2', ownerOrganizationId: demoOrganizationId, rootOrganizationId: demoOrganizationId, createdByUserId: adminUserId },
-        { name: 'Dummy 3', ownerOrganizationId: demoOrganizationId, rootOrganizationId: demoOrganizationId, createdByUserId: adminUserId },
-      ]
+        {
+          name: 'Dummy 1',
+          ownerOrganizationId: demoOrganizationId,
+          rootOrganizationId: demoOrganizationId,
+          createdByUserId: adminUserId,
+        },
+        {
+          name: 'Dummy 2',
+          ownerOrganizationId: demoOrganizationId,
+          rootOrganizationId: demoOrganizationId,
+          createdByUserId: adminUserId,
+        },
+        {
+          name: 'Dummy 3',
+          ownerOrganizationId: demoOrganizationId,
+          rootOrganizationId: demoOrganizationId,
+          createdByUserId: adminUserId,
+        },
+      ],
     });
 
     const res = await request(app.getHttpServer())
       .get(`/resources/organization/${demoOrganizationId}?page=1&limit=2`)
       .set('Authorization', `Bearer ${jwtToken}`)
       .expect(200);
-      
-    expect(res.body.data.length).toBe(2);
-    expect(res.body.limit).toBe(2);
-    expect(res.body.total).toBeGreaterThanOrEqual(4); 
-    
+
+    const body = res.body as ResourceListResponse;
+    expect(body.data.length).toBe(2);
+    expect(body.limit).toBe(2);
+    expect(body.total).toBeGreaterThanOrEqual(4);
+
     // Clean up dummies
-    await prisma.resource.deleteMany({ where: { name: { startsWith: 'Dummy ' } } });
+    await prisma.resource.deleteMany({
+      where: { name: { startsWith: 'Dummy ' } },
+    });
   });
 
   it('should filter resources by search query', async () => {
@@ -182,49 +254,68 @@ describe('ResourcesController (e2e)', () => {
       .get(`/resources/organization/${demoOrganizationId}?search=E2E Test`)
       .set('Authorization', `Bearer ${jwtToken}`)
       .expect(200);
-      
-    expect(res.body.data.length).toBe(1);
-    expect(res.body.data[0].name).toBe('E2E Test Conference Room');
+
+    const body = res.body as ResourceListResponse;
+    expect(body.data.length).toBe(1);
+    expect(body.data[0].name).toBe('E2E Test Conference Room');
   });
 
   it('should verify booking access for an active resource', async () => {
     const res = await request(app.getHttpServer())
-      .get(`/resources/organization/${demoOrganizationId}/${createdResourceId}/access-check`)
+      .get(
+        `/resources/organization/${demoOrganizationId}/${createdResourceId}/access-check`,
+      )
       .set('Authorization', `Bearer ${adminJwtToken}`)
       .expect(200);
-      
-    expect(res.body.bookable).toBe(true);
-    expect(res.body.resourceId).toBe(createdResourceId);
+
+    const body = res.body as BookingAccessResponse;
+    expect(body.bookable).toBe(true);
+    expect(body.resourceId).toBe(createdResourceId);
 
     const res2 = await request(app.getHttpServer())
-    .get(`/resources/organization/${demoOrganizationId}/${createdResourceId}/access-check`)
-    .set('Authorization', `Bearer ${jwtToken}`)
-    .expect(200);
+      .get(
+        `/resources/organization/${demoOrganizationId}/${createdResourceId}/access-check`,
+      )
+      .set('Authorization', `Bearer ${jwtToken}`)
+      .expect(200);
 
-    expect(res2.body.bookable).toBe(true);
-    expect(res2.body.resourceId).toBe(createdResourceId);
+    const secondBody = res2.body as BookingAccessResponse;
+    expect(secondBody.bookable).toBe(true);
+    expect(secondBody.resourceId).toBe(createdResourceId);
   });
 
   it('should reject booking access for an inactive resource', async () => {
     // First, inactivate using the Admin Token
     await request(app.getHttpServer())
-      .delete(`/resources/organization/${demoOrganizationId}/${createdResourceId}`)
+      .delete(
+        `/resources/organization/${demoOrganizationId}/${createdResourceId}`,
+      )
       .set('Authorization', `Bearer ${adminJwtToken}`)
       .expect(200);
 
     // Then, attempt to check access for booking
     const res = await request(app.getHttpServer())
-      .get(`/resources/organization/${demoOrganizationId}/${createdResourceId}/access-check`)
+      .get(
+        `/resources/organization/${demoOrganizationId}/${createdResourceId}/access-check`,
+      )
       .set('Authorization', `Bearer ${adminJwtToken}`)
       .expect(403);
-      
-    expect(res.body.message).toBe('This resource is not active and cannot be booked');
+
+    const body = res.body as ErrorResponse;
+    expect(body.message).toBe(
+      'This resource is not active and cannot be booked',
+    );
 
     const res2 = await request(app.getHttpServer())
-      .get(`/resources/organization/${demoOrganizationId}/${createdResourceId}/access-check`)
+      .get(
+        `/resources/organization/${demoOrganizationId}/${createdResourceId}/access-check`,
+      )
       .set('Authorization', `Bearer ${jwtToken}`)
       .expect(403);
 
-    expect(res2.body.message).toBe('This resource is not active and cannot be booked');
+    const secondBody = res2.body as ErrorResponse;
+    expect(secondBody.message).toBe(
+      'This resource is not active and cannot be booked',
+    );
   });
 });
