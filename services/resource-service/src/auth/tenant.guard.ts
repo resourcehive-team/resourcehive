@@ -16,22 +16,29 @@ export class TenantGuard implements CanActivate {
       return true; 
     }
 
-    // Verify the user is actually a member of this organization
-    const membership = await this.prisma.organizationMembership.findUnique({
+    // Verify if the user has a direct membership to this organization
+    const directMembership = await this.prisma.organizationMembership.findUnique({
       where: { userId_organizationId: { userId: user.userId, organizationId } }
     });
+    
+    const bestMembership = (directMembership && directMembership.status === 'APPROVED') ? directMembership : null;
 
-    if (membership && membership.status === 'APPROVED') {
-      request.membership = membership; // attach membership to the request
+    // If the direct membership is ADMIN, they have the highest access, so return immediately
+    if (bestMembership && bestMembership.role === 'ADMIN') {
+      request.membership = bestMembership;
       return true;
     }
 
-    // Check inherited admin access
+    // Otherwise, check inherited admin access up to the root
     const targetOrg = await this.prisma.organization.findUnique({
       where: { id: organizationId }
     });
 
     if (!targetOrg) {
+      if (bestMembership) {
+        request.membership = bestMembership;
+        return true;
+      }
       throw new ForbiddenException('You do not have access to this organization.');
     }
 
@@ -63,6 +70,11 @@ export class TenantGuard implements CanActivate {
       currentOrgId = currentOrg.parentId;
     }
     
+    // If no inherited admin was found, but they have a direct non-admin membership, use that
+    if (bestMembership) {
+      request.membership = bestMembership;
+      return true;
+    }
 
     throw new ForbiddenException('You do not have access to this organization.');
 
