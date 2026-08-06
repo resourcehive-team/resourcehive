@@ -3,6 +3,10 @@ import { apiUrl } from "@/lib/config";
 let activeRefreshRequest: Promise<boolean> | null = null;
 
 export function refreshSession(): Promise<boolean> {
+  if (typeof window === "undefined") {
+    return Promise.resolve(false);
+  }
+
   if (!activeRefreshRequest) {
     activeRefreshRequest = performRefresh().finally(() => {
       activeRefreshRequest = null;
