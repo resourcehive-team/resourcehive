@@ -1,5 +1,3 @@
-import "client-only";
-
 import { apiUrl } from "@/lib/config";
 
 let activeRefreshRequest: Promise<boolean> | null = null;
