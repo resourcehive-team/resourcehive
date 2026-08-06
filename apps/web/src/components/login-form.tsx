@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/password-input";
+import { refreshSession } from "@/lib/session-api";
 
 export function LoginForm({
   redirectTo = "/dashboard",
@@ -35,8 +36,27 @@ export function LoginForm({
   passwordReset?: boolean;
 }) {
   const router = useRouter();
+  const [isRestoringSession, setIsRestoringSession] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+
+    void refreshSession().then((restored) => {
+      if (!active) return;
+      if (restored) {
+        router.replace(redirectTo);
+        router.refresh();
+        return;
+      }
+      setIsRestoringSession(false);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [redirectTo, router]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -107,6 +127,7 @@ export function LoginForm({
                   autoFocus
                   aria-invalid={Boolean(error)}
                   aria-describedby={error ? "login-error" : undefined}
+                  disabled={isRestoringSession || isSubmitting}
                   required
                 />
               </Field>
@@ -128,6 +149,7 @@ export function LoginForm({
                   autoComplete="current-password"
                   aria-invalid={Boolean(error)}
                   aria-describedby={error ? "login-error" : undefined}
+                  disabled={isRestoringSession || isSubmitting}
                   required
                 />
               </Field>
@@ -136,9 +158,13 @@ export function LoginForm({
                 <Button
                   className="w-full"
                   type="submit"
-                  disabled={isSubmitting}
+                  disabled={isRestoringSession || isSubmitting}
                 >
-                  {isSubmitting ? "Logging in..." : "Login"}
+                  {isRestoringSession
+                    ? "Checking session..."
+                    : isSubmitting
+                      ? "Logging in..."
+                      : "Login"}
                 </Button>
                 <FieldDescription className="text-center">
                   Don&apos;t have an account?{" "}
