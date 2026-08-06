@@ -59,6 +59,45 @@ describe('EmailService', () => {
     );
   });
 
+  it('prints a trusted frontend password reset link for local development', async () => {
+    process.env.EMAIL_TRANSPORT = 'console';
+    process.env.APP_URL = 'http://localhost:3000';
+
+    await expect(
+      service.sendPasswordResetEmail('alex@example.edu', 'reset-token'),
+    ).resolves.toBeUndefined();
+    expect(nodemailer.createTransport).not.toHaveBeenCalled();
+  });
+
+  it('sends password reset and password changed messages through SMTP', async () => {
+    const sendMail = jest
+      .fn<
+        Promise<{ messageId: string }>,
+        [{ to: string; text: string; subject?: string; from?: string }]
+      >()
+      .mockResolvedValue({ messageId: 'message-id' });
+    (nodemailer.createTransport as jest.Mock).mockReturnValue({ sendMail });
+    process.env.EMAIL_TRANSPORT = 'smtp';
+    process.env.APP_URL = 'https://resourcehive.example';
+    process.env.SMTP_HOST = 'smtp.example';
+    process.env.SMTP_PORT = '587';
+
+    await service.sendPasswordResetEmail('alex@example.edu', 'reset-token');
+    await service.sendPasswordChangedEmail('alex@example.edu');
+
+    const resetMessage = sendMail.mock.calls[0][0];
+    expect(resetMessage.to).toBe('alex@example.edu');
+    expect(resetMessage.subject).toBe('Reset your ResourceHive password');
+    expect(resetMessage.text).toContain(
+      'https://resourcehive.example/reset-password?token=reset-token',
+    );
+    const changedMessage = sendMail.mock.calls[1][0];
+    expect(changedMessage.to).toBe('alex@example.edu');
+    expect(changedMessage.subject).toBe(
+      'Your ResourceHive password was changed',
+    );
+  });
+
   it('rejects an unsupported email transport', async () => {
     process.env.EMAIL_TRANSPORT = 'unknown';
 
