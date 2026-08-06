@@ -9,7 +9,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '@resourcehive/database';
 import * as bcrypt from 'bcrypt';
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { EmailService } from '../email/email.service';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
@@ -19,6 +19,8 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 const DEFAULT_BCRYPT_ROUNDS = 12;
 const DEFAULT_VERIFICATION_TOKEN_LIFETIME = '24h';
 const DEFAULT_PASSWORD_RESET_TOKEN_LIFETIME = '1h';
+const DEFAULT_ACCESS_TOKEN_LIFETIME = '15m';
+const DEFAULT_REFRESH_TOKEN_LIFETIME = '30d';
 const PASSWORD_RESET_REQUEST_COOLDOWN_MS = 60 * 1000;
 const PASSWORD_RESET_REQUEST_MESSAGE =
   'If an account exists for that email, a password reset link has been sent.';
@@ -160,31 +162,106 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password');
     }
 
-    const membership = await this.prisma.organizationMembership.findFirst({
-      where: {
-        userId: user.id,
-        status: 'APPROVED',
-      },
-      orderBy: { joinedAt: 'asc' },
-    });
-
-    const token = await this.jwtService.signAsync(
-      {
-        sub: user.id,
-        email: user.email,
-        organizationId: membership?.organizationId ?? null,
-        role: membership?.role.toLowerCase() ?? null,
-      },
-      {
-        secret: this.getJwtSecret(),
-        expiresIn: '1d',
-      },
-    );
+    const accessToken = await this.issueAccessToken(user);
+    const refreshToken = await this.issueRefreshToken(user.id);
 
     return {
       message: 'user login successfully',
-      token,
+      accessToken,
+      ...refreshToken,
     };
+  }
+
+  async refreshSession(token: string | null) {
+    if (!token) {
+      throw new UnauthorizedException('Invalid or expired session');
+    }
+
+    const now = new Date();
+    const storedToken = await this.prisma.refreshToken.findUnique({
+      where: { tokenHash: this.hashToken(token) },
+      select: {
+        id: true,
+        familyId: true,
+        expiresAt: true,
+        usedAt: true,
+        revokedAt: true,
+        user: {
+          select: {
+            id: true,
+            email: true,
+            status: true,
+            emailVerifiedAt: true,
+          },
+        },
+      },
+    });
+
+    if (!storedToken) {
+      throw new UnauthorizedException('Invalid or expired session');
+    }
+
+    if (storedToken.usedAt) {
+      await this.revokeRefreshTokenFamily(storedToken.familyId, now);
+      throw new UnauthorizedException('Invalid or expired session');
+    }
+
+    if (
+      storedToken.revokedAt ||
+      storedToken.expiresAt <= now ||
+      storedToken.user.status !== 'ACTIVE' ||
+      !storedToken.user.emailVerifiedAt
+    ) {
+      await this.revokeRefreshTokenFamily(storedToken.familyId, now);
+      throw new UnauthorizedException('Invalid or expired session');
+    }
+
+    const accessToken = await this.issueAccessToken(storedToken.user);
+    const nextToken = randomBytes(32).toString('base64url');
+
+    await this.prisma.$transaction(async (transaction) => {
+      const claimedToken = await transaction.refreshToken.updateMany({
+        where: {
+          id: storedToken.id,
+          usedAt: null,
+          revokedAt: null,
+          expiresAt: { gt: now },
+        },
+        data: { usedAt: now },
+      });
+
+      if (claimedToken.count !== 1) {
+        throw new UnauthorizedException('Invalid or expired session');
+      }
+
+      await transaction.refreshToken.create({
+        data: {
+          userId: storedToken.user.id,
+          familyId: storedToken.familyId,
+          tokenHash: this.hashToken(nextToken),
+          expiresAt: storedToken.expiresAt,
+        },
+      });
+    });
+
+    return {
+      message: 'Session refreshed successfully',
+      accessToken,
+      refreshToken: nextToken,
+      refreshTokenExpiresAt: storedToken.expiresAt,
+    };
+  }
+
+  async revokeSession(token: string | null): Promise<void> {
+    if (!token) return;
+
+    const storedToken = await this.prisma.refreshToken.findUnique({
+      where: { tokenHash: this.hashToken(token) },
+      select: { familyId: true },
+    });
+    if (!storedToken) return;
+
+    await this.revokeRefreshTokenFamily(storedToken.familyId, new Date());
   }
 
   async requestPasswordReset(request: ForgotPasswordDto) {
@@ -321,6 +398,13 @@ export class AuthService {
           expiresAt: { gt: now },
         },
         data: { usedAt: now },
+      });
+      await transaction.refreshToken.updateMany({
+        where: {
+          userId: passwordResetToken.user.id,
+          revokedAt: null,
+        },
+        data: { revokedAt: now },
       });
     });
 
@@ -627,6 +711,19 @@ export class AuthService {
     );
   }
 
+  private getRefreshTokenLifetimeMs(): number {
+    return this.parseTokenLifetime(
+      process.env.REFRESH_TOKEN_EXPIRES_IN ?? DEFAULT_REFRESH_TOKEN_LIFETIME,
+      'REFRESH_TOKEN_EXPIRES_IN',
+    );
+  }
+
+  private getAccessTokenLifetime(): `${number}${'m' | 'h' | 'd'}` {
+    const value = process.env.JWT_EXPIRES_IN ?? DEFAULT_ACCESS_TOKEN_LIFETIME;
+    this.parseTokenLifetime(value, 'JWT_EXPIRES_IN');
+    return value as `${number}${'m' | 'h' | 'd'}`;
+  }
+
   private parseTokenLifetime(value: string, environmentName: string): number {
     const match = value.match(/^(\d+)(m|h|d)$/);
     if (!match) {
@@ -648,5 +745,60 @@ export class AuthService {
 
   private hashToken(token: string): string {
     return createHash('sha256').update(token).digest('hex');
+  }
+
+  private async issueAccessToken(user: { id: string; email: string }) {
+    const membership = await this.prisma.organizationMembership.findFirst({
+      where: {
+        userId: user.id,
+        status: 'APPROVED',
+      },
+      orderBy: { joinedAt: 'asc' },
+    });
+
+    return this.jwtService.signAsync(
+      {
+        sub: user.id,
+        email: user.email,
+        organizationId: membership?.organizationId ?? null,
+        role: membership?.role.toLowerCase() ?? null,
+      },
+      {
+        secret: this.getJwtSecret(),
+        expiresIn: this.getAccessTokenLifetime(),
+      },
+    );
+  }
+
+  private async issueRefreshToken(userId: string) {
+    const token = randomBytes(32).toString('base64url');
+    const expiresAt = new Date(Date.now() + this.getRefreshTokenLifetimeMs());
+
+    await this.prisma.refreshToken.create({
+      data: {
+        userId,
+        familyId: randomUUID(),
+        tokenHash: this.hashToken(token),
+        expiresAt,
+      },
+    });
+
+    return {
+      refreshToken: token,
+      refreshTokenExpiresAt: expiresAt,
+    };
+  }
+
+  private async revokeRefreshTokenFamily(
+    familyId: string,
+    revokedAt: Date,
+  ): Promise<void> {
+    await this.prisma.refreshToken.updateMany({
+      where: {
+        familyId,
+        revokedAt: null,
+      },
+      data: { revokedAt },
+    });
   }
 }

@@ -30,6 +30,11 @@ interface UpdatePasswordResetTokensRequest {
   data: { usedAt: Date };
 }
 
+interface RevokeRefreshTokensRequest {
+  where: { userId: string; revokedAt: null };
+  data: { revokedAt: Date };
+}
+
 describe('AuthService password reset', () => {
   const user = {
     findUnique: jest.fn(),
@@ -51,8 +56,14 @@ describe('AuthService password reset', () => {
   const transactionUser = {
     update: jest.fn<Promise<{ id: string }>, [UpdateUserPasswordRequest]>(),
   };
+  const transactionRefreshToken = {
+    updateMany: jest
+      .fn<Promise<{ count: number }>, [RevokeRefreshTokensRequest]>()
+      .mockResolvedValue({ count: 0 }),
+  };
   const transaction = {
     passwordResetToken: transactionPasswordResetToken,
+    refreshToken: transactionRefreshToken,
     user: transactionUser,
   };
   const runTransaction = jest.fn(
@@ -91,6 +102,7 @@ describe('AuthService password reset', () => {
     transactionPasswordResetToken.updateMany.mockResolvedValue({ count: 0 });
     transactionPasswordResetToken.create.mockResolvedValue({ id: 'token-id' });
     transactionUser.update.mockResolvedValue({ id: 'user-id' });
+    transactionRefreshToken.updateMany.mockResolvedValue({ count: 0 });
     sendPasswordResetEmail.mockResolvedValue(undefined);
     sendPasswordChangedEmail.mockResolvedValue(undefined);
   });
@@ -180,6 +192,13 @@ describe('AuthService password reset', () => {
       bcrypt.compare('NewPassword123!', passwordUpdate.data.passwordHash),
     ).resolves.toBe(true);
     expect(sendPasswordChangedEmail).toHaveBeenCalledWith('alex@example.edu');
+    const refreshRevocation =
+      transactionRefreshToken.updateMany.mock.calls[0][0];
+    expect(refreshRevocation.where).toEqual({
+      userId: 'user-id',
+      revokedAt: null,
+    });
+    expect(refreshRevocation.data.revokedAt).toBeInstanceOf(Date);
     expect(result.message).toContain('Password reset successfully');
   });
 
