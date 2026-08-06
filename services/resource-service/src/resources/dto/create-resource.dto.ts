@@ -1,4 +1,11 @@
-import { IsString, IsOptional, IsInt, Min, IsArray, IsUUID } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsInt,
+  Min,
+  IsArray,
+  IsUUID,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateResourceDto {
@@ -11,13 +18,19 @@ export class CreateResourceDto {
   @IsOptional()
   description?: string;
 
-  @ApiPropertyOptional({ example: 0, description: 'Points required to book this resource' })
+  @ApiPropertyOptional({
+    example: 0,
+    description: 'Points required to book this resource',
+  })
   @IsInt()
   @Min(0)
   @IsOptional()
   pointCost?: number;
 
-  @ApiPropertyOptional({ type: [String], description: 'List of other Organization IDs allowed to use this resource' })
+  @ApiPropertyOptional({
+    type: [String],
+    description: 'List of other Organization IDs allowed to use this resource',
+  })
   @IsArray()
   @IsUUID('4', { each: true })
   @IsOptional()

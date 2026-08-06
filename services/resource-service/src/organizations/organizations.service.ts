@@ -27,34 +27,46 @@ export class OrganizationsService {
 
   // Email domain methods
   async getEmailDomains(organizationId: string) {
-    return this.prisma.organizationEmailDomain.findMany({ where: { organizationId } });
+    return this.prisma.organizationEmailDomain.findMany({
+      where: { organizationId },
+    });
   }
 
-  async addEmailDomain(organizationId: string, domain: string, autoJoin: boolean = false) {
+  async addEmailDomain(
+    organizationId: string,
+    domain: string,
+    autoJoin: boolean = false,
+  ) {
     return this.prisma.organizationEmailDomain.create({
-      data: { organizationId, domain, autoJoin }
+      data: { organizationId, domain, autoJoin },
     });
   }
 
   async removeEmailDomain(organizationId: string, domainId: string) {
     return this.prisma.organizationEmailDomain.delete({
-      where: { id: domainId, organizationId }
+      where: { id: domainId, organizationId },
     });
   }
 
   // allowlist method
   async getAllowlist(organizationId: string) {
-    return this.prisma.organizationEmailAllowlist.findMany({ where: { organizationId } });
+    return this.prisma.organizationEmailAllowlist.findMany({
+      where: { organizationId },
+    });
   }
 
-  async addToAllowlist(organizationId: string, email: string, addedByUserId: string) {
+  async addToAllowlist(
+    organizationId: string,
+    email: string,
+    addedByUserId: string,
+  ) {
     return this.prisma.organizationEmailAllowlist.create({
-      data: { organizationId, email, addedBy: addedByUserId }
+      data: { organizationId, email, addedBy: addedByUserId },
     });
   }
   async removeFromAllowlist(organizationId: string, allowlistId: string) {
     return this.prisma.organizationEmailAllowlist.delete({
-      where: { id: allowlistId, organizationId }
+      where: { id: allowlistId, organizationId },
     });
   }
 }
