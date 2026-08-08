@@ -1,0 +1,37 @@
+@startuml
+title Figure 20(d). Resource, Booking, and Points Data
+top to bottom direction
+hide methods
+
+skinparam monochrome true
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+skinparam defaultFontSize 16
+skinparam ArrowFontSize 14
+skinparam TitleFontSize 18
+skinparam shadowing false
+
+entity users
+entity organizations
+entity resources
+entity resource_allowed_organizations
+entity resource_slots
+entity bookings
+entity point_transactions
+entity semesters
+
+users ||--o{ resources : creates
+organizations ||--o{ resources : owns
+resources ||--o{ resource_allowed_organizations : permits
+organizations ||--o{ resource_allowed_organizations : allowed
+
+resources ||--o{ resource_slots : provides
+resource_slots ||--o{ bookings : receives
+users ||--o{ bookings : makes
+
+users ||--o{ point_transactions : receives
+bookings |o--o{ point_transactions : booking source
+organizations |o--o{ point_transactions : organization source
+semesters |o--o{ point_transactions : semester source
+organizations ||--o{ semesters : defines
+@enduml

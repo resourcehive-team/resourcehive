@@ -1,0 +1,26 @@
+@startuml
+title Figure 20(f). Booking Dispute Data
+top to bottom direction
+hide methods
+
+skinparam monochrome true
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+skinparam defaultFontSize 16
+skinparam ArrowFontSize 14
+skinparam TitleFontSize 18
+skinparam shadowing false
+
+entity users
+entity organizations
+entity bookings
+entity booking_disputes
+entity booking_dispute_events
+
+bookings ||-down-o| booking_disputes : has
+organizations ||-down-o{ booking_disputes : tenant scope
+users ||-down-o{ booking_disputes : submits
+users |o--o{ booking_disputes : reviews
+booking_disputes ||-down-o{ booking_dispute_events : records
+users ||--o{ booking_dispute_events : acts in
+@enduml

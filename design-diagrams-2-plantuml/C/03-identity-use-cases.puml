@@ -5,7 +5,9 @@ left to right direction
 skinparam monochrome true
 skinparam backgroundColor white
 skinparam defaultFontName Arial
-skinparam defaultFontSize 14
+skinparam defaultFontSize 16
+skinparam ArrowFontSize 14
+skinparam TitleFontSize 18
 
 actor Visitor
 actor "Registered User" as User

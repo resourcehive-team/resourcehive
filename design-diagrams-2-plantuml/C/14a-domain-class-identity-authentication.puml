@@ -1,0 +1,54 @@
+@startuml
+title Figure 6(a). Identity and Authentication Domain Classes
+top to bottom direction
+
+skinparam monochrome true
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+skinparam defaultFontSize 16
+skinparam ArrowFontSize 14
+skinparam TitleFontSize 18
+skinparam shadowing false
+
+class User {
+  id: UUID
+  email: string
+  passwordHash: string
+  emailVerifiedAt: timestamp?
+  status: string
+  platformRole: string
+}
+
+class EmailVerificationToken {
+  tokenHash: string
+  expiresAt: timestamp
+  usedAt: timestamp?
+}
+
+class PasswordResetToken {
+  tokenHash: string
+  expiresAt: timestamp
+  usedAt: timestamp?
+}
+
+class RefreshToken {
+  tokenHash: string
+  tokenFamilyId: UUID
+  expiresAt: timestamp
+  revokedAt: timestamp?
+}
+
+class OAuthAccount {
+  provider: string
+  providerUserId: string
+}
+
+User "1" -down- "0..*" EmailVerificationToken
+User "1" -down- "0..*" PasswordResetToken
+User "1" -down- "0..*" RefreshToken
+User "1" -down- "0..*" OAuthAccount
+
+EmailVerificationToken -[hidden]right- PasswordResetToken
+EmailVerificationToken -[hidden]down- RefreshToken
+PasswordResetToken -[hidden]down- OAuthAccount
+@enduml

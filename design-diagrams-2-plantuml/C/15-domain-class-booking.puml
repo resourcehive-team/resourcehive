@@ -4,7 +4,9 @@ title Figure 7. Resource, Booking, Points, and Semester Domain Classes
 skinparam monochrome true
 skinparam backgroundColor white
 skinparam defaultFontName Arial
-skinparam defaultFontSize 14
+skinparam defaultFontSize 16
+skinparam ArrowFontSize 14
+skinparam TitleFontSize 18
 skinparam shadowing false
 
 class Organization
@@ -45,7 +47,7 @@ class Semester {
 
 Organization "1 owner" -- "0..*" Resource
 User "1 creator" -- "0..*" Resource
-Resource "1" -- "1..*" ResourceAllowedOrganization
+Resource "1" -- "0..*" ResourceAllowedOrganization
 Organization "1 allowed" -- "0..*" ResourceAllowedOrganization
 Resource "1" -- "0..*" ResourceSlot
 ResourceSlot "1" -- "0..*" Booking

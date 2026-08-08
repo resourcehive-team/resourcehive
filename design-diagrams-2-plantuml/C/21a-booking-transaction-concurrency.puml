@@ -1,0 +1,31 @@
+@startuml
+title Figure 21(a). Atomic Booking and Concurrency Handling
+top to bottom direction
+
+skinparam monochrome true
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+skinparam defaultFontSize 16
+skinparam ArrowFontSize 14
+skinparam TitleFontSize 18
+skinparam shadowing false
+
+component "Verify JWT and derive user" as Authenticate
+component "Check active membership, tenant,\nresource access, slot, and points" as Validate
+component "Run serializable\nPrisma transaction" as Transaction
+component "Create booking" as Booking
+component "Append point deduction\nwhen pointCost > 0" as Deduction
+database "PostgreSQL" as Database
+
+Authenticate -down-> Validate
+Validate -down-> Transaction
+Transaction -down-> Booking
+Transaction -down-> Deduction
+Booking -down-> Database
+Deduction -down-> Database
+
+note right of Transaction
+The service retries serialization conflicts.
+Booking and deduction commit or roll back together.
+end note
+@enduml

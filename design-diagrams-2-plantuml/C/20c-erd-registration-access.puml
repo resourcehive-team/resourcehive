@@ -1,0 +1,24 @@
+@startuml
+title Figure 20(c). Registration Access Data
+top to bottom direction
+hide methods
+
+skinparam monochrome true
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+skinparam defaultFontSize 16
+skinparam ArrowFontSize 14
+skinparam TitleFontSize 18
+skinparam shadowing false
+
+entity users
+entity organizations
+entity organization_email_domains
+entity organization_email_allowlist
+
+organizations ||-down-o{ organization_email_domains : owns
+organizations ||-down-o{ organization_email_allowlist : owns
+users ||-down-o{ organization_email_allowlist : adds
+
+organization_email_domains -[hidden]down- organization_email_allowlist
+@enduml

@@ -1,11 +1,13 @@
 @startuml
 title Figure 2. ResourceHive Container and Service Architecture
-left to right direction
+top to bottom direction
 
 skinparam monochrome true
 skinparam backgroundColor white
 skinparam defaultFontName Arial
-skinparam defaultFontSize 14
+skinparam defaultFontSize 16
+skinparam ArrowFontSize 14
+skinparam TitleFontSize 18
 skinparam shadowing false
 
 actor User
@@ -17,34 +19,38 @@ rectangle "Frontend Hosting" {
 
 node "Backend Host" {
   component "API Gateway\nNginx" as Gateway
-  component "Identity Service" as Identity
-  component "Resource Service" as Resource
-  component "Booking Service" as Booking
-  component "Notification Service" as Notification
+  component "Identity Service\nNestJS" as Identity
+  component "Resource Service\nNestJS" as Resource
+  component "Booking Service\nNestJS" as Booking
+  component "Notification Service\nNestJS" as Notification
 }
 
 database "Shared PostgreSQL" as Database
-cloud "Email / OAuth Providers" as Providers
+cloud "Email Provider" as Email
 
 User --> Marketing : HTTPS
 User --> WebApp : HTTPS
-Marketing --> WebApp : Open app
-WebApp --> Gateway : API requests
+Marketing --> WebApp : Open application
+WebApp --> Gateway : API requests\nHttpOnly JWT cookie
 
-Gateway --> Identity : /auth
-Gateway --> Resource : /organizations\n/memberships\n/resources
-Gateway --> Booking : /slots\n/bookings\n/points
-Gateway --> Notification : /notifications
+Gateway -down-> Identity : /auth/*
+Gateway -down-> Resource : /organizations/*\n/memberships/*\n/resources/*
+Gateway -down-> Booking : /slots*\n/bookings*\n/points*\n/resources/{id}/slots
+Gateway -down-> Notification : /notifications*\nSocket.IO upgrade
+
+Identity -[hidden]right- Resource
+Identity -[hidden]down- Booking
+Resource -[hidden]down- Notification
+Booking -[hidden]right- Notification
 
 Identity --> Database
 Resource --> Database
 Booking --> Database
 Notification --> Database
-Identity --> Providers
-Notification --> Providers
+Identity --> Email : Verification email
 
 note bottom of Gateway
-The gateway routes requests.
-Each service handles its own authorization.
+The gateway only routes requests. Protected services verify
+the JWT locally and perform their own authorization checks.
 end note
 @enduml

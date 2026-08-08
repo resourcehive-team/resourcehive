@@ -1,0 +1,25 @@
+@startuml
+title Figure 20(b). Tenant and Membership Data
+top to bottom direction
+hide methods
+
+skinparam monochrome true
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+skinparam defaultFontSize 16
+skinparam ArrowFontSize 14
+skinparam TitleFontSize 18
+skinparam shadowing false
+
+entity users
+entity organizations
+entity organization_memberships
+
+users ||-down-o{ organizations : creates
+organizations |o--o{ organizations : parent
+organizations ||--o{ organizations : tenant root
+
+users ||-down-o{ organization_memberships : holds
+organizations ||-down-o{ organization_memberships : grants
+users |o--o{ organization_memberships : approves
+@enduml

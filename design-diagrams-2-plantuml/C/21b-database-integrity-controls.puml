@@ -1,0 +1,37 @@
+@startuml
+title Figure 21(b). PostgreSQL Integrity Controls
+top to bottom direction
+
+skinparam monochrome true
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+skinparam defaultFontSize 16
+skinparam ArrowFontSize 14
+skinparam TitleFontSize 18
+skinparam shadowing false
+
+database "PostgreSQL" {
+rectangle "Tenant controls" as TenantControls {
+  component "Composite tenant\nforeign keys" as TenantKeys
+  component "Hierarchy and root-domain\nvalidation triggers" as TenantTriggers
+  TenantKeys -[hidden]down- TenantTriggers
+}
+
+rectangle "Booking controls" as BookingControls {
+  component "No overlapping\nresource slots" as SlotOverlap
+  component "One active booking\nper slot" as BookingUnique
+  SlotOverlap -[hidden]down- BookingUnique
+}
+
+rectangle "Audit and data controls" as AuditControls {
+  component "Unique point events" as PointUnique
+  component "Append-only point and\ndispute histories" as AppendOnly
+  component "Status, source, time,\nand cross-table checks" as Checks
+  PointUnique -[hidden]down- AppendOnly
+  AppendOnly -[hidden]down- Checks
+}
+
+TenantControls -[hidden]down- BookingControls
+BookingControls -[hidden]down- AuditControls
+}
+@enduml

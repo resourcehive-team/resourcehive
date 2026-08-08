@@ -1,0 +1,27 @@
+@startuml
+title Figure 20(e). Notification and Rating Data
+top to bottom direction
+hide methods
+
+skinparam monochrome true
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+skinparam defaultFontSize 16
+skinparam ArrowFontSize 14
+skinparam TitleFontSize 18
+skinparam shadowing false
+
+entity users
+entity notifications
+entity bookings
+entity resources
+entity resource_ratings
+
+users ||-down-o{ notifications : receives
+users ||-down-o{ resource_ratings : submits
+bookings ||-down-o| resource_ratings : has
+resources ||-down-o{ resource_ratings : receives
+
+notifications -[hidden]down- resource_ratings
+bookings -[hidden]right- resources
+@enduml

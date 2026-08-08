@@ -1,0 +1,34 @@
+@startuml
+title Figure 9(b). Inherited Organization Administration
+top to bottom direction
+
+skinparam monochrome true
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+skinparam defaultFontSize 16
+skinparam ArrowFontSize 14
+skinparam TitleFontSize 18
+skinparam shadowing false
+
+actor "User with APPROVED ADMIN membership\nin Faculty A1" as Admin
+
+rectangle "Allowed organization scope" as Allowed {
+  rectangle "Faculty A1\nDirect admin membership" as A1
+  rectangle "Department A1.1\nChild organization" as A11
+  A1 -down-> A11 : parent
+}
+
+rectangle "Denied organization scope" as Denied {
+  rectangle "University A\nAncestor" as A
+  rectangle "Club A2\nUnrelated branch" as A2
+  rectangle "Faculty B1\nDifferent root tenant" as B1
+}
+
+Admin -down-> A1 : allowed
+Admin -down-> A11 : inherited access
+Admin -[#black,dashed]-> A : denied
+Admin -[#black,dashed]-> A2 : denied
+Admin -[#black,dashed]-> B1 : denied
+
+Allowed -[hidden]down- Denied
+@enduml

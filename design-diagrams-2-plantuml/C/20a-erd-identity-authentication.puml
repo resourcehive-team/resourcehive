@@ -1,0 +1,28 @@
+@startuml
+title Figure 20(a). Identity and Authentication Data
+top to bottom direction
+hide methods
+
+skinparam monochrome true
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+skinparam defaultFontSize 16
+skinparam ArrowFontSize 14
+skinparam TitleFontSize 18
+skinparam shadowing false
+
+entity users
+entity email_verification_tokens
+entity password_reset_tokens
+entity refresh_tokens
+entity oauth_accounts
+
+users ||-down-o{ email_verification_tokens
+users ||-down-o{ password_reset_tokens
+users ||-down-o{ refresh_tokens
+users ||-down-o{ oauth_accounts
+
+email_verification_tokens -[hidden]right- password_reset_tokens
+email_verification_tokens -[hidden]down- refresh_tokens
+password_reset_tokens -[hidden]down- oauth_accounts
+@enduml

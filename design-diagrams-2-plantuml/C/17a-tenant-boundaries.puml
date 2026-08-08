@@ -1,0 +1,37 @@
+@startuml
+title Figure 9(a). Root Tenant and Organization Boundaries
+top to bottom direction
+
+skinparam monochrome true
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+skinparam defaultFontSize 16
+skinparam ArrowFontSize 14
+skinparam TitleFontSize 18
+skinparam shadowing false
+
+rectangle "Tenant A\nroot_organization_id = A" as TenantA {
+  rectangle "University A\nRoot organization" as A
+  rectangle "Faculty A1" as A1
+  rectangle "Department A1.1" as A11
+  rectangle "Club A2" as A2
+
+  A -down-> A1 : parent
+  A1 -down-> A11 : parent
+  A -down-> A2 : parent
+}
+
+rectangle "Tenant B\nroot_organization_id = B" as TenantB {
+  rectangle "University B\nRoot organization" as B
+  rectangle "Faculty B1" as B1
+
+  B -down-> B1 : parent
+}
+
+TenantA -[hidden]down- TenantB
+
+note bottom
+Every parent and child organization must have the same
+root_organization_id. Relationships cannot cross tenants.
+end note
+@enduml
