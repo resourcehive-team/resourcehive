@@ -206,6 +206,11 @@ describe('Authentication Flow (e2e)', () => {
       .get('/auth/validate')
       .set('Cookie', authenticationCookie)
       .expect(200);
+
+    await request(app.getHttpServer())
+      .post('/auth/refresh')
+      .set('Cookie', previousRefreshCookie)
+      .expect(401);
   });
 
   it('revokes the refresh session and clears both cookies during logout', async () => {
