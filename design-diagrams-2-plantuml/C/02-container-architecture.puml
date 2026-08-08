@@ -50,7 +50,9 @@ Notification --> Database
 Identity --> Email : Verification email
 
 note bottom of Gateway
-The gateway only routes requests. Protected services verify
-the JWT locally and perform their own authorization checks.
+The gateway only routes requests.
+Protected services verify the JWT
+locally and perform their own
+authorization checks.
 end note
 @enduml

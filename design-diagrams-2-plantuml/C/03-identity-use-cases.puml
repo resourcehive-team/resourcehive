@@ -1,5 +1,4 @@
 @startuml
-title Figure 3. Identity and Tenant Onboarding Use Cases
 left to right direction
 
 skinparam monochrome true
@@ -7,41 +6,43 @@ skinparam backgroundColor white
 skinparam defaultFontName Arial
 skinparam defaultFontSize 16
 skinparam ArrowFontSize 14
-skinparam TitleFontSize 18
+skinparam shadowing false
 
-actor Visitor
-actor "Registered User" as User
-actor Member
-actor "Platform Admin" as Admin
+actor "Public Visitor" as Visitor
+actor "Approved Member" as Member
 actor "OAuth Provider" as OAuth
+actor "Unverified User" as Unverified
+actor "Platform Admin" as Admin
 
-rectangle ResourceHive {
-  usecase "Register" as Register
-  usecase "Verify email" as Verify
+rectangle "ResourceHive" {
+  usecase "Sign up with\ninstitutional email" as Register
   usecase "Log in" as Login
-  usecase "Reset password" as Reset
+  usecase "Recover password" as Recover
   usecase "Refresh session" as Refresh
   usecase "Log out" as Logout
   usecase "Link OAuth account" as LinkOAuth
+  usecase "Verify email" as Verify
+  usecase "Assign initial\nadministrator" as AssignAdmin
   usecase "Create root tenant" as CreateTenant
-  usecase "Assign initial admin" as AssignAdmin
   usecase "Suspend tenant or user" as Suspend
+
+  Register -[hidden]down- Verify
+  Recover -[hidden]down- AssignAdmin
 }
 
 Visitor --> Register
-User --> Verify
-User --> Login
-User --> Reset
+
+Member --> Login
+Member --> Recover
 Member --> Refresh
 Member --> Logout
 Member --> LinkOAuth
-OAuth --> LinkOAuth
-Admin --> CreateTenant
-Admin --> AssignAdmin
-Admin --> Suspend
 
-note bottom of Verify
-Registration happens first.
-Email verification happens later through the emailed link.
-end note
+OAuth --> LinkOAuth
+
+Verify <-- Unverified
+
+AssignAdmin <-- Admin
+CreateTenant <-- Admin
+Suspend <-- Admin
 @enduml
