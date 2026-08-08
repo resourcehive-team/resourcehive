@@ -1,52 +1,59 @@
-﻿@startuml
+@startuml
 title Figure 7. Resource, Booking, Points, and Semester Domain Classes
+
 skinparam monochrome true
 skinparam backgroundColor white
 skinparam defaultFontName Arial
 skinparam defaultFontSize 14
-skinparam ArrowFontSize 12
-skinparam nodesep 55
-skinparam ranksep 65
+skinparam shadowing false
+
 class Organization
 class User
+
 class Resource {
-  ownerOrganizationId: UUID
+  pointCost: integer
+  cancellationPeriodMinutes: integer
   rootOrganizationId: UUID
-  pointCost: int
-  cancellationPeriodMinutes: int
 }
-class ResourceAllowedOrganization
+
+class ResourceAllowedOrganization {
+  rootOrganizationId: UUID
+}
+
 class ResourceSlot {
   startsAt: timestamp
   endsAt: timestamp
 }
+
 class Booking {
-  status: BookingStatus
-  cancellationPeriodMinutes: int
-  cancelledByUserId: UUID?
+  status: string
+  cancelledAt: timestamp?
+  completedAt: timestamp?
 }
+
 class PointTransaction {
-  amount: int
-  transactionType: PointType
+  amount: integer
+  transactionType: string
 }
+
 class Semester {
   academicYear: string
   semester: string
   startsAt: timestamp
   endsAt: timestamp
 }
+
 Organization "1 owner" -- "0..*" Resource
-Resource "1" -- "0..*" ResourceAllowedOrganization
+User "1 creator" -- "0..*" Resource
+Resource "1" -- "1..*" ResourceAllowedOrganization
 Organization "1 allowed" -- "0..*" ResourceAllowedOrganization
 Resource "1" -- "0..*" ResourceSlot
 ResourceSlot "1" -- "0..*" Booking
 User "1" -- "0..*" Booking
+
 User "1" -- "0..*" PointTransaction
 Booking "0..1" -- "0..*" PointTransaction
-Organization "0..1 source" -- "0..*" PointTransaction
-Organization "1 root" -- "0..*" Semester
+Organization "0..1" -- "0..*" PointTransaction
 Semester "0..1" -- "0..*" PointTransaction
+Organization "1 root" -- "0..*" Semester
 @enduml
-
-
-

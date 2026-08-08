@@ -1,0 +1,45 @@
+@startuml
+title Figure 3. Identity and Tenant Onboarding Use Cases
+left to right direction
+
+skinparam monochrome true
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+skinparam defaultFontSize 14
+
+actor Visitor
+actor "Registered User" as User
+actor Member
+actor "Platform Admin" as Admin
+actor "OAuth Provider" as OAuth
+
+rectangle ResourceHive {
+  usecase "Register" as Register
+  usecase "Verify email" as Verify
+  usecase "Log in" as Login
+  usecase "Reset password" as Reset
+  usecase "Refresh session" as Refresh
+  usecase "Log out" as Logout
+  usecase "Link OAuth account" as LinkOAuth
+  usecase "Create root tenant" as CreateTenant
+  usecase "Assign initial admin" as AssignAdmin
+  usecase "Suspend tenant or user" as Suspend
+}
+
+Visitor --> Register
+User --> Verify
+User --> Login
+User --> Reset
+Member --> Refresh
+Member --> Logout
+Member --> LinkOAuth
+OAuth --> LinkOAuth
+Admin --> CreateTenant
+Admin --> AssignAdmin
+Admin --> Suspend
+
+note bottom of Verify
+Registration happens first.
+Email verification happens later through the emailed link.
+end note
+@enduml

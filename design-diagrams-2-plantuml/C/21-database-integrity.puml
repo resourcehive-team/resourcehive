@@ -1,0 +1,40 @@
+@startuml
+title Figure 21. Database Integrity and Concurrency Controls
+left to right direction
+
+skinparam monochrome true
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+skinparam defaultFontSize 14
+skinparam shadowing false
+
+rectangle "Application Transaction" {
+  component "Check user, tenant,\nmembership and access" as Validate
+  component "Lock the required\nuser and booking data" as Lock
+  component "Write booking and\npoint changes together" as Write
+}
+
+database PostgreSQL {
+  component "Tenant foreign keys" as TenantKeys
+  component "Hierarchy checks" as Hierarchy
+  component "No overlapping slots" as SlotOverlap
+  component "One active booking per slot" as BookingUnique
+  component "Unique point events" as PointUnique
+  component "Append-only history" as AppendOnly
+  component "Status and timestamp checks" as Checks
+}
+
+Validate --> Lock
+Lock --> Write
+Write --> TenantKeys
+Write --> Hierarchy
+Write --> SlotOverlap
+Write --> BookingUnique
+Write --> PointUnique
+Write --> AppendOnly
+Write --> Checks
+
+note bottom of Write
+If one step fails, the whole transaction is rolled back.
+end note
+@enduml

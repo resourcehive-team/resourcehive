@@ -1,0 +1,50 @@
+@startuml
+title Figure 2. ResourceHive Container and Service Architecture
+left to right direction
+
+skinparam monochrome true
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+skinparam defaultFontSize 14
+skinparam shadowing false
+
+actor User
+
+rectangle "Frontend Hosting" {
+  component "Marketing Website\nNext.js" as Marketing
+  component "Web Application\nNext.js" as WebApp
+}
+
+node "Backend Host" {
+  component "API Gateway\nNginx" as Gateway
+  component "Identity Service" as Identity
+  component "Resource Service" as Resource
+  component "Booking Service" as Booking
+  component "Notification Service" as Notification
+}
+
+database "Shared PostgreSQL" as Database
+cloud "Email / OAuth Providers" as Providers
+
+User --> Marketing : HTTPS
+User --> WebApp : HTTPS
+Marketing --> WebApp : Open app
+WebApp --> Gateway : API requests
+
+Gateway --> Identity : /auth
+Gateway --> Resource : /organizations\n/memberships\n/resources
+Gateway --> Booking : /slots\n/bookings\n/points
+Gateway --> Notification : /notifications
+
+Identity --> Database
+Resource --> Database
+Booking --> Database
+Notification --> Database
+Identity --> Providers
+Notification --> Providers
+
+note bottom of Gateway
+The gateway routes requests.
+Each service handles its own authorization.
+end note
+@enduml

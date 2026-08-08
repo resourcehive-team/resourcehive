@@ -1,0 +1,34 @@
+@startuml
+title Figure 1. ResourceHive System Context
+left to right direction
+
+skinparam monochrome true
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+skinparam defaultFontSize 14
+skinparam shadowing false
+
+actor Visitor
+actor Member
+actor "Organization Admin" as OrgAdmin
+actor "Platform Admin" as PlatformAdmin
+actor "System Operator" as Operator
+
+rectangle "ResourceHive Platform" as System
+
+cloud "Email Provider" as Email
+cloud "OAuth Provider\n(optional)" as OAuth
+database "PostgreSQL" as Database
+cloud "DNS / HTTPS" as Network
+
+Visitor --> System : Register and log in
+Member --> System : Find and book resources
+OrgAdmin --> System : Manage members and resources
+PlatformAdmin --> System : Manage tenants
+Operator --> System : Deploy and monitor
+
+System --> Email : Send emails
+System --> OAuth : Link accounts
+System --> Database : Store data
+System --> Network : Public access
+@enduml
