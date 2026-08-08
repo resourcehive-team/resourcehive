@@ -141,6 +141,7 @@ function MembershipCard({
       <CardFooter className="gap-2">
         <Button
           variant="outline"
+          nativeButton={false}
           render={
             <Link
               href={`/dashboard/organizations/${encodeURIComponent(membership.organizationId)}`}
@@ -154,6 +155,7 @@ function MembershipCard({
         membership.role.toUpperCase() === "ADMIN" ? (
           <Button
             variant="outline"
+            nativeButton={false}
             render={
               <Link
                 href={`/dashboard/organizations/${encodeURIComponent(membership.organizationId)}/members`}
@@ -181,6 +183,7 @@ function EmptyMembershipList() {
       <CardContent>
         <Button
           variant="outline"
+          nativeButton={false}
           render={<Link href="/dashboard/organizations" />}
         >
           Browse organizations
