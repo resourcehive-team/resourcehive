@@ -1,61 +1,100 @@
 @startuml
 title Figure 7. Resource, Booking, Points, and Semester Domain Classes
 
+top to bottom direction
+
 skinparam monochrome true
 skinparam backgroundColor white
 skinparam defaultFontName Arial
-skinparam defaultFontSize 16
-skinparam ArrowFontSize 14
-skinparam TitleFontSize 18
+skinparam defaultFontSize 18
+skinparam ArrowFontSize 16
+skinparam TitleFontSize 22
+skinparam classAttributeIconSize 0
 skinparam shadowing false
-
-class Organization
-class User
+skinparam linetype ortho
+skinparam nodesep 65
+skinparam ranksep 75
 
 class Resource {
+  id: UUID
+  name: string
+  description: string?
+  ownerOrganizationId: UUID
+  rootOrganizationId: UUID
+  createdByUserId: UUID
+  status: ResourceStatus
   pointCost: integer
   cancellationPeriodMinutes: integer
-  rootOrganizationId: UUID
+  createdAt: timestamp
 }
 
 class ResourceAllowedOrganization {
+  resourceId: UUID
+  organizationId: UUID
   rootOrganizationId: UUID
 }
 
 class ResourceSlot {
+  id: UUID
+  resourceId: UUID
   startsAt: timestamp
   endsAt: timestamp
+  createdAt: timestamp
 }
 
 class Booking {
-  status: string
+  id: UUID
+  resourceSlotId: UUID
+  userId: UUID
+  status: BookingStatus
+  cancellationPeriodMinutes: integer
+  cancelledByUserId: UUID?
+  cancellationReason: string?
+  createdAt: timestamp
   cancelledAt: timestamp?
   completedAt: timestamp?
 }
 
 class PointTransaction {
+  id: UUID
+  userId: UUID
   amount: integer
-  transactionType: string
+  transactionType: PointTransactionType
+  sourceOrganizationId: UUID?
+  bookingId: UUID?
+  semesterId: UUID?
+  initiatedByUserId: UUID?
+  description: string?
+  createdAt: timestamp
 }
 
 class Semester {
+  id: UUID
+  rootOrganizationId: UUID
   academicYear: string
   semester: string
   startsAt: timestamp
   endsAt: timestamp
+  createdAt: timestamp
 }
 
-Organization "1 owner" -- "0..*" Resource
-User "1 creator" -- "0..*" Resource
-Resource "1" -- "0..*" ResourceAllowedOrganization
-Organization "1 allowed" -- "0..*" ResourceAllowedOrganization
-Resource "1" -- "0..*" ResourceSlot
-ResourceSlot "1" -- "0..*" Booking
-User "1" -- "0..*" Booking
+Resource "1" --> "0..*" ResourceAllowedOrganization : access
+Resource "1" --> "0..*" ResourceSlot : offers
+ResourceSlot "1" --> "0..*" Booking : reserved as
+Booking "0..1" --> "0..2" PointTransaction : charge / refund
+Semester "0..1" --> "0..*" PointTransaction : allocations
 
-User "1" -- "0..*" PointTransaction
-Booking "0..1" -- "0..*" PointTransaction
-Organization "0..1" -- "0..*" PointTransaction
-Semester "0..1" -- "0..*" PointTransaction
-Organization "1 root" -- "0..*" Semester
+ResourceAllowedOrganization -[hidden]right-> ResourceSlot
+Booking -[hidden]right-> Semester
+
+legend bottom
+  |= Reference fields |= Target class |
+  | *UserId | User |
+  | *OrganizationId | Organization |
+
+  ResourceStatus: ACTIVE, INACTIVE
+  BookingStatus: CONFIRMED, CANCELLED, COMPLETED
+  PointTransactionType:
+  JOIN_BONUS, SEMESTER_ALLOCATION, BOOKING, BOOKING_REFUND
+endlegend
 @enduml

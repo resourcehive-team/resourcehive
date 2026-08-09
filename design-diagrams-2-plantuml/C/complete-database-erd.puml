@@ -1,0 +1,381 @@
+@startuml
+title ResourceHive Complete Database ERD — Current Schema and Planned Core Extensions
+
+top to bottom direction
+
+skinparam monochrome true
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+skinparam defaultFontSize 18
+skinparam ArrowFontSize 16
+skinparam TitleFontSize 24
+skinparam shadowing false
+skinparam linetype ortho
+skinparam nodesep 45
+skinparam ranksep 55
+skinparam packageStyle rectangle
+skinparam classAttributeIconSize 0
+hide methods
+
+package "1. Identity, authentication, and notifications" as identity_domain {
+  entity users {
+    id : UUID [PK]
+    --
+    email : TEXT [UQ]
+    password_hash : TEXT
+    first_name : TEXT
+    last_name : TEXT
+    email_verified_at : TIMESTAMPTZ?
+    status : TEXT {ACTIVE, SUSPENDED}
+    platform_role : TEXT {PLATFORM_ADMIN, USER}
+    created_at : TIMESTAMPTZ
+  }
+
+  entity email_verification_tokens {
+    id : UUID [PK]
+    --
+    user_id : UUID [FK]
+    token_hash : TEXT [UQ]
+    expires_at : TIMESTAMPTZ
+    used_at : TIMESTAMPTZ?
+    created_at : TIMESTAMPTZ
+  }
+
+  entity password_reset_tokens {
+    id : UUID [PK]
+    --
+    user_id : UUID [FK]
+    token_hash : TEXT [UQ]
+    expires_at : TIMESTAMPTZ
+    used_at : TIMESTAMPTZ?
+    created_at : TIMESTAMPTZ
+  }
+
+  entity refresh_tokens {
+    id : UUID [PK]
+    --
+    user_id : UUID [FK]
+    family_id : UUID
+    token_hash : TEXT [UQ]
+    replaced_by_token_id : UUID? [FK, PLANNED]
+    expires_at : TIMESTAMPTZ
+    used_at : TIMESTAMPTZ?
+    revoked_at : TIMESTAMPTZ?
+    created_at : TIMESTAMPTZ
+  }
+
+  entity oauth_accounts <<PLANNED>> {
+    id : UUID [PK]
+    --
+    user_id : UUID [FK]
+    provider : TEXT
+    provider_user_id : TEXT
+    created_at : TIMESTAMPTZ
+    --
+    UQ(provider, provider_user_id)
+    UQ(user_id, provider)
+  }
+
+  entity notifications {
+    id : UUID [PK]
+    --
+    user_id : UUID [FK]
+    type : TEXT
+    title : TEXT
+    message : TEXT
+    read_at : TIMESTAMPTZ?
+    created_at : TIMESTAMPTZ
+  }
+
+  users ||--o{ email_verification_tokens : verifies with
+  users ||--o{ password_reset_tokens : resets with
+  users ||--o{ refresh_tokens : owns
+  refresh_tokens "0..*" --> "0..1" refresh_tokens : replaced by (planned)
+  users ||--o{ oauth_accounts : links (planned)
+  users ||--o{ notifications : receives
+
+  email_verification_tokens -[hidden]right- password_reset_tokens
+  password_reset_tokens -[hidden]right- refresh_tokens
+  oauth_accounts -[hidden]right- notifications
+}
+
+package "2. Organizations, registration, and membership" as tenant_domain {
+  entity "users\n(reference)" as users_tenant <<REFERENCE>> {
+    id : UUID [PK]
+  }
+
+  entity organizations {
+    id : UUID [PK]
+    --
+    name : TEXT
+    type : TEXT
+    parent_id : UUID? [FK]
+    root_organization_id : UUID [FK]
+    join_bonus_points : INTEGER
+    status : TEXT {ACTIVE, SUSPENDED}
+    created_by : UUID [FK]
+    created_at : TIMESTAMPTZ
+    --
+    UQ(id, root_organization_id)
+  }
+
+  entity organization_email_domains {
+    id : UUID [PK]
+    --
+    organization_id : UUID [FK]
+    domain : TEXT [UQ]
+    auto_join : BOOLEAN
+  }
+
+  entity organization_email_allowlist {
+    id : UUID [PK]
+    --
+    organization_id : UUID [FK]
+    email : TEXT
+    added_by : UUID [FK]
+    used_at : TIMESTAMPTZ?
+    --
+    UQ(organization_id, email)
+  }
+
+  entity organization_memberships {
+    id : UUID [PK]
+    --
+    user_id : UUID [FK]
+    organization_id : UUID [FK]
+    role : TEXT {ADMIN, MEMBER}
+    status : TEXT {PENDING, APPROVED, REJECTED, SUSPENDED}
+    joined_at : TIMESTAMPTZ
+    approved_by : UUID? [FK]
+    --
+    UQ(user_id, organization_id)
+  }
+
+  entity semesters <<PLANNED>> {
+    id : UUID [PK]
+    --
+    root_organization_id : UUID [FK]
+    academic_year : TEXT
+    semester : TEXT
+    starts_at : TIMESTAMPTZ
+    ends_at : TIMESTAMPTZ
+    created_at : TIMESTAMPTZ
+    --
+    UQ(root_organization_id, academic_year, semester)
+  }
+
+  users_tenant ||--o{ organizations : creates
+  organizations "0..*" --> "0..1" organizations : parent
+  organizations "1..*" --> "1" organizations : root
+  organizations ||--o{ organization_email_domains : registers
+  organizations ||--o{ organization_email_allowlist : allows
+  users_tenant ||--o{ organization_email_allowlist : adds
+  organizations ||--o{ organization_memberships : contains
+  users_tenant ||--o{ organization_memberships : joins
+  users_tenant "0..1" -- "0..*" organization_memberships : approves
+  organizations ||--o{ semesters : defines (planned)
+
+  organization_email_domains -[hidden]right- organization_email_allowlist
+  organization_email_allowlist -[hidden]right- organization_memberships
+}
+
+package "3. Resources, bookings, ratings, and disputes" as booking_domain {
+  entity "users\n(reference)" as users_booking <<REFERENCE>> {
+    id : UUID [PK]
+  }
+
+  entity "organizations\n(reference)" as organizations_booking <<REFERENCE>> {
+    id : UUID [PK]
+    root_organization_id : UUID
+    UQ(id, root_organization_id)
+  }
+
+  entity resources {
+    id : UUID [PK]
+    --
+    name : TEXT
+    description : TEXT?
+    owner_organization_id : UUID [FK]
+    root_organization_id : UUID [FK]
+    created_by_user_id : UUID [FK]
+    status : TEXT {ACTIVE, INACTIVE}
+    point_cost : INTEGER
+    cancellation_period_minutes : INTEGER [PLANNED]
+    created_at : TIMESTAMPTZ
+    --
+    UQ(id, root_organization_id)
+  }
+
+  entity resource_allowed_organizations {
+    resource_id : UUID [PK, FK]
+    organization_id : UUID [PK, FK]
+    root_organization_id : UUID [FK]
+    --
+    composite tenant FKs to resources and organizations
+  }
+
+  entity resource_slots {
+    id : UUID [PK]
+    --
+    resource_id : UUID [FK]
+    starts_at : TIMESTAMPTZ
+    ends_at : TIMESTAMPTZ
+    created_at : TIMESTAMPTZ
+  }
+
+  entity bookings {
+    id : UUID [PK]
+    --
+    resource_slot_id : UUID [FK]
+    user_id : UUID [FK]
+    status : TEXT {CONFIRMED, CANCELLED, COMPLETED}
+    cancellation_period_minutes : INTEGER [PLANNED]
+    cancelled_by_user_id : UUID? [FK, PLANNED]
+    cancellation_reason : TEXT? [PLANNED]
+    created_at : TIMESTAMPTZ
+    cancelled_at : TIMESTAMPTZ?
+    completed_at : TIMESTAMPTZ?
+    --
+    UQ(id, user_id)
+    partial UQ(resource_slot_id) while active
+  }
+
+  entity resource_ratings <<PLANNED>> {
+    id : UUID [PK]
+    --
+    resource_id : UUID [FK]
+    booking_id : UUID [FK, UQ]
+    user_id : UUID [FK]
+    rating : SMALLINT {1..5}
+    comment : TEXT?
+    created_at : TIMESTAMPTZ
+    --
+    FK(booking_id, user_id)
+  }
+
+  entity booking_disputes <<PLANNED>> {
+    id : UUID [PK]
+    --
+    booking_id : UUID [FK, UQ]
+    submitted_by_user_id : UUID [FK]
+    root_organization_id : UUID [FK]
+    reason : TEXT
+    description : TEXT
+    status : TEXT {OPEN, UNDER_REVIEW, RESOLVED, REJECTED}
+    reviewed_by_user_id : UUID? [FK]
+    resolution_notes : TEXT?
+    resolved_at : TIMESTAMPTZ?
+    created_at : TIMESTAMPTZ
+    updated_at : TIMESTAMPTZ
+  }
+
+  entity booking_dispute_events <<PLANNED>> {
+    id : UUID [PK]
+    --
+    booking_dispute_id : UUID [FK]
+    actor_user_id : UUID [FK]
+    event_type : TEXT {OPENED, UNDER_REVIEW, EVIDENCE_ADDED,
+    NOTE_ADDED, RESOLVED, REJECTED}
+    notes : TEXT?
+    evidence : JSONB?
+    created_at : TIMESTAMPTZ
+  }
+
+  organizations_booking ||--o{ resources : owns
+  users_booking ||--o{ resources : creates
+  resources ||--o{ resource_allowed_organizations : access list
+  organizations_booking ||--o{ resource_allowed_organizations : may access
+  resources ||--o{ resource_slots : offers
+  resource_slots ||--o{ bookings : receives
+  users_booking ||--o{ bookings : makes
+  users_booking "0..1" -- "0..*" bookings : cancels (planned)
+  resources ||--o{ resource_ratings : receives (planned)
+  bookings "1" -- "0..1" resource_ratings : has (planned)
+  users_booking ||--o{ resource_ratings : writes (planned)
+  bookings "1" -- "0..1" booking_disputes : has (planned)
+  users_booking ||--o{ booking_disputes : submits (planned)
+  users_booking "0..1" -- "0..*" booking_disputes : reviews (planned)
+  organizations_booking ||--o{ booking_disputes : tenant (planned)
+  booking_disputes ||--o{ booking_dispute_events : history (planned)
+  users_booking ||--o{ booking_dispute_events : acts (planned)
+
+  resource_allowed_organizations -[hidden]right- resource_slots
+  resource_slots -[hidden]right- bookings
+  resource_ratings -[hidden]right- booking_disputes
+}
+
+package "4. Points and semester allocations" as points_domain {
+  entity "users\n(reference)" as users_points <<REFERENCE>> {
+    id : UUID [PK]
+  }
+
+  entity "organizations\n(reference)" as organizations_points <<REFERENCE>> {
+    id : UUID [PK]
+  }
+
+  entity "bookings\n(reference)" as bookings_points <<REFERENCE>> {
+    id : UUID [PK]
+    user_id : UUID
+    UQ(id, user_id)
+  }
+
+  entity "semesters\n(reference, planned)" as semesters_points <<REFERENCE>> {
+    id : UUID [PK]
+  }
+
+  entity point_transactions {
+    id : UUID [PK]
+    --
+    user_id : UUID [FK]
+    amount : INTEGER
+    transaction_type : TEXT {JOIN_BONUS, SEMESTER_ALLOCATION,
+    BOOKING, BOOKING_REFUND}
+    source_organization_id : UUID? [FK]
+    booking_id : UUID? [FK]
+    semester_id : UUID? [FK, PLANNED]
+    initiated_by_user_id : UUID? [FK, PLANNED]
+    description : TEXT?
+    created_at : TIMESTAMPTZ
+    --
+    partial UQ: join bonus per user/organization
+    partial UQ: one BOOKING and one BOOKING_REFUND per booking
+    partial UQ: semester allocation per user/org/semester [P]
+  }
+
+  users_points ||--o{ point_transactions : account
+  users_points "0..1" -- "0..*" point_transactions : initiates (planned)
+  organizations_points "0..1" -- "0..*" point_transactions : source
+  bookings_points "0..1" -- "0..2" point_transactions : charge / refund
+  semesters_points "0..1" -- "0..*" point_transactions : allocation (planned)
+
+  users_points -[hidden]right- organizations_points
+  bookings_points -[hidden]right- semesters_points
+}
+
+identity_domain -[hidden]right-> tenant_domain
+identity_domain -[hidden]down-> booking_domain
+tenant_domain -[hidden]down-> points_domain
+booking_domain -[hidden]right-> points_domain
+users -[hidden]right-> organizations
+users -[hidden]down-> resources
+organizations -[hidden]down-> point_transactions
+resources -[hidden]right-> point_transactions
+
+legend bottom
+  |= Mark |= Meaning |
+  | [PK] | Primary key |
+  | [FK] | Foreign key |
+  | [UQ] | Unique constraint |
+  | ? | Nullable column |
+  | [PLANNED] or [P] | Supplied core-feature migration; not yet deployed |
+  | (reference) | The same physical table repeated only to keep the ERD readable |
+
+  Composite same-tenant foreign keys protect resources and allowed organizations.
+  SQL checks/triggers enforce hierarchy safety, normalized emails/domains, slot non-overlap,
+  booking timestamps, append-only points/dispute events, rating ownership, and semester tenancy.
+  Reporting additions are indexes on authoritative tables, so they do not create ERD entities.
+  The planned migration must ALTER the existing password_reset_tokens and refresh_tokens tables,
+  not recreate them. This ERD retains the implemented family_id and used_at fields and adds the
+  planned refresh-token replacement reference.
+endlegend
+@enduml
