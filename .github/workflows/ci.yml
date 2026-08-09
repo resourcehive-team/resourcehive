@@ -2,15 +2,27 @@ name: CI Testing Pipeline
 
 on:
   push:
-    branches: [ "dev", "main" ]
+    branches: ["dev", "main"]
   pull_request:
-    branches: [ "dev", "main" ]
+    branches: ["dev", "main"]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CI_DATABASE_URL: postgresql://postgres:password@localhost:5432/testdb?schema=public
+  CI_TEST_DATABASE_URL: postgresql://postgres:password@localhost:5432/integritydb
+  CI_JWT_SECRET: resourcehive-ci-secret-at-least-thirty-two-characters
 
 jobs:
-  test:
+  database:
+    name: Database baseline and integrity
     runs-on: ubuntu-latest
-
-    # This creates a temporary, empty Postgres database just for testing
+    timeout-minutes: 15
     services:
       postgres:
         image: postgres:15-alpine
@@ -21,55 +33,261 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
+          --health-cmd "pg_isready -U postgres -d testdb"
+          --health-interval 5s
           --health-timeout 5s
-          --health-retries 5
+          --health-retries 10
 
     steps:
-      - name: Checkout Code
+      - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
 
       - name: Install pnpm
         uses: pnpm/action-setup@v6
 
-      - name: Install Dependencies
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+
+      - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build Shared Authentication Package
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+
+      - name: Validate Prisma schema
+        run: pnpm run db:validate
+        env:
+          DATABASE_URL: ${{ env.CI_DATABASE_URL }}
+          DATABASE_URL_UNPOOLED: ${{ env.CI_DATABASE_URL }}
+
+      - name: Deploy migrations to clean PostgreSQL 15
+        run: pnpm run db:migrate
+        env:
+          DATABASE_URL: ${{ env.CI_DATABASE_URL }}
+          DATABASE_URL_UNPOOLED: ${{ env.CI_DATABASE_URL }}
+
+      - name: Create disposable integrity-test database
+        run: createdb --host localhost --username postgres integritydb
+        env:
+          PGPASSWORD: password
+
+      - name: Run schema integrity and concurrent booking tests
+        run: pnpm run db:test
+        env:
+          TEST_DATABASE_URL: ${{ env.CI_TEST_DATABASE_URL }}
+
+  shared-and-frontend:
+    name: Shared packages and frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build database package
+        run: pnpm --filter @resourcehive/database run build
+        env:
+          DATABASE_URL: ${{ env.CI_DATABASE_URL }}
+          DATABASE_URL_UNPOOLED: ${{ env.CI_DATABASE_URL }}
+
+      - name: Lint shared authentication package
+        run: pnpm --filter @resourcehive/service-auth run lint
+
+      - name: Test shared authentication package
+        run: pnpm --filter @resourcehive/service-auth run test
+
+      - name: Build shared authentication package
         run: pnpm --filter @resourcehive/service-auth run build
 
-      - name: Run Frontend Component Tests
-        run: pnpm run test:web
+      - name: Lint frontend
+        run: pnpm --filter frontend run lint
 
-      - name: Initialize Temporary PostgreSQL Database
-        run: pnpm run db:init
+      - name: Type-check frontend
+        run: pnpm --filter frontend exec tsc --noEmit
+
+      - name: Test frontend
+        run: pnpm --filter frontend run test
+
+      - name: Build frontend
+        run: pnpm --filter frontend run build
         env:
-          DATABASE_URL: "postgresql://postgres:password@localhost:5432/testdb?schema=public"
-          DATABASE_URL_UNPOOLED: "postgresql://postgres:password@localhost:5432/testdb?schema=public"
+          JWT_SECRET: ${{ env.CI_JWT_SECRET }}
+          NEXT_PUBLIC_API_GATEWAY_URL: http://localhost:8000
 
-      - name: Seed Demo Login
+  services:
+    name: ${{ matrix.label }} quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: identity-service
+            label: Identity Service
+            lint-path: "{src,apps,libs,test}/**/*.ts"
+          - service: resource-service
+            label: Resource Service
+            lint-path: "{src,apps,libs,test}/**/*.ts"
+          - service: booking-service
+            label: Booking Service
+            lint-path: "{src,test}/**/*.ts"
+          - service: notification-service
+            label: Notification Service
+            lint-path: "{src,test}/**/*.ts"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared packages
+        run: |
+          pnpm --filter @resourcehive/database run build
+          pnpm --filter @resourcehive/service-auth run build
+        env:
+          DATABASE_URL: ${{ env.CI_DATABASE_URL }}
+          DATABASE_URL_UNPOOLED: ${{ env.CI_DATABASE_URL }}
+
+      - name: Lint ${{ matrix.label }}
+        run: pnpm --filter "${{ matrix.service }}" exec eslint "${{ matrix.lint-path }}"
+
+      - name: Test ${{ matrix.label }}
+        run: pnpm --filter "${{ matrix.service }}" exec jest --runInBand --passWithNoTests
+
+      - name: Build ${{ matrix.label }}
+        run: pnpm --filter "${{ matrix.service }}" run build
+
+  integration:
+    name: Service integration tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d testdb"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://postgres:password@localhost:5432/testdb?schema=public
+      DATABASE_URL_UNPOOLED: postgresql://postgres:password@localhost:5432/testdb?schema=public
+      TEST_DATABASE_URL: postgresql://postgres:password@localhost:5432/testdb?schema=public
+      JWT_SECRET: resourcehive-ci-secret-at-least-thirty-two-characters
+      BCRYPT_ROUNDS: "4"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Initialize test database and shared packages
+        run: |
+          pnpm run db:init
+          pnpm --filter @resourcehive/service-auth run build
+
+      - name: Seed integration fixtures
         run: pnpm run db:seed:demo
-        env:
-          DATABASE_URL: "postgresql://postgres:password@localhost:5432/testdb?schema=public"
-          DATABASE_URL_UNPOOLED: "postgresql://postgres:password@localhost:5432/testdb?schema=public"
 
-      - name: Run Identity Service E2E Tests
+      - name: Run Identity Service e2e tests
         run: pnpm --filter identity-service run test:e2e
-        env:
-          # Tests will run against the temporary database
-          DATABASE_URL: "postgresql://postgres:password@localhost:5432/testdb?schema=public"
-          DATABASE_URL_UNPOOLED: "postgresql://postgres:password@localhost:5432/testdb?schema=public"
-          JWT_SECRET: "test-secret-key"
 
-      - name: Run Resource Service E2E Tests
+      - name: Run Resource Service e2e tests
         run: pnpm --filter resource-service run test:e2e
+
+      - name: Run Booking Service e2e tests
+        run: pnpm --filter booking-service run test:e2e
+
+      - name: Run Booking Service integration tests
+        run: pnpm --filter booking-service run test:integration
+
+      - name: Run Booking Service concurrency tests
+        run: pnpm --filter booking-service run test:concurrency
+
+      - name: Run Notification Service e2e tests
+        run: pnpm --filter notification-service run test:e2e
+
+      - name: Run Notification Service integration tests
+        run: pnpm --filter notification-service run test:integration
+
+      - name: Run Notification Service concurrency tests
+        run: pnpm --filter notification-service run test:concurrency
+
+  docker:
+    name: Docker and Compose builds
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    needs: [database, shared-and-frontend, services, integration]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate Docker Compose configuration
+        run: docker compose config --quiet
         env:
-          DATABASE_URL: "postgresql://postgres:password@localhost:5432/testdb?schema=public"
-          JWT_SECRET: "test-secret-key"
-          
+          DATABASE_URL: ${{ env.CI_DATABASE_URL }}
+          DATABASE_URL_UNPOOLED: ${{ env.CI_DATABASE_URL }}
+          JWT_SECRET: ${{ env.CI_JWT_SECRET }}
+
+      - name: Build Identity Service image
+        run: docker build --file services/identity-service/Dockerfile --tag resourcehive/identity-service:ci .
+
+      - name: Build Resource Service image
+        run: docker build --file services/resource-service/Dockerfile --tag resourcehive/resource-service:ci .
+
+      - name: Build Booking Service image
+        run: docker build --file services/booking-service/Dockerfile --tag resourcehive/booking-service:ci .
+
+      - name: Build Notification Service image
+        run: docker build --file services/notification-service/Dockerfile --tag resourcehive/notification-service:ci .
+
+      - name: Build API Gateway image
+        run: docker build --file services/api-gateway/Dockerfile --tag resourcehive/api-gateway:ci services/api-gateway

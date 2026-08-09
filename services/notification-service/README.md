@@ -33,6 +33,23 @@ Run persistence integration tests only against a migrated disposable database:
 
 ```sh
 TEST_DATABASE_URL=postgresql://... pnpm --filter notification-service run test:integration
+TEST_DATABASE_URL=postgresql://... pnpm --filter notification-service run test:concurrency
+```
+
+`test:integration` and `test:concurrency` fail immediately when
+`TEST_DATABASE_URL` is missing, preventing CI from treating skipped database
+coverage as successful. The concurrency suite verifies that simultaneous
+mark-read requests remain idempotent and preserve a single notification row.
+
+The service-owned CI command set is:
+
+```sh
+pnpm --filter notification-service run lint
+pnpm --filter notification-service run build
+pnpm --filter notification-service run test
+pnpm --filter notification-service run test:e2e
+pnpm --filter notification-service run test:integration
+pnpm --filter notification-service run test:concurrency
 ```
 
 ## Docker

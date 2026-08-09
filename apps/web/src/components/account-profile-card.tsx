@@ -19,8 +19,19 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import type { CurrentUserResponse } from "@/lib/auth-api";
 
-export function AccountProfileCard() {
+export function AccountProfileCard({
+  user,
+}: {
+  user: CurrentUserResponse["user"];
+}) {
+  const initials =
+    [user.firstName, user.lastName]
+      .filter(Boolean)
+      .map((name) => name[0]?.toUpperCase())
+      .join("") || "RU";
+
   return (
     <Card>
       <CardHeader>
@@ -33,8 +44,8 @@ export function AccountProfileCard() {
         <FieldGroup>
           <div className="flex items-center gap-4">
             <Avatar size="lg">
-              <AvatarImage alt="Account profile" />
-              <AvatarFallback>U</AvatarFallback>
+              <AvatarImage alt={`${user.displayName} profile`} />
+              <AvatarFallback>{initials}</AvatarFallback>
             </Avatar>
             <div>
               <p className="font-medium">Profile picture</p>
@@ -49,7 +60,7 @@ export function AccountProfileCard() {
               <FieldLabel htmlFor="account-first-name">First name</FieldLabel>
               <Input
                 id="account-first-name"
-                placeholder="Your first name"
+                value={user.firstName}
                 disabled
               />
             </Field>
@@ -57,7 +68,7 @@ export function AccountProfileCard() {
               <FieldLabel htmlFor="account-last-name">Last name</FieldLabel>
               <Input
                 id="account-last-name"
-                placeholder="Your last name"
+                value={user.lastName}
                 disabled
               />
             </Field>
@@ -68,7 +79,7 @@ export function AccountProfileCard() {
             <Input
               id="account-email"
               type="email"
-              placeholder="Your verified organization email"
+              value={user.email}
               disabled
             />
             <FieldDescription>

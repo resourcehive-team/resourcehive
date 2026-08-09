@@ -11,11 +11,18 @@ import {
   UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
-import type { Response } from 'express';
-import { clearAccessTokenCookie, setAccessTokenCookie } from './auth-cookie';
+import type { Request, Response } from 'express';
+import {
+  clearAuthenticationCookies,
+  extractRefreshToken,
+  setAccessTokenCookie,
+  setRefreshTokenCookie,
+} from './auth-cookie';
 import { AuthService } from './auth.service';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { AuthenticatedRequest, JwtAuthGuard } from './jwt-auth.guard';
 
@@ -47,17 +54,70 @@ export class AuthController {
     @Res({ passthrough: true }) response: Response,
   ) {
     const login = await this.authService.login(loginData);
-    setAccessTokenCookie(response, login.token);
+    setAccessTokenCookie(response, login.accessToken);
+    setRefreshTokenCookie(
+      response,
+      login.refreshToken,
+      login.refreshTokenExpiresAt,
+    );
 
     return {
       message: login.message,
     };
   }
 
+  @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'no-store')
+  async refresh(
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    try {
+      const session = await this.authService.refreshSession(
+        extractRefreshToken(request),
+      );
+      setAccessTokenCookie(response, session.accessToken);
+      setRefreshTokenCookie(
+        response,
+        session.refreshToken,
+        session.refreshTokenExpiresAt,
+      );
+      return { message: session.message };
+    } catch (error) {
+      clearAuthenticationCookies(response);
+      throw error;
+    }
+  }
+
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  forgotPassword(@Body() request: ForgotPasswordDto) {
+    return this.authService.requestPasswordReset(request);
+  }
+
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  async resetPassword(
+    @Body() reset: ResetPasswordDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const result = await this.authService.resetPassword(reset);
+    clearAuthenticationCookies(response);
+    return result;
+  }
+
   @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT)
-  logout(@Res({ passthrough: true }) response: Response) {
-    clearAccessTokenCookie(response);
+  async logout(
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    try {
+      await this.authService.revokeSession(extractRefreshToken(request));
+    } finally {
+      clearAuthenticationCookies(response);
+    }
   }
 
   @Get('me')

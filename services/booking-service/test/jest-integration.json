@@ -3,6 +3,8 @@
   "rootDir": ".",
   "testEnvironment": "node",
   "testRegex": ".integration-spec.ts$",
+  "testTimeout": 30000,
+  "globalSetup": "<rootDir>/require-test-database.cjs",
   "transform": {
     "^.+\\.ts$": "ts-jest"
   }

@@ -3,21 +3,34 @@ import {
   ConflictException,
   Injectable,
   InternalServerErrorException,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '@resourcehive/database';
 import * as bcrypt from 'bcrypt';
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { EmailService } from '../email/email.service';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 
 const DEFAULT_BCRYPT_ROUNDS = 12;
 const DEFAULT_VERIFICATION_TOKEN_LIFETIME = '24h';
+const DEFAULT_PASSWORD_RESET_TOKEN_LIFETIME = '1h';
+const DEFAULT_ACCESS_TOKEN_LIFETIME = '15m';
+const DEFAULT_REFRESH_TOKEN_LIFETIME = '30d';
+const PASSWORD_RESET_REQUEST_COOLDOWN_MS = 60 * 1000;
+const PASSWORD_RESET_REQUEST_MESSAGE =
+  'If an account exists for that email, a password reset link has been sent.';
+const INVALID_PASSWORD_RESET_MESSAGE =
+  'Password reset link is invalid or has expired.';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
@@ -149,30 +162,265 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password');
     }
 
-    const membership = await this.prisma.organizationMembership.findFirst({
-      where: {
-        userId: user.id,
-        status: 'APPROVED',
-      },
-      orderBy: { joinedAt: 'asc' },
-    });
-
-    const token = await this.jwtService.signAsync(
-      {
-        sub: user.id,
-        email: user.email,
-        organizationId: membership?.organizationId ?? null,
-        role: membership?.role.toLowerCase() ?? null,
-      },
-      {
-        secret: this.getJwtSecret(),
-        expiresIn: '1d',
-      },
-    );
+    const accessToken = await this.issueAccessToken(user);
+    const refreshToken = await this.issueRefreshToken(user.id);
 
     return {
       message: 'user login successfully',
-      token,
+      accessToken,
+      ...refreshToken,
+    };
+  }
+
+  async refreshSession(token: string | null) {
+    if (!token) {
+      throw new UnauthorizedException('Invalid or expired session');
+    }
+
+    const now = new Date();
+    const storedToken = await this.prisma.refreshToken.findUnique({
+      where: { tokenHash: this.hashToken(token) },
+      select: {
+        id: true,
+        familyId: true,
+        expiresAt: true,
+        usedAt: true,
+        revokedAt: true,
+        user: {
+          select: {
+            id: true,
+            email: true,
+            status: true,
+            emailVerifiedAt: true,
+          },
+        },
+      },
+    });
+
+    if (!storedToken) {
+      throw new UnauthorizedException('Invalid or expired session');
+    }
+
+    if (storedToken.usedAt) {
+      await this.revokeRefreshTokenFamily(storedToken.familyId, now);
+      throw new UnauthorizedException('Invalid or expired session');
+    }
+
+    if (
+      storedToken.revokedAt ||
+      storedToken.expiresAt <= now ||
+      storedToken.user.status !== 'ACTIVE' ||
+      !storedToken.user.emailVerifiedAt
+    ) {
+      await this.revokeRefreshTokenFamily(storedToken.familyId, now);
+      throw new UnauthorizedException('Invalid or expired session');
+    }
+
+    const accessToken = await this.issueAccessToken(storedToken.user);
+    const nextToken = randomBytes(32).toString('base64url');
+
+    await this.prisma.$transaction(async (transaction) => {
+      const claimedToken = await transaction.refreshToken.updateMany({
+        where: {
+          id: storedToken.id,
+          usedAt: null,
+          revokedAt: null,
+          expiresAt: { gt: now },
+        },
+        data: { usedAt: now },
+      });
+
+      if (claimedToken.count !== 1) {
+        throw new UnauthorizedException('Invalid or expired session');
+      }
+
+      await transaction.refreshToken.create({
+        data: {
+          userId: storedToken.user.id,
+          familyId: storedToken.familyId,
+          tokenHash: this.hashToken(nextToken),
+          expiresAt: storedToken.expiresAt,
+        },
+      });
+    });
+
+    return {
+      message: 'Session refreshed successfully',
+      accessToken,
+      refreshToken: nextToken,
+      refreshTokenExpiresAt: storedToken.expiresAt,
+    };
+  }
+
+  async revokeSession(token: string | null): Promise<void> {
+    if (!token) return;
+
+    const storedToken = await this.prisma.refreshToken.findUnique({
+      where: { tokenHash: this.hashToken(token) },
+      select: { familyId: true },
+    });
+    if (!storedToken) return;
+
+    await this.revokeRefreshTokenFamily(storedToken.familyId, new Date());
+  }
+
+  async requestPasswordReset(request: ForgotPasswordDto) {
+    const email = request.email.trim().toLowerCase();
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      select: {
+        id: true,
+        email: true,
+        status: true,
+        emailVerifiedAt: true,
+      },
+    });
+
+    if (!user || user.status !== 'ACTIVE' || !user.emailVerifiedAt) {
+      return { message: PASSWORD_RESET_REQUEST_MESSAGE };
+    }
+
+    const mostRecentToken = await this.prisma.passwordResetToken.findFirst({
+      where: { userId: user.id },
+      select: { createdAt: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (
+      mostRecentToken &&
+      mostRecentToken.createdAt.getTime() + PASSWORD_RESET_REQUEST_COOLDOWN_MS >
+        Date.now()
+    ) {
+      return { message: PASSWORD_RESET_REQUEST_MESSAGE };
+    }
+
+    const token = randomBytes(32).toString('base64url');
+    const now = new Date();
+    const expiresAt = new Date(
+      now.getTime() + this.getPasswordResetTokenLifetimeMs(),
+    );
+
+    await this.prisma.$transaction(async (transaction) => {
+      await transaction.passwordResetToken.updateMany({
+        where: {
+          userId: user.id,
+          usedAt: null,
+          expiresAt: { gt: now },
+        },
+        data: { usedAt: now },
+      });
+      await transaction.passwordResetToken.create({
+        data: {
+          userId: user.id,
+          tokenHash: this.hashToken(token),
+          expiresAt,
+        },
+      });
+    });
+
+    try {
+      await this.emailService.sendPasswordResetEmail(user.email, token);
+    } catch (error) {
+      this.logger.error(
+        `Unable to send password reset email for user ${user.id}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+    }
+
+    return { message: PASSWORD_RESET_REQUEST_MESSAGE };
+  }
+
+  async resetPassword(reset: ResetPasswordDto) {
+    const now = new Date();
+    const passwordResetToken = await this.prisma.passwordResetToken.findUnique({
+      where: { tokenHash: this.hashToken(reset.token) },
+      select: {
+        id: true,
+        usedAt: true,
+        expiresAt: true,
+        user: {
+          select: {
+            id: true,
+            email: true,
+            passwordHash: true,
+            status: true,
+            emailVerifiedAt: true,
+          },
+        },
+      },
+    });
+
+    if (
+      !passwordResetToken ||
+      passwordResetToken.usedAt ||
+      passwordResetToken.expiresAt <= now ||
+      passwordResetToken.user.status !== 'ACTIVE' ||
+      !passwordResetToken.user.emailVerifiedAt
+    ) {
+      throw new BadRequestException(INVALID_PASSWORD_RESET_MESSAGE);
+    }
+
+    if (
+      await bcrypt.compare(reset.password, passwordResetToken.user.passwordHash)
+    ) {
+      throw new BadRequestException(
+        'New password must be different from your current password.',
+      );
+    }
+
+    const passwordHash = await bcrypt.hash(
+      reset.password,
+      this.getBcryptRounds(),
+    );
+
+    await this.prisma.$transaction(async (transaction) => {
+      const claimedToken = await transaction.passwordResetToken.updateMany({
+        where: {
+          id: passwordResetToken.id,
+          usedAt: null,
+          expiresAt: { gt: now },
+        },
+        data: { usedAt: now },
+      });
+
+      if (claimedToken.count !== 1) {
+        throw new BadRequestException(INVALID_PASSWORD_RESET_MESSAGE);
+      }
+
+      await transaction.user.update({
+        where: { id: passwordResetToken.user.id },
+        data: { passwordHash },
+      });
+      await transaction.passwordResetToken.updateMany({
+        where: {
+          userId: passwordResetToken.user.id,
+          usedAt: null,
+          expiresAt: { gt: now },
+        },
+        data: { usedAt: now },
+      });
+      await transaction.refreshToken.updateMany({
+        where: {
+          userId: passwordResetToken.user.id,
+          revokedAt: null,
+        },
+        data: { revokedAt: now },
+      });
+    });
+
+    try {
+      await this.emailService.sendPasswordChangedEmail(
+        passwordResetToken.user.email,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Unable to send password change confirmation for user ${passwordResetToken.user.id}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+    }
+
+    return {
+      message: 'Password reset successfully. Log in with your new password.',
     };
   }
 
@@ -448,13 +696,39 @@ export class AuthService {
   }
 
   private getVerificationTokenLifetimeMs(): number {
-    const value =
+    return this.parseTokenLifetime(
       process.env.EMAIL_VERIFICATION_TOKEN_EXPIRES_IN ??
-      DEFAULT_VERIFICATION_TOKEN_LIFETIME;
+        DEFAULT_VERIFICATION_TOKEN_LIFETIME,
+      'EMAIL_VERIFICATION_TOKEN_EXPIRES_IN',
+    );
+  }
+
+  private getPasswordResetTokenLifetimeMs(): number {
+    return this.parseTokenLifetime(
+      process.env.PASSWORD_RESET_TOKEN_EXPIRES_IN ??
+        DEFAULT_PASSWORD_RESET_TOKEN_LIFETIME,
+      'PASSWORD_RESET_TOKEN_EXPIRES_IN',
+    );
+  }
+
+  private getRefreshTokenLifetimeMs(): number {
+    return this.parseTokenLifetime(
+      process.env.REFRESH_TOKEN_EXPIRES_IN ?? DEFAULT_REFRESH_TOKEN_LIFETIME,
+      'REFRESH_TOKEN_EXPIRES_IN',
+    );
+  }
+
+  private getAccessTokenLifetime(): `${number}${'m' | 'h' | 'd'}` {
+    const value = process.env.JWT_EXPIRES_IN ?? DEFAULT_ACCESS_TOKEN_LIFETIME;
+    this.parseTokenLifetime(value, 'JWT_EXPIRES_IN');
+    return value as `${number}${'m' | 'h' | 'd'}`;
+  }
+
+  private parseTokenLifetime(value: string, environmentName: string): number {
     const match = value.match(/^(\d+)(m|h|d)$/);
     if (!match) {
       throw new InternalServerErrorException(
-        'EMAIL_VERIFICATION_TOKEN_EXPIRES_IN must use m, h, or d',
+        `${environmentName} must use m, h, or d`,
       );
     }
 
@@ -471,5 +745,60 @@ export class AuthService {
 
   private hashToken(token: string): string {
     return createHash('sha256').update(token).digest('hex');
+  }
+
+  private async issueAccessToken(user: { id: string; email: string }) {
+    const membership = await this.prisma.organizationMembership.findFirst({
+      where: {
+        userId: user.id,
+        status: 'APPROVED',
+      },
+      orderBy: { joinedAt: 'asc' },
+    });
+
+    return this.jwtService.signAsync(
+      {
+        sub: user.id,
+        email: user.email,
+        organizationId: membership?.organizationId ?? null,
+        role: membership?.role.toLowerCase() ?? null,
+      },
+      {
+        secret: this.getJwtSecret(),
+        expiresIn: this.getAccessTokenLifetime(),
+      },
+    );
+  }
+
+  private async issueRefreshToken(userId: string) {
+    const token = randomBytes(32).toString('base64url');
+    const expiresAt = new Date(Date.now() + this.getRefreshTokenLifetimeMs());
+
+    await this.prisma.refreshToken.create({
+      data: {
+        userId,
+        familyId: randomUUID(),
+        tokenHash: this.hashToken(token),
+        expiresAt,
+      },
+    });
+
+    return {
+      refreshToken: token,
+      refreshTokenExpiresAt: expiresAt,
+    };
+  }
+
+  private async revokeRefreshTokenFamily(
+    familyId: string,
+    revokedAt: Date,
+  ): Promise<void> {
+    await this.prisma.refreshToken.updateMany({
+      where: {
+        familyId,
+        revokedAt: null,
+      },
+      data: { revokedAt },
+    });
   }
 }

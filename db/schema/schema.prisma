@@ -28,6 +28,8 @@ model User {
   bookings                Booking[]                    @relation("BookingUser")
   pointTransactions       PointTransaction[]           @relation("PointTransactionUser")
   emailVerificationTokens EmailVerificationToken[]
+  passwordResetTokens     PasswordResetToken[]
+  refreshTokens           RefreshToken[]
   notifications           Notification[]
 
   @@map("users")
@@ -209,6 +211,37 @@ model EmailVerificationToken {
 
   @@index([userId], map: "email_verification_tokens_user_id_idx")
   @@map("email_verification_tokens")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique(map: "password_reset_tokens_token_hash_unique") @map("token_hash")
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz
+  usedAt    DateTime? @map("used_at") @db.Timestamptz
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([userId, createdAt], map: "password_reset_tokens_user_created_at_idx")
+  @@map("password_reset_tokens")
+}
+
+model RefreshToken {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  familyId  String    @map("family_id") @db.Uuid
+  tokenHash String    @unique(map: "refresh_tokens_token_hash_unique") @map("token_hash")
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz
+  usedAt    DateTime? @map("used_at") @db.Timestamptz
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([userId, createdAt], map: "refresh_tokens_user_created_at_idx")
+  @@index([familyId], map: "refresh_tokens_family_id_idx")
+  @@map("refresh_tokens")
 }
 
 model Notification {

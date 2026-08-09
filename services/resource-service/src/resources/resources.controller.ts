@@ -90,4 +90,16 @@ export class ResourcesController {
   ) {
     return this.resourcesService.findOne(organizationId, resourceId);
   }
+
+  @UseGuards(TenantGuard)
+  @Get('organization/:organizationId/:resourceId/access-check')
+  @ApiOperation({
+    summary: 'Internal check for Booking Service to verify resource access',
+  })
+  checkAccess(
+    @Param('organizationId') organizationId: string,
+    @Param('resourceId') resourceId: string,
+  ) {
+    return this.resourcesService.checkBookingAccess(organizationId, resourceId);
+  }
 }

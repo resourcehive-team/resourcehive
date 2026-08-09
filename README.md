@@ -71,8 +71,13 @@ pnpm run dev:setup
 
 Start all backend services and the Nginx API gateway:
 
+First Time:
 ```bash
 docker compose up --build -d
+```
+Later:
+```bash
+docker compose up -d
 ```
 
 Confirm that the containers are running:

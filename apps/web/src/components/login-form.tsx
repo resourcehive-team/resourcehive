@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -24,15 +24,39 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/password-input";
+import { refreshSession } from "@/lib/session-api";
 
 export function LoginForm({
   redirectTo = "/dashboard",
+  passwordReset = false,
   className,
   ...props
-}: React.ComponentProps<"div"> & { redirectTo?: string }) {
+}: React.ComponentProps<"div"> & {
+  redirectTo?: string;
+  passwordReset?: boolean;
+}) {
   const router = useRouter();
+  const [isRestoringSession, setIsRestoringSession] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+
+    void refreshSession().then((restored) => {
+      if (!active) return;
+      if (restored) {
+        router.replace(redirectTo);
+        router.refresh();
+        return;
+      }
+      setIsRestoringSession(false);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [redirectTo, router]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -74,6 +98,11 @@ export function LoginForm({
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {passwordReset && (
+            <p className="mb-4 text-sm text-muted-foreground" role="status">
+              Your password has been reset. Log in with your new password.
+            </p>
+          )}
           <p className="mb-4 text-xs text-muted-foreground">
             <span className="text-destructive" aria-hidden="true">
               *
@@ -98,22 +127,29 @@ export function LoginForm({
                   autoFocus
                   aria-invalid={Boolean(error)}
                   aria-describedby={error ? "login-error" : undefined}
+                  disabled={isRestoringSession || isSubmitting}
                   required
                 />
               </Field>
               <Field data-invalid={error ? "true" : undefined}>
-                <FieldLabel htmlFor="password">
-                  Password
-                  <span className="text-destructive" aria-hidden="true">
-                    *
-                  </span>
-                </FieldLabel>
+                <div className="flex items-center justify-between">
+                  <FieldLabel htmlFor="password">
+                    Password
+                    <span className="text-destructive" aria-hidden="true">
+                      *
+                    </span>
+                  </FieldLabel>
+                  <Link className="text-sm underline-offset-4 hover:underline" href="/forgot-password">
+                    Forgot password?
+                  </Link>
+                </div>
                 <PasswordInput
                   id="password"
                   name="password"
                   autoComplete="current-password"
                   aria-invalid={Boolean(error)}
                   aria-describedby={error ? "login-error" : undefined}
+                  disabled={isRestoringSession || isSubmitting}
                   required
                 />
               </Field>
@@ -122,9 +158,13 @@ export function LoginForm({
                 <Button
                   className="w-full"
                   type="submit"
-                  disabled={isSubmitting}
+                  disabled={isRestoringSession || isSubmitting}
                 >
-                  {isSubmitting ? "Logging in..." : "Login"}
+                  {isRestoringSession
+                    ? "Checking session..."
+                    : isSubmitting
+                      ? "Logging in..."
+                      : "Login"}
                 </Button>
                 <FieldDescription className="text-center">
                   Don&apos;t have an account?{" "}

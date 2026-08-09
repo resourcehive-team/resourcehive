@@ -30,7 +30,11 @@ export class BookingCreationService {
         return await this.prisma.$transaction(
           (transaction) =>
             this.createWithinTransaction(resourceSlotId, user, transaction),
-          { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+          {
+            isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+            maxWait: 10000,
+            timeout: 30000,
+          },
         );
       } catch (error) {
         if (this.isUniqueConstraintConflict(error)) {
