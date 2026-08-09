@@ -13,7 +13,7 @@ import {
 
 import { RequestErrorCard } from "@/components/request-error-card";
 import { ResourceCatalogueCard } from "@/components/resource-catalogue-card";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Card,
   CardAction,
@@ -279,13 +279,13 @@ function CatalogueControls({
         </CardDescription>
         {canCreateResources ? (
           <CardAction>
-            <Button
-              nativeButton={false}
-              render={<Link href="/dashboard/resources/new" />}
+            <Link
+              className={buttonVariants()}
+              href="/dashboard/resources/new"
             >
               <PlusIcon data-icon="inline-start" />
               Create resource
-            </Button>
+            </Link>
           </CardAction>
         ) : null}
       </CardHeader>
@@ -466,13 +466,13 @@ function NoApprovedMemberships() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <Button
-          variant="outline"
-          render={<Link href="/dashboard/organizations" />}
+        <Link
+          className={buttonVariants({ variant: "outline" })}
+          href="/dashboard/organizations"
         >
           Browse organizations
           <ArrowRightIcon data-icon="inline-end" />
-        </Button>
+        </Link>
       </CardContent>
     </Card>
   );
