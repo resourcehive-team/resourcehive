@@ -11,7 +11,7 @@ import {
 
 import { MembershipStatusBadge } from "@/components/membership-status-badge";
 import { RequestErrorCard } from "@/components/request-error-card";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import {
   Card,
   CardAction,
@@ -139,32 +139,22 @@ function MembershipCard({
         </dl>
       </CardContent>
       <CardFooter className="gap-2">
-        <Button
-          variant="outline"
-          nativeButton={false}
-          render={
-            <Link
-              href={`/dashboard/organizations/${encodeURIComponent(membership.organizationId)}`}
-            />
-          }
+        <Link
+          className={buttonVariants({ variant: "outline" })}
+          href={`/dashboard/organizations/${encodeURIComponent(membership.organizationId)}`}
         >
           View organization
           <ArrowRightIcon data-icon="inline-end" />
-        </Button>
+        </Link>
         {normalizedStatus === "APPROVED" &&
         membership.role.toUpperCase() === "ADMIN" ? (
-          <Button
-            variant="outline"
-            nativeButton={false}
-            render={
-              <Link
-                href={`/dashboard/organizations/${encodeURIComponent(membership.organizationId)}/members`}
-              />
-            }
+          <Link
+            className={buttonVariants({ variant: "outline" })}
+            href={`/dashboard/organizations/${encodeURIComponent(membership.organizationId)}/members`}
           >
             <UsersIcon data-icon="inline-start" />
             View members
-          </Button>
+          </Link>
         ) : null}
       </CardFooter>
     </Card>
@@ -181,14 +171,13 @@ function EmptyMembershipList() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <Button
-          variant="outline"
-          nativeButton={false}
-          render={<Link href="/dashboard/organizations" />}
+        <Link
+          className={buttonVariants({ variant: "outline" })}
+          href="/dashboard/organizations"
         >
           Browse organizations
           <ArrowRightIcon data-icon="inline-end" />
-        </Button>
+        </Link>
       </CardContent>
     </Card>
   );

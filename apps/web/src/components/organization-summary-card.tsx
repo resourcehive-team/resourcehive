@@ -8,7 +8,7 @@ import {
 } from "@/lib/resource-service/organization-format";
 import type { Organization } from "@/lib/resource-service/types";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import {
   Card,
   CardAction,
@@ -67,17 +67,13 @@ export function OrganizationSummaryCard({
         </dl>
       </CardContent>
       <CardFooter>
-        <Button
-          variant="outline"
-          render={
-            <Link
-              href={`/dashboard/organizations/${encodeURIComponent(organization.id)}`}
-            />
-          }
+        <Link
+          className={buttonVariants({ variant: "outline" })}
+          href={`/dashboard/organizations/${encodeURIComponent(organization.id)}`}
         >
           View details
           <ArrowRightIcon data-icon="inline-end" />
-        </Button>
+        </Link>
       </CardFooter>
     </Card>
   );

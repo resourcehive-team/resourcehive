@@ -147,7 +147,7 @@ describe("ResourceCatalogue", () => {
     await screen.findByText("Electronics Laboratory");
 
     expect(
-      screen.getByRole("button", { name: "Create resource" }).getAttribute(
+      screen.getByRole("link", { name: "Create resource" }).getAttribute(
         "href",
       ),
     ).toBe("/dashboard/resources/new");
