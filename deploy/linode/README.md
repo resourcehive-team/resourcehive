@@ -20,8 +20,7 @@ VM without changing application code.
 
 ## What happens automatically
 
-A successful `CI` run for a push to `dev` triggers the backend deployment
-workflow. It:
+A push to `main` triggers the backend deployment workflow. It:
 
 1. builds the four service images in GitHub Actions;
 2. tags them with the exact Git commit and publishes them to GHCR;
@@ -150,10 +149,9 @@ cannot be deployed from this monorepo until that application exists.
 
 ## First and later deployments
 
-After DNS, the server env file, and GitHub secrets are ready, either:
-
-- push to `dev` and wait for CI to pass; or
-- manually run **Deploy backend to Linode** from the Actions page.
+After DNS, the server env file, and GitHub secrets are ready, open a pull request
+from `dev` into `main`. Merging that pull request starts the production backend
+deployment.
 
 No SSH session is normally required for later deployments.
 
