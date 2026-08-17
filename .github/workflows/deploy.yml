@@ -4,8 +4,7 @@ on:
   workflow_run:
     workflows: ["CI"]
     types: [completed]
-    branches: [dev]
-  workflow_dispatch:
+    branches: [main]
 
 concurrency:
   group: backend-production
@@ -19,9 +18,8 @@ jobs:
   publish:
     name: Publish ${{ matrix.label }} image
     if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.event == 'push')
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -47,12 +45,7 @@ jobs:
       - name: Select source commit
         id: source
         shell: bash
-        run: |
-          if [[ "${{ github.event_name }}" == "workflow_run" ]]; then
-            echo "sha=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "sha=${{ github.sha }}" >> "$GITHUB_OUTPUT"
-          fi
+        run: echo "sha=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
 
       - name: Checkout source commit
         uses: actions/checkout@v4
@@ -77,7 +70,7 @@ jobs:
           push: true
           tags: |
             ${{ env.IMAGE_PREFIX }}-${{ matrix.image }}:${{ steps.source.outputs.sha }}
-            ${{ env.IMAGE_PREFIX }}-${{ matrix.image }}:dev
+            ${{ env.IMAGE_PREFIX }}-${{ matrix.image }}:main
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}
 
@@ -94,12 +87,7 @@ jobs:
       - name: Select source commit
         id: source
         shell: bash
-        run: |
-          if [[ "${{ github.event_name }}" == "workflow_run" ]]; then
-            echo "sha=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "sha=${{ github.sha }}" >> "$GITHUB_OUTPUT"
-          fi
+        run: echo "sha=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
 
       - name: Checkout deployment configuration
         uses: actions/checkout@v4
