@@ -6,7 +6,7 @@ services:
     container_name: resourcehive-api-gateway
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "${API_PORT:-8000}:8000"
     environment:
       API_DOMAIN: ${API_DOMAIN:-http://localhost:8000}
       ACME_EMAIL: ${ACME_EMAIL:-admin@localhost}
