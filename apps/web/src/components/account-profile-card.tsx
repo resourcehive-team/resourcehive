@@ -18,8 +18,15 @@ import {
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import type { CurrentUserResponse } from "@/lib/auth-api";
+import { PencilIcon, Trash2Icon, UploadIcon } from "lucide-react";
 
 export function AccountProfileCard({
   user,
@@ -47,12 +54,35 @@ export function AccountProfileCard({
               <AvatarImage alt={`${user.displayName} profile`} />
               <AvatarFallback>{initials}</AvatarFallback>
             </Avatar>
-            <div>
+            <div className="flex flex-col gap-1">
               <p className="font-medium">Profile picture</p>
               <p className="text-muted-foreground">
-                Profile image editing will be available later.
+                Manage your profile picture.
               </p>
             </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Manage profile picture"
+                  />
+                }
+              >
+                <PencilIcon />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem>
+                  <UploadIcon />
+                  Upload
+                </DropdownMenuItem>
+                <DropdownMenuItem variant="destructive">
+                  <Trash2Icon />
+                  Remove
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
