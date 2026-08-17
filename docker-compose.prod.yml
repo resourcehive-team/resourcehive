@@ -1,45 +1,119 @@
 name: resourcehive-production
 
+x-service-environment: &service-environment
+  DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env.production}
+  JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env.production}
+  CORS_ORIGINS: ${CORS_ORIGINS:?Set CORS_ORIGINS in .env.production}
+  NODE_ENV: production
+
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+
 services:
   api-gateway:
-    build:
-      context: ./services/api-gateway
-    container_name: resourcehive-api-gateway-prod
-    restart: always
+    image: caddy:2-alpine
+    <<: *service-defaults
     ports:
       - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      API_DOMAIN: ${API_DOMAIN:?Set API_DOMAIN in .env.production}
+      ACME_EMAIL: ${ACME_EMAIL:?Set ACME_EMAIL in .env.production}
+    volumes:
+      - ./services/api-gateway/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:2019/config/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     depends_on:
-      - identity-service
+      identity-service:
+        condition: service_healthy
+      resource-service:
+        condition: service_healthy
+      booking-service:
+        condition: service_healthy
+      notification-service:
+        condition: service_healthy
 
   identity-service:
-    image: ghcr.io/resourcehive-team/resourcehive-identity:latest
-    container_name: resourcehive-identity-prod
-    restart: always
+    image: ghcr.io/resourcehive-team/resourcehive-identity:${IMAGE_TAG:?Set IMAGE_TAG in .env.production}
+    <<: *service-defaults
     environment:
-      # EC2 injects env vars from the .env file on the server
-      DATABASE_URL: ${DATABASE_URL}
-      DATABASE_URL_UNPOOLED: ${DATABASE_URL_UNPOOLED}
-      JWT_SECRET: ${JWT_SECRET}
+      <<: *service-environment
+      DATABASE_URL_UNPOOLED: ${DATABASE_URL_UNPOOLED:?Set DATABASE_URL_UNPOOLED in .env.production}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-15m}
       REFRESH_TOKEN_EXPIRES_IN: ${REFRESH_TOKEN_EXPIRES_IN:-30d}
       PORT: 3000
-      CORS_ORIGINS: ${CORS_ORIGINS}
-      APP_URL: ${APP_URL}
-      AUTH_COOKIE_DOMAIN: ${AUTH_COOKIE_DOMAIN}
+      APP_URL: ${APP_URL:?Set APP_URL in .env.production}
+      AUTH_COOKIE_DOMAIN: ${AUTH_COOKIE_DOMAIN:-}
       AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-true}
       BCRYPT_ROUNDS: ${BCRYPT_ROUNDS:-12}
       EMAIL_VERIFICATION_TOKEN_EXPIRES_IN: ${EMAIL_VERIFICATION_TOKEN_EXPIRES_IN:-24h}
       PASSWORD_RESET_TOKEN_EXPIRES_IN: ${PASSWORD_RESET_TOKEN_EXPIRES_IN:-1h}
       EMAIL_TRANSPORT: ${EMAIL_TRANSPORT:-smtp}
-      EMAIL_FROM: ${EMAIL_FROM}
-      SMTP_HOST: ${SMTP_HOST}
+      EMAIL_FROM: ${EMAIL_FROM:?Set EMAIL_FROM in .env.production}
+      SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_SECURE: ${SMTP_SECURE:-false}
-      SMTP_USER: ${SMTP_USER}
-      SMTP_PASSWORD: ${SMTP_PASSWORD}
-      NODE_ENV: production
-    command: >
-      sh -c "
-        pnpm run db:migrate &&
-        pnpm --filter identity-service run start:prod
-      "
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  resource-service:
+    image: ghcr.io/resourcehive-team/resourcehive-resource:${IMAGE_TAG:?Set IMAGE_TAG in .env.production}
+    <<: *service-defaults
+    environment:
+      <<: *service-environment
+      PORT: 3004
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3004/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  booking-service:
+    image: ghcr.io/resourcehive-team/resourcehive-booking:${IMAGE_TAG:?Set IMAGE_TAG in .env.production}
+    <<: *service-defaults
+    environment:
+      <<: *service-environment
+      PORT: 3002
+
+  notification-service:
+    image: ghcr.io/resourcehive-team/resourcehive-notification:${IMAGE_TAG:?Set IMAGE_TAG in .env.production}
+    <<: *service-defaults
+    environment:
+      <<: *service-environment
+      PORT: 3003
+
+  migrate:
+    image: ghcr.io/resourcehive-team/resourcehive-identity:${IMAGE_TAG:?Set IMAGE_TAG in .env.production}
+    profiles: ["tools"]
+    restart: "no"
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env.production}
+      DATABASE_URL_UNPOOLED: ${DATABASE_URL_UNPOOLED:?Set DATABASE_URL_UNPOOLED in .env.production}
+    command:
+      - pnpm
+      - --filter
+      - "@resourcehive/database"
+      - exec
+      - prisma
+      - migrate
+      - deploy
+      - --schema
+      - ../../db/schema/schema.prisma
+
+volumes:
+  caddy_data:
+  caddy_config:

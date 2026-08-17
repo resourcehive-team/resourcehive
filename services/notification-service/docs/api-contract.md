@@ -6,7 +6,7 @@ Week 2 implemented persistence. Week 3 implements the approved read endpoints.
 
 ## Common rules
 
-- Base URL: the approved public Nginx gateway.
+- Base URL: the approved public Caddy gateway.
 - Authentication: `Authorization: Bearer <JWT>`.
 - The service validates the agreed JWT locally.
 - Recipient identity is derived from validated authentication.

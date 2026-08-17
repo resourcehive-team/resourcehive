@@ -6,13 +6,13 @@ This document records the Resource Service HTTP contract that currently exists
 for the Week 4 frontend work.
 
 It is based on the merged Resource Service controllers, services, DTOs, tests,
-database schema, and Nginx routes. It does not propose new endpoints or change
+database schema, and Caddy routes. It does not propose new endpoints or change
 Person A's service.
 
 The frontend must use the public API gateway:
 
 ```text
-Browser → http://localhost:8000 → Nginx → Resource Service
+Browser → http://localhost:8000 → Caddy → Resource Service
 ```
 
 The frontend must not call the private Resource Service container or port
@@ -20,7 +20,7 @@ directly.
 
 ## Public route prefixes
 
-Nginx forwards these prefixes to the Resource Service:
+Caddy forwards these prefixes to the Resource Service:
 
 | Public prefix | Domain |
 | --- | --- |
@@ -358,7 +358,7 @@ Gateway:  http://localhost:8000
 ```
 
 NestJS services own CORS and use the explicit `CORS_ORIGINS` allowlist with
-credentials enabled. Nginx forwards requests and responses without adding a
+credentials enabled. Caddy forwards requests and responses without adding a
 second, conflicting CORS policy. CORS must not be reimplemented inside
 frontend API functions.
 
@@ -461,7 +461,7 @@ resource-details operations.
 
 Future frontend API modules must:
 
-- call these paths through the Nginx gateway;
+- call these paths through the Caddy gateway;
 - use the shared `apiRequest` browser client;
 - let the browser send the HttpOnly authentication cookie;
 - take the current user from authenticated server responses;

@@ -27,15 +27,11 @@ The example environment contains one public backend URL:
 NEXT_PUBLIC_API_URL=http://localhost:8000
 ```
 
-`NEXT_PUBLIC_API_URL` is the Nginx API gateway. It is used for Identity,
+`NEXT_PUBLIC_API_URL` is the Caddy API gateway. It is used for Identity,
 Resource, Booking, and Notification requests. The frontend must not use private
 service URLs.
 
 This URL is public configuration, not a secret.
-
-Existing deployments may temporarily continue using
-`NEXT_PUBLIC_API_GATEWAY_URL` as a compatibility fallback. New and updated
-environments must use `NEXT_PUBLIC_API_URL`.
 
 `JWT_SECRET` is server-only. It must use the same value as the Identity
 Service so the Next.js proxy can protect frontend routes. Never prefix this

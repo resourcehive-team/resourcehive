@@ -1,4 +1,4 @@
-name: CI Testing Pipeline
+name: CI
 
 on:
   push:
@@ -130,7 +130,7 @@ jobs:
         run: pnpm --filter frontend run build
         env:
           JWT_SECRET: ${{ env.CI_JWT_SECRET }}
-          NEXT_PUBLIC_API_GATEWAY_URL: http://localhost:8000
+          NEXT_PUBLIC_API_URL: http://localhost:8000
 
   services:
     name: ${{ matrix.label }} quality
@@ -260,34 +260,29 @@ jobs:
       - name: Run Notification Service concurrency tests
         run: pnpm --filter notification-service run test:concurrency
 
-  docker:
-    name: Docker and Compose builds
+  infrastructure:
+    name: Deployment configuration
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 10
     needs: [database, shared-and-frontend, services, integration]
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Validate Docker Compose configuration
-        run: docker compose config --quiet
+      - name: Validate Docker Compose configurations
+        run: |
+          docker compose config --quiet
+          docker compose --env-file .env.production.example -f docker-compose.prod.yml config --quiet
         env:
           DATABASE_URL: ${{ env.CI_DATABASE_URL }}
           DATABASE_URL_UNPOOLED: ${{ env.CI_DATABASE_URL }}
           JWT_SECRET: ${{ env.CI_JWT_SECRET }}
 
-      - name: Build Identity Service image
-        run: docker build --file services/identity-service/Dockerfile --tag resourcehive/identity-service:ci .
-
-      - name: Build Resource Service image
-        run: docker build --file services/resource-service/Dockerfile --tag resourcehive/resource-service:ci .
-
-      - name: Build Booking Service image
-        run: docker build --file services/booking-service/Dockerfile --tag resourcehive/booking-service:ci .
-
-      - name: Build Notification Service image
-        run: docker build --file services/notification-service/Dockerfile --tag resourcehive/notification-service:ci .
-
-      - name: Build API Gateway image
-        run: docker build --file services/api-gateway/Dockerfile --tag resourcehive/api-gateway:ci services/api-gateway
+      - name: Validate Caddy configuration
+        run: >-
+          docker run --rm
+          --env API_DOMAIN=api.resourcehive.thisismalindu.com
+          --env ACME_EMAIL=admin@example.com
+          --volume "$PWD/services/api-gateway/Caddyfile:/etc/caddy/Caddyfile:ro"
+          caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile

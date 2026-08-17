@@ -28,6 +28,7 @@ redis/
 .env
 .env.*
 !.env.example
+!.env.production.example
 .neon
 
 # OS files
