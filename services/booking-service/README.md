@@ -60,7 +60,7 @@ docker run --rm -p 3002:3002 -e DATABASE_URL=postgresql://... resourcehive-booki
 ```
 
 The public prefixes proposed for Person C's gateway integration are
-`/bookings/*` and `/points/*`. Root Compose, Nginx, shared environment files,
+`/bookings/*` and `/points/*`. Root Compose, Caddy, shared environment files,
 CI workflows, and port assignments require Person C approval.
 
 Booking creation is `POST /bookings`. Slot availability also requires the

@@ -2,17 +2,25 @@ name: resourcehive
 
 services:
   api-gateway:
-    build:
-      context: ./services/api-gateway
+    image: caddy:2-alpine
     container_name: resourcehive-api-gateway
     restart: unless-stopped
     ports:
-      - "8000:80"
+      - "${API_PORT:-8000}:8000"
+    environment:
+      API_DOMAIN: ${API_DOMAIN:-http://localhost:8000}
+      ACME_EMAIL: ${ACME_EMAIL:-admin@localhost}
+    volumes:
+      - ./services/api-gateway/Caddyfile:/etc/caddy/Caddyfile:ro
     depends_on:
-      - identity-service
-      - resource-service
-      - booking-service
-      - notification-service
+      identity-service:
+        condition: service_healthy
+      resource-service:
+        condition: service_healthy
+      booking-service:
+        condition: service_healthy
+      notification-service:
+        condition: service_healthy
 
   identity-service:
     build:
@@ -42,11 +50,17 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       NODE_ENV: development
-    command: >
-      sh -c "
-        pnpm run db:migrate &&
-        pnpm --filter identity-service run start:prod
-      "
+    command: >-
+      sh -c "pnpm --filter @resourcehive/database exec prisma migrate deploy
+      --schema ../../db/schema/schema.prisma &&
+      exec pnpm --filter identity-service run start:prod"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
   resource-service:
     build:
       context: .
@@ -59,6 +73,12 @@ services:
       PORT: 3004
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
       NODE_ENV: development
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3004/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   booking-service:
     build:

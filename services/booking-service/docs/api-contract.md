@@ -9,7 +9,7 @@ public points endpoints remain scheduled for their stated milestones.
 
 ## Common rules
 
-- Base URL: the approved public Nginx gateway.
+- Base URL: the approved public Caddy gateway.
 - Authentication: `Authorization: Bearer <JWT>`.
 - The service must validate the agreed JWT locally.
 - User, role, tenant, and organization values supplied in request bodies or

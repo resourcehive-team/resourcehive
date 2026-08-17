@@ -63,7 +63,7 @@ docker run --rm -p 3003:3003 -e DATABASE_URL=postgresql://... resourcehive-notif
 
 The public HTTP prefix is `/notifications/*`. Person C's gateway integration
 must proxy `/notifications/socket.io` to this service with HTTP/1.1 WebSocket
-upgrade headers and long-lived connection timeouts. Root Compose, Nginx, shared
+upgrade handling and long-lived connections. Root Compose, Caddy, shared
 environment files, CI workflows, and port assignments remain Person C-owned.
 
 Redis is not required for the single-instance authentication foundation. An

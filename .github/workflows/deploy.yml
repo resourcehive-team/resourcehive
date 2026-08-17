@@ -1,64 +1,162 @@
-name: Deploy ResourceHive
+name: Deploy backend to Linode
 
 on:
-  push:
-    branches:
-      - dev
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [dev]
+  workflow_dispatch:
+
+concurrency:
+  group: backend-production
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ghcr.io/resourcehive-team/resourcehive
 
 jobs:
-  build-and-push:
+  publish:
+    name: Publish ${{ matrix.label }} image
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push')
     runs-on: ubuntu-latest
-    # These permissions allow the action to push the Docker image to GitHub Packages
     permissions:
       contents: read
       packages: write
-    
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: Identity Service
+            image: identity
+            dockerfile: services/identity-service/Dockerfile
+          - label: Resource Service
+            image: resource
+            dockerfile: services/resource-service/Dockerfile
+          - label: Booking Service
+            image: booking
+            dockerfile: services/booking-service/Dockerfile
+          - label: Notification Service
+            image: notification
+            dockerfile: services/notification-service/Dockerfile
 
-      # Setup Docker Buildx in github cloud
+    steps:
+      - name: Select source commit
+        id: source
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_run" ]]; then
+            echo "sha=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "sha=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout source commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.source.outputs.sha }}
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # Login to GitHub Container Registry
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
+          registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+      - name: Build and publish image
+        uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./services/identity-service/Dockerfile
+          file: ${{ matrix.dockerfile }}
           push: true
-          tags: ghcr.io/resourcehive-team/resourcehive-identity:latest
+          tags: |
+            ${{ env.IMAGE_PREFIX }}-${{ matrix.image }}:${{ steps.source.outputs.sha }}
+            ${{ env.IMAGE_PREFIX }}-${{ matrix.image }}:dev
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
 
   deploy:
-    needs: build-and-push
+    name: Deploy to Linode
+    needs: publish
     runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      packages: read
+
     steps:
-      - name: Deploy to EC2
-        uses: appleboy/ssh-action@v1.2.0
+      - name: Select source commit
+        id: source
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_run" ]]; then
+            echo "sha=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "sha=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout deployment configuration
+        uses: actions/checkout@v4
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USERNAME }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            cd ~/resourcehive
-            git fetch origin
-            git reset --hard origin/dev
-            
-            # Login to GHCR on the EC2 server using the ephemeral GitHub token
-            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-            
-            # Pull the new pre-built image
-            docker compose -f docker-compose.prod.yml pull
-            
-            # This shuts down any old development containers holding onto ports
-            docker compose down || true
-            docker compose -f docker-compose.prod.yml down || true
-            docker compose -f docker-compose.prod.yml up -d
+          ref: ${{ steps.source.outputs.sha }}
+
+      - name: Configure SSH
+        shell: bash
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.LINODE_SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.LINODE_SSH_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Copy deployment configuration to Linode
+        shell: bash
+        env:
+          LINODE_HOST: ${{ secrets.LINODE_HOST }}
+          LINODE_USERNAME: ${{ secrets.LINODE_USERNAME }}
+        run: |
+          target="${LINODE_USERNAME}@${LINODE_HOST}"
+          ssh "$target" "mkdir -p ~/resourcehive/services/api-gateway"
+          scp docker-compose.prod.yml "$target:~/resourcehive/docker-compose.prod.yml"
+          scp services/api-gateway/Caddyfile "$target:~/resourcehive/services/api-gateway/Caddyfile"
+
+      - name: Log the Linode in to GHCR
+        shell: bash
+        env:
+          GHCR_READ_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USERNAME: ${{ github.actor }}
+          LINODE_HOST: ${{ secrets.LINODE_HOST }}
+          LINODE_USERNAME: ${{ secrets.LINODE_USERNAME }}
+        run: |
+          target="${LINODE_USERNAME}@${LINODE_HOST}"
+          printf '%s' "$GHCR_READ_TOKEN" |
+            ssh "$target" "docker login ghcr.io --username '$GHCR_USERNAME' --password-stdin"
+
+      - name: Migrate Neon and deploy backend
+        shell: bash
+        env:
+          IMAGE_TAG: ${{ steps.source.outputs.sha }}
+          LINODE_HOST: ${{ secrets.LINODE_HOST }}
+          LINODE_USERNAME: ${{ secrets.LINODE_USERNAME }}
+        run: |
+          target="${LINODE_USERNAME}@${LINODE_HOST}"
+          ssh "$target" "IMAGE_TAG='$IMAGE_TAG' bash -se" <<'REMOTE'
+          cd ~/resourcehive
+          test -f .env.production
+
+          compose="docker compose --env-file .env.production -f docker-compose.prod.yml"
+          $compose config --quiet
+          $compose pull
+          $compose --profile tools run --rm migrate
+          $compose up -d --remove-orphans --wait --wait-timeout 180
+          $compose ps
+          REMOTE

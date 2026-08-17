@@ -1,0 +1,25 @@
+{
+	email {$ACME_EMAIL}
+}
+
+{$API_DOMAIN} {
+	encode zstd gzip
+
+	@identity path /auth /auth/*
+	@resourceSlots path_regexp resourceSlots ^/resources/[^/]+/slots/?$
+	@resource path /organizations /organizations/* /memberships /memberships/* /resources /resources/* /api/docs /api/docs/*
+	@booking path /slots /slots/* /bookings /bookings/* /points /points/*
+	@notifications path /notifications /notifications/*
+
+	route {
+		respond /health "ok" 200
+
+		reverse_proxy @identity identity-service:3000
+		reverse_proxy @resourceSlots booking-service:3002
+		reverse_proxy @resource resource-service:3004
+		reverse_proxy @booking booking-service:3002
+		reverse_proxy @notifications notification-service:3003
+
+		respond "Not Found" 404
+	}
+}

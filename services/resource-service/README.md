@@ -16,10 +16,12 @@ The Resource Service is responsible for managing organizational hierarchies, mem
 
 ## Environment
 
-This service relies on a `.env` file for configuration. Since it shares a monorepo setup, you can either rely on the root `.env` or create a local `.env` inside `services/resource-service`.
+This service uses the root `.env` during local monorepo development and receives
+its production environment from Docker Compose. Do not create service-specific
+environment files.
 
 **Required environment variables:**
-- `PORT` (or `RESOURCE_SERVICE_PORT`): The port this service runs on (defaults to 3004).
+- `PORT`: The port this service runs on (defaults to 3004).
 - `JWT_SECRET`: Used to verify tokens issued by the Identity Service.
 - `DATABASE_URL`: Connection string for PostgreSQL.
 
@@ -50,8 +52,6 @@ $ npx dotenv-cli -e ../../.env -- pnpm run test:e2e
 # test coverage
 $ npx dotenv-cli -e ../../.env -- pnpm run test:cov
 ```
-*(Note: If you have created a local `.env` inside this service's directory, you can simply run `pnpm run test:e2e`)*
-
 ## API Documentation
 
 The Resource Service exposes a Swagger UI for its REST endpoints. When running locally, you can view the interactive API documentation at:
@@ -61,9 +61,11 @@ Here you will find documentation for Organizations, Memberships, and Resources e
 
 ## Gateway-Routing Instructions
 
-The Resource Service is not meant to be accessed directly from the frontend. All traffic should route through the central NGINX API Gateway (or API Gateway service). 
+The Resource Service is not meant to be accessed directly from the frontend. All traffic should route through the central Caddy API gateway.
 
 - **Internal Port**: 3004
 - **Gateway Prefix**: Typically routed under `/resources/`, `/organizations/`, and `/memberships/`. 
 
-Ensure that your NGINX or API Gateway configuration proxies requests targeting resource management directly to this service's internal port. The Gateway handles the cross-origin resource sharing (CORS).
+Ensure that the Caddy configuration proxies resource-management requests to the
+service's internal port. The NestJS services enforce the configured CORS
+allowlist; Caddy only routes requests.

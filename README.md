@@ -3,13 +3,16 @@
 ResourceHive is a monorepo containing:
 
 - a Next.js frontend;
-- an Nginx API gateway;
+- a Caddy API gateway;
 - Identity, Resource, Booking, and Notification services;
 - a shared Prisma database package;
 - a shared service authentication package.
 
 The backend services and API gateway run with Docker Compose. The frontend runs
-locally with pnpm.
+locally with pnpm and is deployed separately to Vercel.
+
+For a production backend deployment on a Linode with GHCR and Neon, see
+[`deploy/linode/README.md`](deploy/linode/README.md).
 
 ## Requirements
 
@@ -69,7 +72,7 @@ pnpm run dev:setup
 
 ## Run the application
 
-Start all backend services and the Nginx API gateway:
+Start all backend services and the Caddy API gateway:
 
 First Time:
 ```bash
@@ -90,7 +93,7 @@ The backend is now available through:
 
 | Component | Address |
 | --- | --- |
-| Nginx API gateway | `http://localhost:8000` |
+| Caddy API gateway | `http://localhost:8000` |
 | Next.js frontend | `http://localhost:3000` |
 
 The Identity, Resource, Booking, and Notification services are private Docker
