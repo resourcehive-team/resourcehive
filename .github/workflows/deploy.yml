@@ -1,9 +1,7 @@
 name: Deploy backend to Linode
 
 on:
-  workflow_run:
-    workflows: ["CI"]
-    types: [completed]
+  push:
     branches: [main]
 
 concurrency:
@@ -17,9 +15,6 @@ env:
 jobs:
   publish:
     name: Publish ${{ matrix.label }} image
-    if: >-
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.event == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -42,15 +37,10 @@ jobs:
             dockerfile: services/notification-service/Dockerfile
 
     steps:
-      - name: Select source commit
-        id: source
-        shell: bash
-        run: echo "sha=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
-
       - name: Checkout source commit
         uses: actions/checkout@v4
         with:
-          ref: ${{ steps.source.outputs.sha }}
+          ref: ${{ github.sha }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -69,7 +59,7 @@ jobs:
           file: ${{ matrix.dockerfile }}
           push: true
           tags: |
-            ${{ env.IMAGE_PREFIX }}-${{ matrix.image }}:${{ steps.source.outputs.sha }}
+            ${{ env.IMAGE_PREFIX }}-${{ matrix.image }}:${{ github.sha }}
             ${{ env.IMAGE_PREFIX }}-${{ matrix.image }}:main
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}
@@ -84,15 +74,10 @@ jobs:
       packages: read
 
     steps:
-      - name: Select source commit
-        id: source
-        shell: bash
-        run: echo "sha=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
-
       - name: Checkout deployment configuration
         uses: actions/checkout@v4
         with:
-          ref: ${{ steps.source.outputs.sha }}
+          ref: ${{ github.sha }}
 
       - name: Configure SSH
         shell: bash
@@ -132,7 +117,7 @@ jobs:
       - name: Migrate Neon and deploy backend
         shell: bash
         env:
-          IMAGE_TAG: ${{ steps.source.outputs.sha }}
+          IMAGE_TAG: ${{ github.sha }}
           LINODE_HOST: ${{ secrets.LINODE_HOST }}
           LINODE_USERNAME: ${{ secrets.LINODE_USERNAME }}
         run: |
