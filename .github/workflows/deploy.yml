@@ -156,7 +156,29 @@ jobs:
           compose="docker compose --env-file .env.production -f docker-compose.prod.yml"
           $compose config --quiet
           $compose pull
-          $compose --profile tools run --rm migrate
+
+          # The remote script is supplied over stdin, so the migration container
+          # must not consume the commands that follow it.
+          $compose --profile tools run \
+            --rm \
+            --no-deps \
+            --interactive=false \
+            -T \
+            migrate </dev/null
+
           $compose up -d --remove-orphans --wait --wait-timeout 180
           $compose ps
+
+          running_services="$($compose ps --services --status running)"
+          for service in \
+            api-gateway \
+            identity-service \
+            resource-service \
+            booking-service \
+            notification-service; do
+            if ! grep -qx "$service" <<<"$running_services"; then
+              echo "Expected service '$service' is not running" >&2
+              exit 1
+            fi
+          done
           REMOTE
