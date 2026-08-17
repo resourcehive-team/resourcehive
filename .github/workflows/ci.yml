@@ -19,6 +19,24 @@ env:
   CI_JWT_SECRET: resourcehive-ci-secret-at-least-thirty-two-characters
 
 jobs:
+  main-promotion-policy:
+    name: Main promotion policy
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+
+    steps:
+      - name: Require the repository dev branch as the source
+        shell: bash
+        env:
+          SOURCE_BRANCH: ${{ github.head_ref }}
+          SOURCE_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+        run: |
+          if [[ "$SOURCE_BRANCH" != "dev" || "$SOURCE_REPOSITORY" != "$GITHUB_REPOSITORY" ]]; then
+            echo "Pull requests into main must come from resourcehive-team/resourcehive:dev." >&2
+            exit 1
+          fi
+
   database:
     name: Database baseline and integrity
     runs-on: ubuntu-latest
