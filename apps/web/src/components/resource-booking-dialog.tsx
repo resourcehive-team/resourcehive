@@ -1,14 +1,14 @@
 "use client";
 
 import * as React from "react";
-import { format } from "date-fns";
 import {
   CalendarIcon,
+  CalendarX2Icon,
   CheckCircle2Icon,
+  RefreshCwIcon,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
 import {
   Dialog,
   DialogClose,
@@ -19,19 +19,19 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+  RadioGroup,
+  RadioGroupItem,
+} from "@/components/ui/radio-group";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   ApiAuthenticationError,
   ApiError,
@@ -47,16 +47,11 @@ import type {
 } from "@/lib/booking-service/types";
 import { cn } from "@/lib/utils";
 
-const HOURS = Array.from({ length: 24 }, (_, hour) =>
-  String(hour).padStart(2, "0"),
-);
-const MINUTES = Array.from({ length: 60 }, (_, minute) =>
-  String(minute).padStart(2, "0"),
-);
-const HOUR_LABELS = Object.fromEntries(HOURS.map((hour) => [hour, hour]));
-const MINUTE_LABELS = Object.fromEntries(
-  MINUTES.map((minute) => [minute, minute]),
-);
+type SlotListState =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "loaded"; slots: ResourceSlot[] }
+  | { status: "error" };
 
 export function ResourceBookingDialog({
   disabled = false,
@@ -68,22 +63,74 @@ export function ResourceBookingDialog({
   resourceName: string;
 }) {
   const [open, setOpen] = React.useState(false);
-  const [fromDate, setFromDate] = React.useState<Date>();
-  const [fromTime, setFromTime] = React.useState("09:00");
-  const [toDate, setToDate] = React.useState<Date>();
-  const [toTime, setToTime] = React.useState("10:00");
+  const [slotList, setSlotList] = React.useState<SlotListState>({
+    status: "idle",
+  });
+  const [selectedSlotId, setSelectedSlotId] = React.useState("");
+  const [slotRequestVersion, setSlotRequestVersion] = React.useState(0);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [formError, setFormError] = React.useState("");
   const [createdBooking, setCreatedBooking] =
     React.useState<CreatedBooking | null>(null);
 
+  React.useEffect(() => {
+    if (!open || createdBooking) {
+      return;
+    }
+
+    const controller = new AbortController();
+    const earliestStart = new Date();
+
+    getResourceSlots(resourceId, {
+      startsAtOrAfter: earliestStart,
+      take: 100,
+      signal: controller.signal,
+    })
+      .then((slots) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        setSlotList({
+          status: "loaded",
+          slots: availableFutureSlots(slots, earliestStart),
+        });
+      })
+      .catch((requestError: unknown) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        if (requestError instanceof ApiAuthenticationError) {
+          window.location.assign("/login");
+          return;
+        }
+
+        setSlotList({ status: "error" });
+      });
+
+    return () => controller.abort();
+  }, [createdBooking, open, resourceId, slotRequestVersion]);
+
   function changeOpen(nextOpen: boolean) {
     setOpen(nextOpen);
 
-    if (!nextOpen) {
+    if (nextOpen) {
+      setSlotList({ status: "loading" });
+      setSelectedSlotId("");
+    } else {
+      setSlotList({ status: "idle" });
+      setSelectedSlotId("");
       setFormError("");
       setCreatedBooking(null);
     }
+  }
+
+  function reloadSlots() {
+    setFormError("");
+    setSlotList({ status: "loading" });
+    setSelectedSlotId("");
+    setSlotRequestVersion((version) => version + 1);
   }
 
   async function submitBooking(event: React.FormEvent<HTMLFormElement>) {
@@ -93,21 +140,13 @@ export function ResourceBookingDialog({
       return;
     }
 
-    const startsAt = combineDateAndTime(fromDate, fromTime);
-    const endsAt = combineDateAndTime(toDate, toTime);
+    const selectedSlot =
+      slotList.status === "loaded"
+        ? slotList.slots.find((slot) => slot.id === selectedSlotId)
+        : undefined;
 
-    if (!startsAt || !endsAt) {
-      setFormError("Choose both a date and time for From and To.");
-      return;
-    }
-
-    if (startsAt.getTime() <= Date.now()) {
-      setFormError("The booking must start in the future.");
-      return;
-    }
-
-    if (endsAt.getTime() <= startsAt.getTime()) {
-      setFormError("To must be later than From.");
+    if (!selectedSlot) {
+      setFormError("Select an available slot before confirming.");
       return;
     }
 
@@ -115,21 +154,7 @@ export function ResourceBookingDialog({
     setFormError("");
 
     try {
-      const slots = await getResourceSlots(resourceId, {
-        startsAtOrAfter: startsAt,
-        startsBefore: endsAt,
-        take: 100,
-      });
-      const matchingSlot = findExactAvailableSlot(slots, startsAt, endsAt);
-
-      if (!matchingSlot) {
-        setFormError(
-          "There is no available published slot for that exact time. Choose a different From and To time.",
-        );
-        return;
-      }
-
-      const booking = await createBooking(matchingSlot.id);
+      const booking = await createBooking(selectedSlot.id);
       setCreatedBooking(booking);
     } catch (requestError) {
       if (requestError instanceof ApiAuthenticationError) {
@@ -138,6 +163,15 @@ export function ResourceBookingDialog({
       }
 
       setFormError(bookingErrorMessage(requestError));
+
+      if (
+        requestError instanceof ApiError &&
+        (requestError.status === 404 || requestError.status === 409)
+      ) {
+        setSelectedSlotId("");
+        setSlotList({ status: "loading" });
+        setSlotRequestVersion((version) => version + 1);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -152,7 +186,7 @@ export function ResourceBookingDialog({
         <CalendarIcon data-icon="inline-start" />
         Create booking
       </DialogTrigger>
-      <DialogContent className="max-h-[calc(100svh-2rem)] overflow-y-auto sm:max-w-2xl">
+      <DialogContent className="max-h-[calc(100svh-2rem)] overflow-y-auto sm:max-w-3xl">
         {createdBooking ? (
           <BookingConfirmation booking={createdBooking} />
         ) : (
@@ -163,37 +197,26 @@ export function ResourceBookingDialog({
                 Book {resourceName}
               </DialogTitle>
               <DialogDescription>
-                Choose the exact From and To date and time of an available slot.
-                The booking service will confirm access, availability, and your
-                point balance.
+                Select one of the available times published for this resource.
+                Times are shown in your local timezone; the booking service will
+                confirm access and your point balance.
               </DialogDescription>
             </DialogHeader>
             <form
               className="grid gap-5"
-              aria-busy={isSubmitting}
+              aria-busy={isSubmitting || slotList.status === "loading"}
               onSubmit={submitBooking}
             >
-              <div className="grid border border-line md:grid-cols-2">
-                <BookingTimeBoundary
-                  date={fromDate}
-                  disabled={isSubmitting}
-                  id="booking-from"
-                  label="From"
-                  time={fromTime}
-                  onDateChange={setFromDate}
-                  onTimeChange={setFromTime}
-                />
-                <BookingTimeBoundary
-                  className="border-t md:border-t-0 md:border-l"
-                  date={toDate}
-                  disabled={isSubmitting}
-                  id="booking-to"
-                  label="To"
-                  time={toTime}
-                  onDateChange={setToDate}
-                  onTimeChange={setToTime}
-                />
-              </div>
+              <SlotSelection
+                disabled={isSubmitting}
+                selectedSlotId={selectedSlotId}
+                slotList={slotList}
+                onReload={reloadSlots}
+                onSelect={(slotId) => {
+                  setSelectedSlotId(slotId);
+                  setFormError("");
+                }}
+              />
               {formError ? (
                 <p
                   className="border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive"
@@ -206,9 +229,14 @@ export function ResourceBookingDialog({
                 <DialogClose render={<Button variant="outline" />}>
                   Cancel
                 </DialogClose>
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? "Checking availability..." : "Confirm booking"}
-                </Button>
+                {slotList.status === "loaded" && slotList.slots.length > 0 ? (
+                  <Button
+                    type="submit"
+                    disabled={isSubmitting || !selectedSlotId}
+                  >
+                    {isSubmitting ? "Confirming booking..." : "Confirm booking"}
+                  </Button>
+                ) : null}
               </DialogFooter>
             </form>
           </>
@@ -218,127 +246,160 @@ export function ResourceBookingDialog({
   );
 }
 
-function BookingTimeBoundary({
-  className,
-  date,
+function SlotSelection({
   disabled,
-  id,
-  label,
-  time,
-  onDateChange,
-  onTimeChange,
+  selectedSlotId,
+  slotList,
+  onReload,
+  onSelect,
 }: {
-  className?: string;
-  date?: Date;
   disabled: boolean;
-  id: string;
-  label: string;
-  time: string;
-  onDateChange: (date?: Date) => void;
-  onTimeChange: (time: string) => void;
+  selectedSlotId: string;
+  slotList: SlotListState;
+  onReload: () => void;
+  onSelect: (slotId: string) => void;
 }) {
-  return (
-    <fieldset className={cn("grid gap-4 p-4", className)}>
-      <legend className="eyebrow px-1 text-clay">{label}</legend>
-      <div className="grid gap-2">
-        <Label htmlFor={`${id}-date`}>Date</Label>
-        <Popover>
-          <PopoverTrigger
-            disabled={disabled}
-            render={
-              <Button
-                id={`${id}-date`}
-                variant="outline"
-                className="w-full justify-start bg-paper-alt text-left font-normal"
-              />
-            }
-          >
-            <CalendarIcon />
-            {date ? format(date, "PPP") : <span>Choose a date</span>}
-          </PopoverTrigger>
-          <PopoverContent align="start" className="w-auto p-0">
-            <Calendar
-              mode="single"
-              selected={date}
-              disabled={{ before: startOfToday() }}
-              onSelect={onDateChange}
-            />
-          </PopoverContent>
-        </Popover>
+  if (slotList.status === "idle" || slotList.status === "loading") {
+    return <SlotTableSkeleton />;
+  }
+
+  if (slotList.status === "error") {
+    return (
+      <div className="grid min-h-48 place-items-center gap-4 border border-line p-6 text-center">
+        <div className="grid max-w-md gap-2">
+          <p className="font-medium">Available slots could not be loaded.</p>
+          <p className="text-sm text-muted-foreground">
+            Check your connection and try loading the published slots again.
+          </p>
+        </div>
+        <Button type="button" variant="outline" onClick={onReload}>
+          <RefreshCwIcon data-icon="inline-start" />
+          Try again
+        </Button>
       </div>
-      <div className="grid gap-2">
-        <Label id={`${id}-time-label`}>Time</Label>
-        <div
-          aria-labelledby={`${id}-time-label`}
-          className="grid grid-cols-[1fr_auto_1fr] items-center gap-2"
-          role="group"
-        >
-          <TimePartSelect
-            ariaLabel={`${label} hour`}
-            disabled={disabled}
-            items={HOURS}
-            itemLabels={HOUR_LABELS}
-            value={timePart(time, 0)}
-            onValueChange={(hour) =>
-              onTimeChange(`${hour}:${timePart(time, 1)}`)
-            }
-          />
-          <span aria-hidden="true" className="font-medium text-muted-foreground">
-            :
-          </span>
-          <TimePartSelect
-            ariaLabel={`${label} minute`}
-            disabled={disabled}
-            items={MINUTES}
-            itemLabels={MINUTE_LABELS}
-            value={timePart(time, 1)}
-            onValueChange={(minute) =>
-              onTimeChange(`${timePart(time, 0)}:${minute}`)
-            }
-          />
+    );
+  }
+
+  if (slotList.slots.length === 0) {
+    return (
+      <div className="grid min-h-48 place-items-center border border-line p-6 text-center">
+        <div className="grid max-w-md justify-items-center gap-2">
+          <CalendarX2Icon className="mb-2 size-6 text-clay" />
+          <p className="font-medium">No available slots</p>
+          <p className="text-sm text-muted-foreground">
+            This resource has no future published slots right now. Check again
+            after a resource administrator publishes another time.
+          </p>
         </div>
       </div>
-    </fieldset>
+    );
+  }
+
+  return (
+    <div className="grid gap-2">
+      <RadioGroup
+        aria-label="Available booking slots"
+        className="block border border-line"
+        disabled={disabled}
+        value={selectedSlotId}
+        onValueChange={(value) => {
+          if (typeof value === "string") {
+            onSelect(value);
+          }
+        }}
+      >
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead className="w-12">
+                <span className="sr-only">Select</span>
+              </TableHead>
+              <TableHead>Date</TableHead>
+              <TableHead>From</TableHead>
+              <TableHead>To</TableHead>
+              <TableHead>Duration</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {slotList.slots.map((slot) => {
+              const selected = selectedSlotId === slot.id;
+              const controlId = `booking-slot-${slot.id}`;
+
+              return (
+                <TableRow
+                  key={slot.id}
+                  className={cn(
+                    "cursor-pointer",
+                    disabled && "cursor-wait",
+                  )}
+                  data-state={selected ? "selected" : undefined}
+                  onClick={() => {
+                    if (!disabled) {
+                      onSelect(slot.id);
+                    }
+                  }}
+                >
+                  <TableCell>
+                    <RadioGroupItem
+                      id={controlId}
+                      aria-label={`Select ${formatSlotRange(slot)}`}
+                      className={cn(
+                        selected &&
+                          "border-paper bg-paper data-checked:border-paper data-checked:bg-paper [&_[data-slot=radio-group-indicator]>span]:bg-ink",
+                      )}
+                      value={slot.id}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <label
+                      className="cursor-pointer font-medium"
+                      htmlFor={controlId}
+                    >
+                      {formatSlotDate(slot.startsAt)}
+                    </label>
+                  </TableCell>
+                  <TableCell>{formatSlotTime(slot.startsAt)}</TableCell>
+                  <TableCell>{formatSlotTime(slot.endsAt)}</TableCell>
+                  <TableCell>{formatSlotDuration(slot)}</TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </RadioGroup>
+      <p className="text-xs text-muted-foreground">
+        Only future slots that are currently available are shown.
+      </p>
+    </div>
   );
 }
 
-function TimePartSelect({
-  ariaLabel,
-  disabled,
-  items,
-  itemLabels,
-  value,
-  onValueChange,
-}: {
-  ariaLabel: string;
-  disabled: boolean;
-  items: string[];
-  itemLabels: Record<string, string>;
-  value: string;
-  onValueChange: (value: string) => void;
-}) {
+function SlotTableSkeleton() {
   return (
-    <Select
-      items={itemLabels}
-      value={value}
-      disabled={disabled}
-      onValueChange={(nextValue) => {
-        if (typeof nextValue === "string") {
-          onValueChange(nextValue);
-        }
-      }}
+    <div
+      aria-label="Loading available slots"
+      className="grid border border-line"
+      role="status"
     >
-      <SelectTrigger aria-label={ariaLabel} className="w-full">
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent className="shadow-none">
-        {items.map((item) => (
-          <SelectItem key={item} value={item}>
-            {item}
-          </SelectItem>
+      <div className="grid grid-cols-[3rem_1.5fr_repeat(3,1fr)] border-b border-line p-3">
+        {Array.from({ length: 5 }, (_, index) => (
+          <Skeleton key={index} className="h-3 w-16 max-w-[70%]" />
         ))}
-      </SelectContent>
-    </Select>
+      </div>
+      {Array.from({ length: 3 }, (_, index) => (
+        <div
+          key={index}
+          className="grid grid-cols-[3rem_1.5fr_repeat(3,1fr)] items-center border-b border-line p-3 last:border-b-0"
+        >
+          <Skeleton className="size-4" />
+          <Skeleton className="h-4 w-28" />
+          <Skeleton className="h-4 w-16" />
+          <Skeleton className="h-4 w-16" />
+          <Skeleton className="h-4 w-20" />
+        </div>
+      ))}
+      <span className="sr-only">Loading available booking slots.</span>
+    </div>
   );
 }
 
@@ -371,58 +432,32 @@ function BookingConfirmation({ booking }: { booking: CreatedBooking }) {
   );
 }
 
-function startOfToday(): Date {
-  const today = new Date();
-  return new Date(today.getFullYear(), today.getMonth(), today.getDate());
-}
-
-function combineDateAndTime(date: Date | undefined, time: string): Date | null {
-  const timeMatch = /^(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(time);
-
-  if (!date || !timeMatch) {
-    return null;
-  }
-
-  const hours = Number(timeMatch[1]);
-  const minutes = Number(timeMatch[2]);
-  const seconds = Number(timeMatch[3] ?? 0);
-
-  if (hours > 23 || minutes > 59 || seconds > 59) {
-    return null;
-  }
-
-  return new Date(
-    date.getFullYear(),
-    date.getMonth(),
-    date.getDate(),
-    hours,
-    minutes,
-    seconds,
-  );
-}
-
-function timePart(time: string, index: 0 | 1): string {
-  const parts = time.split(":");
-
-  return /^\d{2}$/.test(parts[index] ?? "") ? parts[index] : "00";
-}
-
-function findExactAvailableSlot(
+function availableFutureSlots(
   slots: ResourceSlot[],
-  startsAt: Date,
-  endsAt: Date,
-): ResourceSlot | undefined {
-  return slots.find(
-    (slot) =>
-      slot.available &&
-      new Date(slot.startsAt).getTime() === startsAt.getTime() &&
-      new Date(slot.endsAt).getTime() === endsAt.getTime(),
-  );
+  earliestStart: Date,
+): ResourceSlot[] {
+  return slots
+    .filter((slot) => {
+      const startsAt = new Date(slot.startsAt).getTime();
+      const endsAt = new Date(slot.endsAt).getTime();
+
+      return (
+        slot.available &&
+        Number.isFinite(startsAt) &&
+        Number.isFinite(endsAt) &&
+        startsAt >= earliestStart.getTime() &&
+        endsAt > startsAt
+      );
+    })
+    .sort(
+      (left, right) =>
+        new Date(left.startsAt).getTime() - new Date(right.startsAt).getTime(),
+    );
 }
 
 function bookingErrorMessage(error: unknown): string {
   if (error instanceof ApiError && error.status === 409) {
-    return "The booking could not be confirmed because the slot is no longer available or your point balance is insufficient.";
+    return "That slot is no longer available or your point balance is insufficient. The available slots have been refreshed.";
   }
 
   if (error instanceof ApiError && error.status === 403) {
@@ -430,7 +465,7 @@ function bookingErrorMessage(error: unknown): string {
   }
 
   if (error instanceof ApiError && error.status === 404) {
-    return "That published slot is no longer available.";
+    return "That published slot is no longer available. The available slots have been refreshed.";
   }
 
   if (error instanceof ApiError && error.status === 400) {
@@ -442,6 +477,44 @@ function bookingErrorMessage(error: unknown): string {
   }
 
   return "The booking could not be completed. Please try again.";
+}
+
+function formatSlotDate(value: string): string {
+  return new Intl.DateTimeFormat(undefined, {
+    weekday: "short",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  }).format(new Date(value));
+}
+
+function formatSlotTime(value: string): string {
+  return new Intl.DateTimeFormat(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
+function formatSlotRange(slot: ResourceSlot): string {
+  return `${formatSlotDate(slot.startsAt)}, ${formatSlotTime(slot.startsAt)} to ${formatSlotTime(slot.endsAt)}`;
+}
+
+function formatSlotDuration(slot: ResourceSlot): string {
+  const milliseconds =
+    new Date(slot.endsAt).getTime() - new Date(slot.startsAt).getTime();
+  const totalMinutes = Math.round(milliseconds / 60_000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  if (hours === 0) {
+    return `${minutes} min`;
+  }
+
+  if (minutes === 0) {
+    return `${hours} hr`;
+  }
+
+  return `${hours} hr ${minutes} min`;
 }
 
 function formatDateTime(value: string): string {
