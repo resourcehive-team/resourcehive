@@ -208,6 +208,18 @@
     background: var(--paper-alt);
   }
 
+  .shared-panel-grid {
+    display: grid;
+    gap: 1px;
+    border: 1px solid var(--line);
+    background: var(--line);
+  }
+
+  .shared-panel-grid > [data-slot="card"] {
+    border: 0;
+    background: var(--paper);
+  }
+
   .auth-shell {
     display: grid;
     min-height: 100svh;
@@ -219,6 +231,7 @@
     display: flex;
     width: 100%;
     max-width: 34rem;
+    margin-inline: auto;
     flex-direction: column;
     justify-content: center;
     padding: 2rem 1.25rem;
@@ -244,4 +257,25 @@
       grid-template-columns: minmax(26rem, 5fr) minmax(0, 7fr);
     }
   }
+}
+
+.auth-form-card {
+  gap: 2rem;
+  border: 0;
+  background: transparent;
+  padding-block: 0;
+}
+
+.auth-form-card > [data-slot="card-header"],
+.auth-form-card > [data-slot="card-content"] {
+  padding-inline: 0;
+}
+
+.auth-form-title {
+  font-family: var(--font-instrument-serif), serif;
+  font-size: clamp(2.5rem, 5vw, 3.75rem);
+  font-weight: 400;
+  letter-spacing: -0.045em;
+  line-height: 0.95;
+  text-wrap: balance;
 }

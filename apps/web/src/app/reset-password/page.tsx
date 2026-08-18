@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { ResetPasswordForm } from "@/components/reset-password-form";
+import { AuthShell } from "@/components/auth-shell";
 
 export const metadata: Metadata = {
   title: "Reset password | ResourceHive",
@@ -20,10 +21,8 @@ export default async function ResetPasswordPage({
   const token = typeof tokenValue === "string" ? tokenValue : "";
 
   return (
-    <main className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
-      <div className="w-full max-w-sm">
-        <ResetPasswordForm token={token} />
-      </div>
-    </main>
+    <AuthShell>
+      <ResetPasswordForm token={token} />
+    </AuthShell>
   );
 }

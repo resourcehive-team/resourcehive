@@ -10,7 +10,8 @@ const badgeVariants = cva(
     variants: {
       variant: {
         default: "bg-primary text-primary-foreground [a]:hover:bg-primary/80",
-        secondary: "border-sage bg-sage text-foreground [a]:hover:bg-muted",
+        secondary:
+          "border-secondary bg-secondary text-secondary-foreground [a]:hover:bg-muted",
         success: "border-sage bg-sage text-foreground [a]:hover:bg-muted",
         warning: "border-ochre bg-ochre text-ink [a]:hover:bg-ochre/80",
         destructive:

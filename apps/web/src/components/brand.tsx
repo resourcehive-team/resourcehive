@@ -6,11 +6,13 @@ import { cn } from "@/lib/utils";
 export function Brand({
   className,
   href = "/dashboard",
+  label = "ResourceHive dashboard",
   markClassName,
   wordmarkClassName,
 }: {
   className?: string;
   href?: string;
+  label?: string;
   markClassName?: string;
   wordmarkClassName?: string;
 }) {
@@ -18,7 +20,7 @@ export function Brand({
     <Link
       href={href}
       className={cn("flex w-fit items-center gap-3", className)}
-      aria-label="ResourceHive dashboard"
+      aria-label={label}
     >
       <Image
         src="/resourcehive-mark.svg"
