@@ -23,6 +23,10 @@ export interface PasswordResetResponse {
   message: string;
 }
 
+export interface ResendVerificationResponse {
+  message: string;
+}
+
 export interface CurrentUserResponse {
   user: {
     id: string;
@@ -129,6 +133,13 @@ export class PasswordResetError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "PasswordResetError";
+  }
+}
+
+export class ResendVerificationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ResendVerificationError";
   }
 }
 
@@ -336,6 +347,36 @@ export async function register(
   };
 }
 
+export async function resendVerificationEmail(
+  email: string,
+): Promise<ResendVerificationResponse> {
+  let response: Response;
+
+  try {
+    response = await fetch(`${apiUrl}/auth/resend-verification`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email }),
+    });
+  } catch {
+    throw new ResendVerificationError(
+      "Unable to connect to the email verification service.",
+    );
+  }
+
+  const data: unknown = await response.json().catch(() => null);
+
+  if (!response.ok || !isMessageResponse(data)) {
+    throw new ResendVerificationError(
+      getApiErrorMessage(data, "Unable to resend the verification email."),
+    );
+  }
+
+  return { message: data.message };
+}
+
 export async function verifyEmail(
   token: string,
 ): Promise<EmailVerificationResponse> {
@@ -394,10 +435,7 @@ function getApiErrorMessage(data: unknown, fallback: string): string {
 
 function isApiErrorWithCode(data: unknown, code: string): boolean {
   return (
-    !!data &&
-    typeof data === "object" &&
-    "code" in data &&
-    data.code === code
+    !!data && typeof data === "object" && "code" in data && data.code === code
   );
 }
 
@@ -515,9 +553,11 @@ function isEmailVerificationResponse(
   );
 }
 
-function isPasswordResetResponse(
-  data: unknown,
-): data is PasswordResetResponse {
+function isPasswordResetResponse(data: unknown): data is PasswordResetResponse {
+  return isMessageResponse(data);
+}
+
+function isMessageResponse(data: unknown): data is { message: string } {
   return (
     !!data &&
     typeof data === "object" &&

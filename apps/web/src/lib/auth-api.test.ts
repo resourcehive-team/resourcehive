@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { login } from "@/lib/auth-api";
+import { login, resendVerificationEmail } from "@/lib/auth-api";
 
 describe("login client", () => {
   afterEach(() => {
@@ -36,13 +36,10 @@ describe("login client", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue(
-        new Response(
-          JSON.stringify({ message: "Invalid email or password" }),
-          {
-            status: 401,
-            headers: { "Content-Type": "application/json" },
-          },
-        ),
+        new Response(JSON.stringify({ message: "Invalid email or password" }), {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        }),
       ),
     );
 
@@ -51,6 +48,30 @@ describe("login client", () => {
     ).rejects.toMatchObject({
       code: "INVALID_CREDENTIALS",
       message: "Email or password is incorrect.",
+    });
+  });
+
+  it("requests another verification email without retaining extra fields", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            message:
+              "If an unverified account exists for that email, a verification link has been sent.",
+            unexpectedField: "must-not-reach-the-client",
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      ),
+    );
+
+    await expect(resendVerificationEmail("alex@example.edu")).resolves.toEqual({
+      message:
+        "If an unverified account exists for that email, a verification link has been sent.",
     });
   });
 });

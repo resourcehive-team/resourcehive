@@ -8,6 +8,7 @@ import { login, LoginError } from "@/lib/auth-api";
 import {
   hasPendingSignupForEmail,
   markSignupEmailVerified,
+  storePendingVerificationEmail,
 } from "@/lib/auth-storage";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -87,6 +88,7 @@ export function LoginForm({
           (loginError.code === "INVALID_CREDENTIALS" &&
             hasPendingSignupForEmail(email)))
       ) {
+        storePendingVerificationEmail(email);
         router.replace("/signup/status");
         router.refresh();
         return;
@@ -153,7 +155,10 @@ export function LoginForm({
                       *
                     </span>
                   </FieldLabel>
-                  <Link className="text-sm underline-offset-4 hover:underline" href="/forgot-password">
+                  <Link
+                    className="text-sm underline-offset-4 hover:underline"
+                    href="/forgot-password"
+                  >
                     Forgot password?
                   </Link>
                 </div>

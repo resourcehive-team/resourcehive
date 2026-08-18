@@ -2,12 +2,11 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { LoginForm } from "@/components/login-form";
+import { login, LoginError, type RegistrationResponse } from "@/lib/auth-api";
 import {
-  login,
-  LoginError,
-  type RegistrationResponse,
-} from "@/lib/auth-api";
-import { storeSignupDebugData } from "@/lib/auth-storage";
+  getPendingVerificationEmailSnapshot,
+  storeSignupDebugData,
+} from "@/lib/auth-storage";
 import { refreshSession } from "@/lib/session-api";
 
 const navigation = vi.hoisted(() => ({
@@ -136,6 +135,7 @@ describe("LoginForm", () => {
       expect(navigation.replace).toHaveBeenCalledWith("/signup/status");
       expect(navigation.refresh).toHaveBeenCalled();
     });
+    expect(getPendingVerificationEmailSnapshot()).toBe("alex@example.edu");
   });
 
   it("keeps the generic error for a login not associated with that signup", async () => {

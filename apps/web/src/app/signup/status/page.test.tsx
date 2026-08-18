@@ -69,10 +69,12 @@ describe("SignupStatusPage", () => {
     expect(screen.getByText("You cannot log in yet")).toBeDefined();
     expect(screen.getByText("How to verify your email")).toBeDefined();
     expect(
-      (screen.getByRole("button", {
-        name: "Resend verification link",
-      }) as HTMLButtonElement).disabled,
-    ).toBe(true);
+      (
+        screen.getByRole("button", {
+          name: "Resend verification link",
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(false);
   });
 
   it("redirects to login once the email has been verified", async () => {

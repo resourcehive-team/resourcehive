@@ -6,6 +6,7 @@ import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { Check, LockKeyhole, Mail } from "lucide-react";
 
 import { AuthShell } from "@/components/auth-shell";
+import { ResendVerificationButton } from "@/components/resend-verification-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,6 +17,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
+  getPendingVerificationEmailSnapshot,
   getSignupDebugDataSnapshot,
   parseSignupDebugData,
   subscribeToSignupDebugData,
@@ -43,11 +45,17 @@ export default function SignupStatusPage() {
     getSignupDebugDataSnapshot,
     () => null,
   );
+  const pendingVerificationEmail = useSyncExternalStore(
+    subscribeToSignupDebugData,
+    getPendingVerificationEmailSnapshot,
+    () => null,
+  );
   const signup = useMemo(
     () => parseSignupDebugData(storedSignup),
     [storedSignup],
   );
   const isVerified = signup?.user.emailVerified === true;
+  const verificationEmail = signup?.user.email ?? pendingVerificationEmail;
 
   useEffect(() => {
     if (isVerified) {
@@ -66,11 +74,11 @@ export default function SignupStatusPage() {
           <p className="eyebrow text-clay">Account created</p>
           <CardTitle className="auth-form-title">Check your inbox.</CardTitle>
           <CardDescription className="leading-6">
-            {signup ? (
+            {verificationEmail ? (
               <>
                 We created your account for{" "}
                 <strong className="font-medium text-foreground">
-                  {signup.user.email}
+                  {verificationEmail}
                 </strong>
                 . Verify this email address before you log in.
               </>
@@ -99,73 +107,56 @@ export default function SignupStatusPage() {
           )}
 
           <section aria-labelledby="verification-steps-title">
-                <div className="mb-3 flex items-center gap-2">
-                  <Mail className="size-4" aria-hidden="true" />
-                  <h2
-                    id="verification-steps-title"
-                    className="text-sm font-medium"
-                  >
-                    How to verify your email
-                  </h2>
-                </div>
-                <ol className="border border-line">
-                  {verificationSteps.map((step, index) => (
-                    <li
-                      className="grid grid-cols-[2rem_1fr] gap-3 border-b border-line p-3 last:border-b-0"
-                      key={step.title}
-                    >
-                      <span className="eyebrow pt-0.5 text-clay">
-                        {String(index + 1).padStart(2, "0")}
-                      </span>
-                      <div>
-                        <p className="text-sm font-medium">{step.title}</p>
-                        <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                          {step.description}
-                        </p>
-                      </div>
-                    </li>
-                  ))}
-                </ol>
+            <div className="mb-3 flex items-center gap-2">
+              <Mail className="size-4" aria-hidden="true" />
+              <h2 id="verification-steps-title" className="text-sm font-medium">
+                How to verify your email
+              </h2>
+            </div>
+            <ol className="border border-line">
+              {verificationSteps.map((step, index) => (
+                <li
+                  className="grid grid-cols-[2rem_1fr] gap-3 border-b border-line p-3 last:border-b-0"
+                  key={step.title}
+                >
+                  <span className="eyebrow pt-0.5 text-clay">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                  <div>
+                    <p className="text-sm font-medium">{step.title}</p>
+                    <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                      {step.description}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ol>
           </section>
 
           <div className="flex gap-3 border border-ochre bg-ochre/10 p-4">
-                <LockKeyhole
-                  className="mt-0.5 size-4 shrink-0"
-                  aria-hidden="true"
-                />
-                <div>
-                  <p className="text-sm font-medium">You cannot log in yet</p>
-                  <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                    Your account exists, but login remains locked until you
-                    verify your email identity.
-                  </p>
-                </div>
+            <LockKeyhole
+              className="mt-0.5 size-4 shrink-0"
+              aria-hidden="true"
+            />
+            <div>
+              <p className="text-sm font-medium">You cannot log in yet</p>
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                Your account exists, but login remains locked until you verify
+                your email identity.
+              </p>
+            </div>
           </div>
 
           <div className="grid gap-2">
-                <Button
-                  aria-describedby="resend-verification-help"
-                  disabled
-                  variant="outline"
-                >
-                  Resend verification link
-                </Button>
-                <Button
-                  nativeButton={false}
-                  render={<Link href="/login" />}
-                  variant="ghost"
-                >
-                  Return to login
-                </Button>
+            <ResendVerificationButton email={verificationEmail} />
+            <Button
+              nativeButton={false}
+              render={<Link href="/login" />}
+              variant="ghost"
+            >
+              Return to login
+            </Button>
           </div>
-
-          <p
-            className="text-xs leading-5 text-muted-foreground"
-            id="resend-verification-help"
-          >
-            Resending is not available yet. The original verification link
-            must be used for now.
-          </p>
         </CardContent>
       </Card>
     </AuthShell>
