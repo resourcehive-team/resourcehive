@@ -91,7 +91,7 @@ export function MembershipRequestCard({
         {state.status === "success" ? (
           <div
             aria-live="polite"
-            className="flex items-start gap-3 rounded-lg border p-3"
+            className="flex items-start gap-3 border border-sage bg-sage/40 p-3"
           >
             <CircleCheckIcon className="mt-0.5 size-4 text-primary" />
             <div className="space-y-1">
@@ -107,7 +107,7 @@ export function MembershipRequestCard({
         {feedback ? (
           <div
             role="alert"
-            className="flex items-start gap-3 rounded-lg border p-3"
+            className="flex items-start gap-3 border border-destructive/30 bg-destructive/5 p-3"
           >
             <CircleAlertIcon className="mt-0.5 size-4 text-destructive" />
             <div className="space-y-1">

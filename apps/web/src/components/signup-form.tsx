@@ -74,9 +74,9 @@ export function SignupForm({
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <Card>
+      <Card className="auth-form-card">
         <CardHeader>
-          <CardTitle>Create an account</CardTitle>
+          <CardTitle className="auth-form-title">Create an account</CardTitle>
           <CardDescription>
             Use the email address provided by your organization
           </CardDescription>

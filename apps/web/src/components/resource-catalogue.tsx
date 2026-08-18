@@ -418,7 +418,7 @@ function CatalogueResults({
           Page {catalogue.page} of {catalogue.totalPages}
         </p>
       </div>
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="shared-panel-grid *:data-[slot=card]:border-0 md:grid-cols-2 xl:grid-cols-3">
         {catalogue.data.map((resource) => (
           <ResourceCatalogueCard
             key={resource.id}
@@ -505,7 +505,7 @@ function ResourceResultsSkeleton() {
     <div
       aria-busy="true"
       aria-label="Loading resources"
-      className="grid gap-4 md:grid-cols-2 xl:grid-cols-3"
+      className="shared-panel-grid *:data-[slot=card]:border-0 md:grid-cols-2 xl:grid-cols-3"
     >
       {Array.from({ length: 3 }, (_, index) => (
         <Card key={index}>

@@ -90,9 +90,9 @@ export function LoginForm({
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <Card>
+      <Card className="auth-form-card">
         <CardHeader>
-          <CardTitle>Welcome back</CardTitle>
+          <CardTitle className="auth-form-title">Welcome back</CardTitle>
           <CardDescription>
             Enter your institutional email to continue to ResourceHive.
           </CardDescription>
