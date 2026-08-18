@@ -5,7 +5,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { login, LoginError } from "@/lib/auth-api";
-import { markSignupEmailVerified } from "@/lib/auth-storage";
+import {
+  hasPendingSignupForEmail,
+  markSignupEmailVerified,
+} from "@/lib/auth-storage";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -78,6 +81,16 @@ export function LoginForm({
       router.replace(redirectTo);
       router.refresh();
     } catch (loginError) {
+      if (
+        loginError instanceof LoginError &&
+        loginError.code === "INVALID_CREDENTIALS" &&
+        hasPendingSignupForEmail(email)
+      ) {
+        router.replace("/signup/status");
+        router.refresh();
+        return;
+      }
+
       setError(
         loginError instanceof LoginError
           ? loginError.message

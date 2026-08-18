@@ -96,3 +96,13 @@ export function parseSignupDebugData(
     return null;
   }
 }
+
+export function hasPendingSignupForEmail(email: string): boolean {
+  const signup = parseSignupDebugData(getSignupDebugDataSnapshot());
+
+  return Boolean(
+    signup &&
+      !signup.user.emailVerified &&
+      signup.user.email.toLowerCase() === email.trim().toLowerCase(),
+  );
+}

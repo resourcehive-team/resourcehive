@@ -93,8 +93,17 @@ export interface EmailVerificationStatusResponse {
   emailVerified: boolean;
 }
 
+export type LoginErrorCode =
+  | "INVALID_CREDENTIALS"
+  | "SERVICE_UNAVAILABLE"
+  | "INVALID_RESPONSE"
+  | "REQUEST_FAILED";
+
 export class LoginError extends Error {
-  constructor(message: string) {
+  constructor(
+    message: string,
+    public readonly code: LoginErrorCode = "REQUEST_FAILED",
+  ) {
     super(message);
     this.name = "LoginError";
   }
@@ -141,7 +150,10 @@ export async function login(credentials: LoginRequest): Promise<LoginResponse> {
       body: JSON.stringify(credentials),
     });
   } catch {
-    throw new LoginError("Unable to connect to the login service.");
+    throw new LoginError(
+      "Unable to connect to the login service.",
+      "SERVICE_UNAVAILABLE",
+    );
   }
 
   if (!response.ok) {
@@ -150,7 +162,10 @@ export async function login(credentials: LoginRequest): Promise<LoginResponse> {
       response.status === 401 ||
       response.status === 404
     ) {
-      throw new LoginError("Email or password is incorrect.");
+      throw new LoginError(
+        "Email or password is incorrect.",
+        "INVALID_CREDENTIALS",
+      );
     }
 
     throw new LoginError("Unable to log in. Please try again.");
@@ -164,7 +179,10 @@ export async function login(credentials: LoginRequest): Promise<LoginResponse> {
     !("message" in data) ||
     data.message !== "user login successfully"
   ) {
-    throw new LoginError("The login service returned an invalid response.");
+    throw new LoginError(
+      "The login service returned an invalid response.",
+      "INVALID_RESPONSE",
+    );
   }
 
   return {
