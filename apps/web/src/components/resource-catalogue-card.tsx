@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { CoinsIcon, PackageIcon } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -17,18 +18,28 @@ import {
 import type { Resource } from "@/lib/resource-service/types";
 
 export function ResourceCatalogueCard({
+  accessOrganizationId,
+  accessOrganizationName,
   resource,
-  selectedOrganizationId,
 }: {
+  accessOrganizationId: string;
+  accessOrganizationName?: string;
   resource: Resource;
-  selectedOrganizationId: string;
 }) {
+  const isOwnedByAccessOrganization =
+    resource.ownerOrganizationId === accessOrganizationId;
+
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <PackageIcon className="size-4" />
-          {resource.name}
+          <Link
+            className="underline decoration-line underline-offset-4 transition-colors hover:text-terracotta hover:decoration-terracotta"
+            href={`/dashboard/resources/${encodeURIComponent(resource.id)}?organization=${encodeURIComponent(accessOrganizationId)}`}
+          >
+            {resource.name}
+          </Link>
         </CardTitle>
         <CardDescription>
           {resource.description || "No description provided."}
@@ -53,9 +64,8 @@ export function ResourceCatalogueCard({
           <div className="flex items-center justify-between gap-4">
             <dt className="text-muted-foreground">Access</dt>
             <dd className="font-medium">
-              {resource.ownerOrganizationId === selectedOrganizationId
-                ? "Owned by this organization"
-                : "Shared with this organization"}
+              {isOwnedByAccessOrganization ? "Owned by" : "Shared with"} {" "}
+              {accessOrganizationName ?? "your organization"}
             </dd>
           </div>
           <div className="flex items-center justify-between gap-4">
