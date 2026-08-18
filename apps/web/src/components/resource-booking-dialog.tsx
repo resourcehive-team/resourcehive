@@ -136,7 +136,7 @@ export function ResourceBookingDialog({
         <CalendarIcon data-icon="inline-start" />
         Create booking
       </DialogTrigger>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="max-h-[calc(100svh-2rem)] overflow-y-auto sm:max-w-2xl">
         {createdBooking ? (
           <BookingConfirmation booking={createdBooking} />
         ) : (
