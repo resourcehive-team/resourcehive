@@ -117,7 +117,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   return (
     <Sidebar collapsible="offcanvas" {...props}>
-      <SidebarHeader className="border-b border-sidebar-border p-4">
+      <SidebarHeader className="h-(--header-height) shrink-0 justify-center border-b border-sidebar-border px-4 py-0">
         <SidebarMenu>
           <SidebarMenuItem>
             <Brand />
