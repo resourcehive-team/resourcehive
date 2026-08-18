@@ -22,6 +22,7 @@ import { AuthService } from './auth.service';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { ResendVerificationDto } from './dto/resend-verification.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { AuthenticatedRequest, JwtAuthGuard } from './jwt-auth.guard';
@@ -45,6 +46,12 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async getVerificationStatus(@Body() verification: VerifyEmailDto) {
     return this.authService.getEmailVerificationStatus(verification.token);
+  }
+
+  @Post('resend-verification')
+  @HttpCode(HttpStatus.OK)
+  resendVerification(@Body() request: ResendVerificationDto) {
+    return this.authService.resendVerificationEmail(request);
   }
 
   @Post('login')

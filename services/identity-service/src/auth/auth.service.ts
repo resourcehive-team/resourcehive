@@ -14,6 +14,7 @@ import { EmailService } from '../email/email.service';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { ResendVerificationDto } from './dto/resend-verification.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 
 const DEFAULT_BCRYPT_ROUNDS = 12;
@@ -21,6 +22,9 @@ const DEFAULT_VERIFICATION_TOKEN_LIFETIME = '24h';
 const DEFAULT_PASSWORD_RESET_TOKEN_LIFETIME = '1h';
 const DEFAULT_ACCESS_TOKEN_LIFETIME = '15m';
 const DEFAULT_REFRESH_TOKEN_LIFETIME = '30d';
+const EMAIL_VERIFICATION_REQUEST_COOLDOWN_MS = 60 * 1000;
+const EMAIL_VERIFICATION_REQUEST_MESSAGE =
+  'If an unverified account exists for that email, a verification link has been sent.';
 const PASSWORD_RESET_REQUEST_COOLDOWN_MS = 60 * 1000;
 const PASSWORD_RESET_REQUEST_MESSAGE =
   'If an account exists for that email, a password reset link has been sent.';
@@ -176,6 +180,73 @@ export class AuthService {
       accessToken,
       ...refreshToken,
     };
+  }
+
+  async resendVerificationEmail(request: ResendVerificationDto) {
+    const email = request.email.trim().toLowerCase();
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      select: {
+        id: true,
+        email: true,
+        status: true,
+        emailVerifiedAt: true,
+      },
+    });
+
+    if (!user || user.status !== 'ACTIVE' || user.emailVerifiedAt) {
+      return { message: EMAIL_VERIFICATION_REQUEST_MESSAGE };
+    }
+
+    const mostRecentToken = await this.prisma.emailVerificationToken.findFirst({
+      where: { userId: user.id },
+      select: { createdAt: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (
+      mostRecentToken &&
+      mostRecentToken.createdAt.getTime() +
+        EMAIL_VERIFICATION_REQUEST_COOLDOWN_MS >
+        Date.now()
+    ) {
+      return { message: EMAIL_VERIFICATION_REQUEST_MESSAGE };
+    }
+
+    const token = randomBytes(32).toString('base64url');
+    const now = new Date();
+    const expiresAt = new Date(
+      now.getTime() + this.getVerificationTokenLifetimeMs(),
+    );
+
+    await this.prisma.$transaction(async (transaction) => {
+      await transaction.emailVerificationToken.updateMany({
+        where: {
+          userId: user.id,
+          usedAt: null,
+          expiresAt: { gt: now },
+        },
+        data: { usedAt: now },
+      });
+      await transaction.emailVerificationToken.create({
+        data: {
+          userId: user.id,
+          tokenHash: this.hashToken(token),
+          expiresAt,
+        },
+      });
+    });
+
+    try {
+      await this.emailService.sendVerificationEmail(user.email, token);
+    } catch (error) {
+      this.logger.error(
+        `Unable to resend verification email for user ${user.id}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+    }
+
+    return { message: EMAIL_VERIFICATION_REQUEST_MESSAGE };
   }
 
   async refreshSession(token: string | null) {
