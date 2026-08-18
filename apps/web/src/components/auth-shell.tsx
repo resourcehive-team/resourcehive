@@ -11,7 +11,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
         </p>
       </section>
 
-      <aside className="relative hidden min-h-svh overflow-hidden border-l border-line bg-ink p-10 text-paper lg:flex lg:flex-col lg:justify-between xl:p-16">
+      <aside className="relative hidden h-svh overflow-hidden border-l border-line bg-ink p-10 text-paper lg:sticky lg:top-0 lg:flex lg:self-start lg:flex-col lg:justify-between xl:p-16">
         <div className="grid grid-cols-12 gap-4" aria-hidden="true">
           <span className="col-span-7 h-px bg-paper/30" />
           <span className="col-span-3 col-start-10 h-px bg-clay" />

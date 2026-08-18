@@ -2,11 +2,31 @@ import type { RegistrationResponse } from "@/lib/auth-api";
 
 const signupDebugDataKey = "resourcehive_signup_debug_data";
 const verifiedSignupEmailKey = "resourcehive_verified_signup_email";
+const pendingVerificationEmailKey = "resourcehive_pending_verification_email";
 const signupDebugDataChangedEvent = "resourcehive:signup-debug-data-changed";
 
 export function storeSignupDebugData(data: RegistrationResponse) {
   localStorage.setItem(signupDebugDataKey, JSON.stringify(data));
   sessionStorage.removeItem(signupDebugDataKey);
+
+  const normalizedEmail = data.user.email.toLowerCase();
+  if (data.user.emailVerified) {
+    if (localStorage.getItem(pendingVerificationEmailKey) === normalizedEmail) {
+      localStorage.removeItem(pendingVerificationEmailKey);
+    }
+  } else {
+    localStorage.setItem(pendingVerificationEmailKey, normalizedEmail);
+  }
+
+  window.dispatchEvent(new Event(signupDebugDataChangedEvent));
+}
+
+export function storePendingVerificationEmail(email: string) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  localStorage.setItem(pendingVerificationEmailKey, email.trim().toLowerCase());
   window.dispatchEvent(new Event(signupDebugDataChangedEvent));
 }
 
@@ -17,12 +37,12 @@ export function markSignupEmailVerified(verifiedEmail: string) {
 
   const normalizedEmail = verifiedEmail.toLowerCase();
   localStorage.setItem(verifiedSignupEmailKey, normalizedEmail);
+  if (localStorage.getItem(pendingVerificationEmailKey) === normalizedEmail) {
+    localStorage.removeItem(pendingVerificationEmailKey);
+  }
 
   const signup = parseSignupDebugData(getSignupDebugDataSnapshot());
-  if (
-    !signup ||
-    signup.user.email.toLowerCase() !== normalizedEmail
-  ) {
+  if (!signup || signup.user.email.toLowerCase() !== normalizedEmail) {
     window.dispatchEvent(new Event(signupDebugDataChangedEvent));
     return;
   }
@@ -64,11 +84,20 @@ export function getSignupDebugDataSnapshot(): string | null {
   return storedData;
 }
 
+export function getPendingVerificationEmailSnapshot(): string | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  return localStorage.getItem(pendingVerificationEmailKey);
+}
+
 export function subscribeToSignupDebugData(onStoreChange: () => void) {
   function handleStorage(event: StorageEvent) {
     if (
       event.key === signupDebugDataKey ||
-      event.key === verifiedSignupEmailKey
+      event.key === verifiedSignupEmailKey ||
+      event.key === pendingVerificationEmailKey
     ) {
       onStoreChange();
     }
@@ -95,4 +124,14 @@ export function parseSignupDebugData(
   } catch {
     return null;
   }
+}
+
+export function hasPendingSignupForEmail(email: string): boolean {
+  const signup = parseSignupDebugData(getSignupDebugDataSnapshot());
+
+  return Boolean(
+    signup &&
+    !signup.user.emailVerified &&
+    signup.user.email.toLowerCase() === email.trim().toLowerCase(),
+  );
 }
