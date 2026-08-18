@@ -53,19 +53,9 @@ export default async function VerifyEmailPage({
           <CardTitle className="auth-form-title">{title}</CardTitle>
           <CardDescription>{message}</CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-col gap-2 sm:flex-row">
-          {verifiedEmail && (
-            <Button
-              className="w-full sm:w-auto"
-              nativeButton={false}
-              render={<Link href="/signup/status" />}
-            >
-              View signup status
-            </Button>
-          )}
+        <CardContent>
           <Button
             className="w-full sm:w-auto"
-            variant={verifiedEmail ? "outline" : "default"}
             nativeButton={false}
             render={<Link href="/login" />}
           >

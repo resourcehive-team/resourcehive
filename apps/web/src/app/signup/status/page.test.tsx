@@ -1,9 +1,17 @@
-import { render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import SignupStatusPage from "@/app/signup/status/page";
 import type { RegistrationResponse } from "@/lib/auth-api";
 import { storeSignupDebugData } from "@/lib/auth-storage";
+
+const navigation = vi.hoisted(() => ({
+  replace: vi.fn(),
+}));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => navigation,
+}));
 
 function createMemoryStorage(): Storage {
   const values = new Map<string, string>();
@@ -40,6 +48,7 @@ const signup: RegistrationResponse = {
 
 describe("SignupStatusPage", () => {
   beforeEach(() => {
+    navigation.replace.mockReset();
     Object.defineProperty(window, "localStorage", {
       configurable: true,
       value: createMemoryStorage(),
@@ -66,7 +75,7 @@ describe("SignupStatusPage", () => {
     ).toBe(true);
   });
 
-  it("offers login once the email has been verified", () => {
+  it("redirects to login once the email has been verified", async () => {
     storeSignupDebugData({
       ...signup,
       user: { ...signup.user, emailVerified: true },
@@ -74,12 +83,9 @@ describe("SignupStatusPage", () => {
 
     render(<SignupStatusPage />);
 
-    expect(screen.getByText("You’re ready to begin.")).toBeDefined();
-    expect(screen.getByText("Verified")).toBeDefined();
-    expect(
-      screen
-        .getByRole("button", { name: "Continue to login" })
-        .getAttribute("href"),
-    ).toBe("/login");
+    await waitFor(() => {
+      expect(navigation.replace).toHaveBeenCalledWith("/login");
+    });
+    expect(screen.queryByText("How to verify your email")).toBeNull();
   });
 });

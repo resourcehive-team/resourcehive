@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useSyncExternalStore } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { Check, LockKeyhole, Mail } from "lucide-react";
 
 import { AuthShell } from "@/components/auth-shell";
@@ -36,6 +37,7 @@ const verificationSteps = [
 ] as const;
 
 export default function SignupStatusPage() {
+  const router = useRouter();
   const storedSignup = useSyncExternalStore(
     subscribeToSignupDebugData,
     getSignupDebugDataSnapshot,
@@ -47,20 +49,24 @@ export default function SignupStatusPage() {
   );
   const isVerified = signup?.user.emailVerified === true;
 
+  useEffect(() => {
+    if (isVerified) {
+      router.replace("/login");
+    }
+  }, [isVerified, router]);
+
+  if (isVerified) {
+    return null;
+  }
+
   return (
     <AuthShell>
       <Card className="auth-form-card">
         <CardHeader>
-          <p className="eyebrow text-clay">
-            {isVerified ? "Verification complete" : "Account created"}
-          </p>
-          <CardTitle className="auth-form-title">
-            {isVerified ? "You’re ready to begin." : "Check your inbox."}
-          </CardTitle>
+          <p className="eyebrow text-clay">Account created</p>
+          <CardTitle className="auth-form-title">Check your inbox.</CardTitle>
           <CardDescription className="leading-6">
-            {isVerified ? (
-              "Your email address is verified. You can now log in to ResourceHive."
-            ) : signup ? (
+            {signup ? (
               <>
                 We created your account for{" "}
                 <strong className="font-medium text-foreground">
@@ -87,35 +93,12 @@ export default function SignupStatusPage() {
                 <p className="mb-2 text-xs text-muted-foreground">
                   Email verification
                 </p>
-                <Badge variant={isVerified ? "success" : "warning"}>
-                  {isVerified ? "Verified" : "Required"}
-                </Badge>
+                <Badge variant="warning">Required</Badge>
               </div>
             </div>
           )}
 
-          {isVerified ? (
-            <div className="space-y-4">
-              <div className="flex gap-3 border border-sage bg-sage/45 p-4">
-                <Check className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-                <div>
-                  <p className="text-sm font-medium">Verification complete</p>
-                  <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                    Your account is active and ready for you to use.
-                  </p>
-                </div>
-              </div>
-              <Button
-                className="w-full"
-                nativeButton={false}
-                render={<Link href="/login" />}
-              >
-                Continue to login
-              </Button>
-            </div>
-          ) : (
-            <>
-              <section aria-labelledby="verification-steps-title">
+          <section aria-labelledby="verification-steps-title">
                 <div className="mb-3 flex items-center gap-2">
                   <Mail className="size-4" aria-hidden="true" />
                   <h2
@@ -143,9 +126,9 @@ export default function SignupStatusPage() {
                     </li>
                   ))}
                 </ol>
-              </section>
+          </section>
 
-              <div className="flex gap-3 border border-ochre bg-ochre/10 p-4">
+          <div className="flex gap-3 border border-ochre bg-ochre/10 p-4">
                 <LockKeyhole
                   className="mt-0.5 size-4 shrink-0"
                   aria-hidden="true"
@@ -157,9 +140,9 @@ export default function SignupStatusPage() {
                     verify your email identity.
                   </p>
                 </div>
-              </div>
+          </div>
 
-              <div className="grid gap-2">
+          <div className="grid gap-2">
                 <Button
                   aria-describedby="resend-verification-help"
                   disabled
@@ -174,17 +157,15 @@ export default function SignupStatusPage() {
                 >
                   Return to login
                 </Button>
-              </div>
+          </div>
 
-              <p
-                className="text-xs leading-5 text-muted-foreground"
-                id="resend-verification-help"
-              >
-                Resending is not available yet. The original verification link
-                must be used for now.
-              </p>
-            </>
-          )}
+          <p
+            className="text-xs leading-5 text-muted-foreground"
+            id="resend-verification-help"
+          >
+            Resending is not available yet. The original verification link
+            must be used for now.
+          </p>
         </CardContent>
       </Card>
     </AuthShell>
