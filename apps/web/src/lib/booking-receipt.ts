@@ -5,6 +5,7 @@ import {
   type PDFFont,
   type PDFPage,
 } from "pdf-lib";
+import QRCode from "qrcode";
 
 import type { CreatedBooking } from "@/lib/booking-service/types";
 
@@ -121,6 +122,9 @@ function drawReference(
 ) {
   const boxY = 566;
   const boxHeight = 68;
+  const qrSize = 56;
+  const qrX = PAGE_MARGIN + CONTENT_WIDTH - qrSize - 6;
+  const qrY = boxY + 6;
 
   page.drawRectangle({
     x: PAGE_MARGIN,
@@ -143,15 +147,47 @@ function drawReference(
     font: sansBold,
     color: PAPER,
   });
+  drawReferenceQr(page, referenceId, qrX, qrY, qrSize);
   drawFittedText(page, pdfSafeText(referenceId), {
     x: PAGE_MARGIN + 22,
     y: boxY + 18,
-    maxWidth: CONTENT_WIDTH - 44,
+    maxWidth: qrX - PAGE_MARGIN - 38,
     size: 13,
     minSize: 8,
     font: mono,
     color: PAPER,
   });
+}
+
+function drawReferenceQr(
+  page: PDFPage,
+  referenceId: string,
+  x: number,
+  y: number,
+  size: number,
+) {
+  const qr = QRCode.create(referenceId, { errorCorrectionLevel: "M" });
+  const quietZone = 4;
+  const moduleCount = qr.modules.size;
+  const moduleSize = size / (moduleCount + quietZone * 2);
+
+  page.drawRectangle({ x, y, width: size, height: size, color: PAPER });
+
+  for (let row = 0; row < moduleCount; row += 1) {
+    for (let column = 0; column < moduleCount; column += 1) {
+      if (!qr.modules.get(row, column)) {
+        continue;
+      }
+
+      page.drawRectangle({
+        x: x + (column + quietZone) * moduleSize,
+        y: y + size - (row + quietZone + 1) * moduleSize,
+        width: moduleSize,
+        height: moduleSize,
+        color: INK,
+      });
+    }
+  }
 }
 
 function drawDetailsGrid(
