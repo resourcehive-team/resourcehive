@@ -34,7 +34,11 @@ describe("ResourceBookingDialog", () => {
     expect(await screen.findByText("Book Study Room")).toBeDefined();
     expect(screen.getByText("From")).toBeDefined();
     expect(screen.getByText("To")).toBeDefined();
-    expect(screen.getAllByLabelText("Time")).toHaveLength(2);
+    expect(screen.getByRole("combobox", { name: "From hour" })).toBeDefined();
+    expect(screen.getByRole("combobox", { name: "From minute" })).toBeDefined();
+    expect(screen.getByRole("combobox", { name: "To hour" })).toBeDefined();
+    expect(screen.getByRole("combobox", { name: "To minute" })).toBeDefined();
+    expect(document.querySelector('input[type="time"]')).toBeNull();
   });
 
   it("does not call booking APIs until both dates are selected", async () => {

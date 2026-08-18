@@ -5,7 +5,6 @@ import { format } from "date-fns";
 import {
   CalendarIcon,
   CheckCircle2Icon,
-  Clock3Icon,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -20,13 +19,19 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   ApiAuthenticationError,
   ApiError,
@@ -41,6 +46,17 @@ import type {
   ResourceSlot,
 } from "@/lib/booking-service/types";
 import { cn } from "@/lib/utils";
+
+const HOURS = Array.from({ length: 24 }, (_, hour) =>
+  String(hour).padStart(2, "0"),
+);
+const MINUTES = Array.from({ length: 60 }, (_, minute) =>
+  String(minute).padStart(2, "0"),
+);
+const HOUR_LABELS = Object.fromEntries(HOURS.map((hour) => [hour, hour]));
+const MINUTE_LABELS = Object.fromEntries(
+  MINUTES.map((minute) => [minute, minute]),
+);
 
 export function ResourceBookingDialog({
   disabled = false,
@@ -251,21 +267,78 @@ function BookingTimeBoundary({
         </Popover>
       </div>
       <div className="grid gap-2">
-        <Label htmlFor={`${id}-time`}>Time</Label>
-        <div className="relative">
-          <Clock3Icon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            id={`${id}-time`}
-            className="pl-9"
-            type="time"
-            step={900}
-            value={time}
+        <Label id={`${id}-time-label`}>Time</Label>
+        <div
+          aria-labelledby={`${id}-time-label`}
+          className="grid grid-cols-[1fr_auto_1fr] items-center gap-2"
+          role="group"
+        >
+          <TimePartSelect
+            ariaLabel={`${label} hour`}
             disabled={disabled}
-            onChange={(event) => onTimeChange(event.target.value)}
+            items={HOURS}
+            itemLabels={HOUR_LABELS}
+            value={timePart(time, 0)}
+            onValueChange={(hour) =>
+              onTimeChange(`${hour}:${timePart(time, 1)}`)
+            }
+          />
+          <span aria-hidden="true" className="font-medium text-muted-foreground">
+            :
+          </span>
+          <TimePartSelect
+            ariaLabel={`${label} minute`}
+            disabled={disabled}
+            items={MINUTES}
+            itemLabels={MINUTE_LABELS}
+            value={timePart(time, 1)}
+            onValueChange={(minute) =>
+              onTimeChange(`${timePart(time, 0)}:${minute}`)
+            }
           />
         </div>
       </div>
     </fieldset>
+  );
+}
+
+function TimePartSelect({
+  ariaLabel,
+  disabled,
+  items,
+  itemLabels,
+  value,
+  onValueChange,
+}: {
+  ariaLabel: string;
+  disabled: boolean;
+  items: string[];
+  itemLabels: Record<string, string>;
+  value: string;
+  onValueChange: (value: string) => void;
+}) {
+  return (
+    <Select
+      items={itemLabels}
+      value={value}
+      disabled={disabled}
+      onValueChange={(nextValue) => {
+        if (typeof nextValue === "string") {
+          onValueChange(nextValue);
+        }
+      }}
+    >
+      <SelectTrigger aria-label={ariaLabel} className="w-full">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent className="shadow-none">
+        {items.map((item) => (
+          <SelectItem key={item} value={item}>
+            {item}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
 
@@ -304,7 +377,7 @@ function startOfToday(): Date {
 }
 
 function combineDateAndTime(date: Date | undefined, time: string): Date | null {
-  const timeMatch = /^(\d{2}):(\d{2})$/.exec(time);
+  const timeMatch = /^(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(time);
 
   if (!date || !timeMatch) {
     return null;
@@ -312,8 +385,9 @@ function combineDateAndTime(date: Date | undefined, time: string): Date | null {
 
   const hours = Number(timeMatch[1]);
   const minutes = Number(timeMatch[2]);
+  const seconds = Number(timeMatch[3] ?? 0);
 
-  if (hours > 23 || minutes > 59) {
+  if (hours > 23 || minutes > 59 || seconds > 59) {
     return null;
   }
 
@@ -323,7 +397,14 @@ function combineDateAndTime(date: Date | undefined, time: string): Date | null {
     date.getDate(),
     hours,
     minutes,
+    seconds,
   );
+}
+
+function timePart(time: string, index: 0 | 1): string {
+  const parts = time.split(":");
+
+  return /^\d{2}$/.test(parts[index] ?? "") ? parts[index] : "00";
 }
 
 function findExactAvailableSlot(
