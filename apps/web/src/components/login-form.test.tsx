@@ -114,6 +114,30 @@ describe("LoginForm", () => {
     expect(screen.queryByText("Email or password is incorrect.")).toBeNull();
   });
 
+  it("redirects an unverified account identified by the identity service", async () => {
+    loginMock.mockRejectedValue(
+      new LoginError(
+        "Verify your email address before logging in.",
+        "EMAIL_VERIFICATION_REQUIRED",
+      ),
+    );
+
+    render(<LoginForm />);
+
+    fireEvent.change(screen.getByLabelText(/Institutional email/), {
+      target: { value: "alex@example.edu" },
+    });
+    fireEvent.change(screen.getByLabelText(/^Password/), {
+      target: { value: "Password123!" },
+    });
+    fireEvent.click(await screen.findByRole("button", { name: "Login" }));
+
+    await waitFor(() => {
+      expect(navigation.replace).toHaveBeenCalledWith("/signup/status");
+      expect(navigation.refresh).toHaveBeenCalled();
+    });
+  });
+
   it("keeps the generic error for a login not associated with that signup", async () => {
     storeSignupDebugData(pendingSignup);
     loginMock.mockRejectedValue(

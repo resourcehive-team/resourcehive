@@ -95,6 +95,7 @@ export interface EmailVerificationStatusResponse {
 
 export type LoginErrorCode =
   | "INVALID_CREDENTIALS"
+  | "EMAIL_VERIFICATION_REQUIRED"
   | "SERVICE_UNAVAILABLE"
   | "INVALID_RESPONSE"
   | "REQUEST_FAILED";
@@ -157,6 +158,18 @@ export async function login(credentials: LoginRequest): Promise<LoginResponse> {
   }
 
   if (!response.ok) {
+    const data: unknown = await response.json().catch(() => null);
+
+    if (
+      response.status === 401 &&
+      isApiErrorWithCode(data, "EMAIL_VERIFICATION_REQUIRED")
+    ) {
+      throw new LoginError(
+        "Verify your email address before logging in.",
+        "EMAIL_VERIFICATION_REQUIRED",
+      );
+    }
+
     if (
       response.status === 400 ||
       response.status === 401 ||
@@ -413,6 +426,15 @@ function getApiErrorMessage(data: unknown, fallback: string): string {
   }
 
   return fallback;
+}
+
+function isApiErrorWithCode(data: unknown, code: string): boolean {
+  return (
+    !!data &&
+    typeof data === "object" &&
+    "code" in data &&
+    data.code === code
+  );
 }
 
 function isCurrentUserResponse(data: unknown): data is CurrentUserResponse {

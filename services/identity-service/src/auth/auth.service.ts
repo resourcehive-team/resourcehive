@@ -156,10 +156,16 @@ export class AuthService {
     if (
       !user ||
       user.status !== 'ACTIVE' ||
-      !user.emailVerifiedAt ||
       !(await bcrypt.compare(password, user.passwordHash))
     ) {
       throw new UnauthorizedException('Invalid email or password');
+    }
+
+    if (!user.emailVerifiedAt) {
+      throw new UnauthorizedException({
+        code: 'EMAIL_VERIFICATION_REQUIRED',
+        message: 'Verify your email address before logging in',
+      });
     }
 
     const accessToken = await this.issueAccessToken(user);

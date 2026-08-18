@@ -83,8 +83,9 @@ export function LoginForm({
     } catch (loginError) {
       if (
         loginError instanceof LoginError &&
-        loginError.code === "INVALID_CREDENTIALS" &&
-        hasPendingSignupForEmail(email)
+        (loginError.code === "EMAIL_VERIFICATION_REQUIRED" ||
+          (loginError.code === "INVALID_CREDENTIALS" &&
+            hasPendingSignupForEmail(email)))
       ) {
         router.replace("/signup/status");
         router.refresh();
