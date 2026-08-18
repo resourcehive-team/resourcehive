@@ -65,7 +65,6 @@ export interface RegisteredUser {
 export interface RegistrationResponse {
   message: string;
   verificationRequired: true;
-  developmentVerificationUrl?: string;
   user: RegisteredUser;
 }
 
@@ -86,11 +85,6 @@ export interface EmailVerificationResponse {
       status: string;
     }>;
   };
-}
-
-export interface EmailVerificationStatusResponse {
-  status: "PENDING" | "EXPIRED" | "VERIFIED";
-  emailVerified: boolean;
 }
 
 export type LoginErrorCode =
@@ -335,7 +329,11 @@ export async function register(
     );
   }
 
-  return data;
+  return {
+    message: data.message,
+    verificationRequired: true,
+    user: data.user,
+  };
 }
 
 export async function verifyEmail(
@@ -369,40 +367,6 @@ export async function verifyEmail(
   if (!isEmailVerificationResponse(data)) {
     throw new EmailVerificationError(
       "The email verification service returned an invalid response.",
-    );
-  }
-
-  return data;
-}
-
-export async function getEmailVerificationStatus(
-  token: string,
-): Promise<EmailVerificationStatusResponse> {
-  let response: Response;
-
-  try {
-    response = await fetch(`${apiUrl}/auth/verification-status`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ token }),
-      cache: "no-store",
-    });
-  } catch {
-    throw new EmailVerificationError(
-      "Unable to check the email verification status.",
-    );
-  }
-
-  const data: unknown = await response.json().catch(() => null);
-
-  if (!response.ok || !isEmailVerificationStatusResponse(data)) {
-    throw new EmailVerificationError(
-      getApiErrorMessage(
-        data,
-        "Unable to check the email verification status.",
-      ),
     );
   }
 
@@ -490,8 +454,6 @@ function isRegistrationResponse(data: unknown): data is RegistrationResponse {
     typeof data.message !== "string" ||
     !("verificationRequired" in data) ||
     data.verificationRequired !== true ||
-    ("developmentVerificationUrl" in data &&
-      typeof data.developmentVerificationUrl !== "string") ||
     !("user" in data) ||
     !data.user ||
     typeof data.user !== "object"
@@ -550,26 +512,6 @@ function isEmailVerificationResponse(
     user.emailVerified === true &&
     "organizations" in user &&
     Array.isArray(user.organizations)
-  );
-}
-
-function isEmailVerificationStatusResponse(
-  data: unknown,
-): data is EmailVerificationStatusResponse {
-  if (
-    !data ||
-    typeof data !== "object" ||
-    !("status" in data) ||
-    !("emailVerified" in data)
-  ) {
-    return false;
-  }
-
-  return (
-    (data.status === "PENDING" ||
-      data.status === "EXPIRED" ||
-      data.status === "VERIFIED") &&
-    typeof data.emailVerified === "boolean"
   );
 }
 

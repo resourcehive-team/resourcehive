@@ -1,13 +1,9 @@
 import { render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import SignupStatusPage from "@/app/signup/status/page";
 import type { RegistrationResponse } from "@/lib/auth-api";
 import { storeSignupDebugData } from "@/lib/auth-storage";
-
-vi.mock("@/components/signup-verification-status-sync", () => ({
-  SignupVerificationStatusSync: () => null,
-}));
 
 function createMemoryStorage(): Storage {
   const values = new Map<string, string>();

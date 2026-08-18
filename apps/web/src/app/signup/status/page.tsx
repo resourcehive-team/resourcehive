@@ -5,7 +5,6 @@ import { useMemo, useSyncExternalStore } from "react";
 import { Check, LockKeyhole, Mail } from "lucide-react";
 
 import { AuthShell } from "@/components/auth-shell";
-import { SignupVerificationStatusSync } from "@/components/signup-verification-status-sync";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -50,14 +49,6 @@ export default function SignupStatusPage() {
 
   return (
     <AuthShell>
-      {signup?.developmentVerificationUrl && (
-        <SignupVerificationStatusSync
-          email={signup.user.email}
-          emailVerified={signup.user.emailVerified}
-          verificationUrl={signup.developmentVerificationUrl}
-        />
-      )}
-
       <Card className="auth-form-card">
         <CardHeader>
           <p className="eyebrow text-clay">
@@ -169,14 +160,6 @@ export default function SignupStatusPage() {
               </div>
 
               <div className="grid gap-2">
-                {signup?.developmentVerificationUrl && (
-                  <Button
-                    nativeButton={false}
-                    render={<a href={signup.developmentVerificationUrl} />}
-                  >
-                    Open development verification link
-                  </Button>
-                )}
                 <Button
                   aria-describedby="resend-verification-help"
                   disabled
