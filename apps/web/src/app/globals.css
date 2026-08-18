@@ -212,12 +212,13 @@
     display: grid;
     gap: 1px;
     border: 1px solid var(--line);
-    background: var(--line);
+    background: transparent;
   }
 
   .shared-panel-grid > [data-slot="card"] {
     border: 0;
     background: var(--paper);
+    box-shadow: 0 0 0 1px var(--line);
   }
 
   .auth-shell {

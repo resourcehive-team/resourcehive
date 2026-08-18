@@ -10,9 +10,7 @@ export function SiteHeader({ title }: { title: string }) {
           orientation="vertical"
           className="mx-2 h-4 data-vertical:self-auto"
         />
-        <h1 className="font-serif text-2xl leading-none tracking-[-0.035em]">
-          {title}
-        </h1>
+        <h1 className="eyebrow text-foreground">{title}</h1>
       </div>
     </header>
   );
