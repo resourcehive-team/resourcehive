@@ -41,6 +41,17 @@ import type {
 } from "@/lib/resource-service/types";
 
 const RESOURCE_PAGE_SIZE = 10;
+const AGGREGATE_RESOURCE_PAGE_SIZE = 100;
+const ALL_ORGANIZATIONS = "all";
+
+interface CatalogueResource {
+  accessOrganizationId: string;
+  resource: PaginatedResources["data"][number];
+}
+
+interface CataloguePage extends Omit<PaginatedResources, "data"> {
+  data: CatalogueResource[];
+}
 
 type MembershipsState =
   | { status: "loading" }
@@ -53,7 +64,7 @@ type MembershipsState =
 type CatalogueState =
   | { status: "idle" }
   | { status: "loading" }
-  | { status: "loaded"; catalogue: PaginatedResources }
+  | { status: "loaded"; catalogue: CataloguePage }
   | { status: "error"; error: unknown };
 
 export function ResourceCatalogue() {
@@ -61,9 +72,8 @@ export function ResourceCatalogue() {
   const [membershipsState, setMembershipsState] =
     React.useState<MembershipsState>({ status: "loading" });
   const [membershipsAttempt, setMembershipsAttempt] = React.useState(0);
-  const [selectedOrganizationId, setSelectedOrganizationId] = React.useState<
-    string | null
-  >(null);
+  const [selectedOrganizationId, setSelectedOrganizationId] =
+    React.useState(ALL_ORGANIZATIONS);
   const [searchInput, setSearchInput] = React.useState("");
   const [appliedSearch, setAppliedSearch] = React.useState("");
   const [page, setPage] = React.useState(1);
@@ -84,19 +94,15 @@ export function ResourceCatalogue() {
           status: "loaded",
           memberships: approvedMemberships,
         });
-        setSelectedOrganizationId((currentOrganizationId) => {
-          if (
-            currentOrganizationId &&
-            approvedMemberships.some(
-              (membership) =>
-                membership.organizationId === currentOrganizationId,
-            )
-          ) {
-            return currentOrganizationId;
-          }
-
-          return approvedMemberships[0]?.organizationId ?? null;
-        });
+        setSelectedOrganizationId((currentOrganizationId) =>
+          currentOrganizationId === ALL_ORGANIZATIONS ||
+          approvedMemberships.some(
+            (membership) =>
+              membership.organizationId === currentOrganizationId,
+          )
+            ? currentOrganizationId
+            : ALL_ORGANIZATIONS,
+        );
 
         if (approvedMemberships.length > 0) {
           setCatalogueState({ status: "loading" });
@@ -119,18 +125,35 @@ export function ResourceCatalogue() {
   }, [membershipsAttempt, router]);
 
   React.useEffect(() => {
-    if (!selectedOrganizationId) {
+    if (membershipsState.status !== "loaded") {
       return;
     }
 
     const controller = new AbortController();
+    const catalogueRequest =
+      selectedOrganizationId === ALL_ORGANIZATIONS
+        ? getCombinedCatalogue(
+            membershipsState.memberships.map(
+              (membership) => membership.organizationId,
+            ),
+            page,
+            appliedSearch,
+            controller.signal,
+          )
+        : getAccessibleResources(selectedOrganizationId, {
+            page,
+            limit: RESOURCE_PAGE_SIZE,
+            search: appliedSearch,
+            signal: controller.signal,
+          }).then((catalogue) => ({
+            ...catalogue,
+            data: catalogue.data.map((resource) => ({
+              accessOrganizationId: selectedOrganizationId,
+              resource,
+            })),
+          }));
 
-    getAccessibleResources(selectedOrganizationId, {
-      page,
-      limit: RESOURCE_PAGE_SIZE,
-      search: appliedSearch,
-      signal: controller.signal,
-    })
+    catalogueRequest
       .then((catalogue) => {
         setCatalogueState({ status: "loaded", catalogue });
       })
@@ -151,6 +174,7 @@ export function ResourceCatalogue() {
   }, [
     appliedSearch,
     catalogueAttempt,
+    membershipsState,
     page,
     router,
     selectedOrganizationId,
@@ -211,10 +235,6 @@ export function ResourceCatalogue() {
     return <NoApprovedMemberships />;
   }
 
-  if (!selectedOrganizationId) {
-    return <ResourceCatalogueSkeleton />;
-  }
-
   return (
     <div className="flex flex-col gap-6">
       <CatalogueControls
@@ -233,6 +253,7 @@ export function ResourceCatalogue() {
       <CatalogueResults
         appliedSearch={appliedSearch}
         catalogueState={catalogueState}
+        memberships={membershipsState.memberships}
         selectedOrganizationId={selectedOrganizationId}
         onPageChange={changePage}
         onRetry={retryCatalogue}
@@ -263,19 +284,21 @@ function CatalogueControls({
   onSearchSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
 }) {
   const organizationLabels = Object.fromEntries(
-    memberships.map((membership) => [
-      membership.organizationId,
-      membership.organization.name,
-    ]),
+    [
+      [ALL_ORGANIZATIONS, "All organizations"],
+      ...memberships.map((membership) => [
+        membership.organizationId,
+        membership.organization.name,
+      ]),
+    ],
   );
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Catalogue filters</CardTitle>
+        <CardTitle>Search the catalogue</CardTitle>
         <CardDescription>
-          Choose one of your approved organizations and search by resource
-          name.
+          Search every resource available through your approved organizations.
         </CardDescription>
         {canCreateResources ? (
           <CardAction>
@@ -289,9 +312,34 @@ function CatalogueControls({
           </CardAction>
         ) : null}
       </CardHeader>
-      <CardContent className="grid gap-4 lg:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="resource-organization">Organization</Label>
+      <CardContent className="grid gap-5">
+        <form className="space-y-2" onSubmit={onSearchSubmit}>
+          <Label htmlFor="resource-search">Search resources</Label>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Input
+              id="resource-search"
+              value={searchInput}
+              placeholder="Search by resource name"
+              onChange={(event) => onSearchInputChange(event.target.value)}
+            />
+            <Button type="submit">
+              <SearchIcon data-icon="inline-start" />
+              Search
+            </Button>
+            {appliedSearch ? (
+              <Button type="button" variant="outline" onClick={onClearSearch}>
+                Clear
+              </Button>
+            ) : null}
+          </div>
+        </form>
+        <div className="grid gap-2 border-t pt-5 md:grid-cols-2 md:items-end">
+          <div>
+            <Label htmlFor="resource-organization">Organization filter</Label>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Narrow the current search to one organization when needed.
+            </p>
+          </div>
           <Select
             items={organizationLabels}
             value={selectedOrganizationId}
@@ -308,6 +356,9 @@ function CatalogueControls({
               <SelectValue placeholder="Select an organization" />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value={ALL_ORGANIZATIONS}>
+                All organizations
+              </SelectItem>
               {memberships.map((membership) => (
                 <SelectItem
                   key={membership.organizationId}
@@ -319,26 +370,6 @@ function CatalogueControls({
             </SelectContent>
           </Select>
         </div>
-        <form className="space-y-2" onSubmit={onSearchSubmit}>
-          <Label htmlFor="resource-search">Resource name</Label>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <Input
-              id="resource-search"
-              value={searchInput}
-              placeholder="Search resources"
-              onChange={(event) => onSearchInputChange(event.target.value)}
-            />
-            <Button type="submit">
-              <SearchIcon data-icon="inline-start" />
-              Search
-            </Button>
-            {appliedSearch ? (
-              <Button type="button" variant="outline" onClick={onClearSearch}>
-                Clear
-              </Button>
-            ) : null}
-          </div>
-        </form>
       </CardContent>
     </Card>
   );
@@ -347,12 +378,14 @@ function CatalogueControls({
 function CatalogueResults({
   appliedSearch,
   catalogueState,
+  memberships,
   selectedOrganizationId,
   onPageChange,
   onRetry,
 }: {
   appliedSearch: string;
   catalogueState: CatalogueState;
+  memberships: MembershipWithOrganization[];
   selectedOrganizationId: string;
   onPageChange: (page: number) => void;
   onRetry: () => void;
@@ -375,6 +408,12 @@ function CatalogueResults({
   }
 
   const { catalogue } = catalogueState;
+  const membershipNames = new Map(
+    memberships.map((membership) => [
+      membership.organizationId,
+      membership.organization.name,
+    ]),
+  );
 
   if (catalogue.data.length === 0) {
     return (
@@ -388,7 +427,9 @@ function CatalogueResults({
           <CardDescription>
             {appliedSearch
               ? `No resources matched “${appliedSearch}”. Try another name.`
-              : "This organization does not have accessible resources yet."}
+              : selectedOrganizationId === ALL_ORGANIZATIONS
+                ? "Your approved organizations do not have accessible resources yet."
+                : "This organization does not have accessible resources yet."}
           </CardDescription>
         </CardHeader>
         {catalogue.page > 1 ? (
@@ -419,11 +460,12 @@ function CatalogueResults({
         </p>
       </div>
       <div className="shared-panel-grid *:data-[slot=card]:border-0 md:grid-cols-2 xl:grid-cols-3">
-        {catalogue.data.map((resource) => (
+        {catalogue.data.map(({ accessOrganizationId, resource }) => (
           <ResourceCatalogueCard
             key={resource.id}
+            accessOrganizationId={accessOrganizationId}
+            accessOrganizationName={membershipNames.get(accessOrganizationId)}
             resource={resource}
-            selectedOrganizationId={selectedOrganizationId}
           />
         ))}
       </div>
@@ -453,6 +495,66 @@ function CatalogueResults({
       </nav>
     </div>
   );
+}
+
+async function getCombinedCatalogue(
+  organizationIds: string[],
+  requestedPage: number,
+  search: string,
+  signal: AbortSignal,
+): Promise<CataloguePage> {
+  const organizationCatalogues = await Promise.all(
+    organizationIds.map(async (organizationId) => {
+      const firstPage = await getAccessibleResources(organizationId, {
+        page: 1,
+        limit: AGGREGATE_RESOURCE_PAGE_SIZE,
+        search,
+        signal,
+      });
+      const remainingPages = await Promise.all(
+        Array.from(
+          { length: Math.max(firstPage.totalPages - 1, 0) },
+          (_, index) =>
+            getAccessibleResources(organizationId, {
+              page: index + 2,
+              limit: AGGREGATE_RESOURCE_PAGE_SIZE,
+              search,
+              signal,
+            }),
+        ),
+      );
+
+      return [firstPage, ...remainingPages].flatMap((catalogue) =>
+        catalogue.data.map((resource) => ({
+          accessOrganizationId: organizationId,
+          resource,
+        })),
+      );
+    }),
+  );
+  const resourcesById = new Map<string, CatalogueResource>();
+
+  for (const catalogueResource of organizationCatalogues.flat()) {
+    if (!resourcesById.has(catalogueResource.resource.id)) {
+      resourcesById.set(catalogueResource.resource.id, catalogueResource);
+    }
+  }
+
+  const resources = [...resourcesById.values()].sort((first, second) =>
+    first.resource.name.localeCompare(second.resource.name),
+  );
+  const total = resources.length;
+  const totalPages = Math.ceil(total / RESOURCE_PAGE_SIZE);
+  const page = Math.min(requestedPage, Math.max(totalPages, 1));
+  const pageStart = (page - 1) * RESOURCE_PAGE_SIZE;
+
+  return {
+    data: resources.slice(pageStart, pageStart + RESOURCE_PAGE_SIZE),
+    total,
+    page,
+    limit: RESOURCE_PAGE_SIZE,
+    totalPages,
+  };
 }
 
 function NoApprovedMemberships() {
