@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { PrismaService } from "@resourcehive/database";
-import { PointLedgerRepository } from "../src/points/point-ledger.repository";
+import { PointLedgerRepository } from "../../src/points/point-ledger.repository";
 
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 const describeWithDatabase = testDatabaseUrl ? describe : describe.skip;

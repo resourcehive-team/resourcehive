@@ -3,8 +3,8 @@ import { Test } from "@nestjs/testing";
 import { JwtAuthGuard } from "@resourcehive/service-auth";
 import request from "supertest";
 import { App } from "supertest/types";
-import { BookingCreationService } from "../src/bookings/booking-creation.service";
-import { BookingsController } from "../src/bookings/bookings.controller";
+import { BookingCreationService } from "../../src/bookings/booking-creation.service";
+import { BookingsController } from "../../src/bookings/bookings.controller";
 
 describe("BookingsController (e2e)", () => {
   let app: INestApplication<App>;

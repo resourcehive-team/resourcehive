@@ -4,16 +4,21 @@ import { JwtAuthGuard } from '@resourcehive/service-auth';
 import request from 'supertest';
 import { BookingsController } from '../../src/bookings/bookings.controller';
 import { BookingReadService } from '../../src/bookings/booking-read.service';
+import { BookingCreationService } from '../../src/bookings/booking-creation.service';
 
 describe('BookingsController (e2e GET endpoints)', () => {
   let app: INestApplication;
   const getUserBookings = jest.fn();
   const getOrgBookings = jest.fn();
+  const create = jest.fn();
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
       controllers: [BookingsController],
-      providers: [{ provide: BookingReadService, useValue: { getUserBookings, getOrgBookings } }],
+      providers: [
+        { provide: BookingReadService, useValue: { getUserBookings, getOrgBookings } },
+        { provide: BookingCreationService, useValue: { create } },
+      ],
     })
       .overrideGuard(JwtAuthGuard)
       .useValue({
@@ -42,6 +47,7 @@ describe('BookingsController (e2e GET endpoints)', () => {
   beforeEach(() => {
     getUserBookings.mockReset();
     getOrgBookings.mockReset();
+    create.mockReset();
   });
 
   it('GET /bookings/me returns user bookings', async () => {
