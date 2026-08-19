@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { login, resendVerificationEmail } from "@/lib/auth-api";
+import {
+  getCurrentUserPoints,
+  login,
+  resendVerificationEmail,
+} from "@/lib/auth-api";
 
 describe("login client", () => {
   afterEach(() => {
@@ -73,5 +77,60 @@ describe("login client", () => {
       message:
         "If an unverified account exists for that email, a verification link has been sent.",
     });
+  });
+
+  it("loads the authenticated user's projected point balance", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            userId: "user-1",
+            availablePoints: 75,
+            updatedAt: "2026-08-19T10:30:00.000Z",
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      ),
+    );
+
+    await expect(getCurrentUserPoints()).resolves.toEqual({
+      userId: "user-1",
+      availablePoints: 75,
+      updatedAt: "2026-08-19T10:30:00.000Z",
+    });
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining("/auth/me/points"),
+      expect.objectContaining({
+        credentials: "include",
+        cache: "no-store",
+      }),
+    );
+  });
+
+  it("rejects an invalid point balance response", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            userId: "user-1",
+            availablePoints: -10,
+            updatedAt: null,
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      ),
+    );
+
+    await expect(getCurrentUserPoints()).rejects.toThrow(
+      "The identity service returned an invalid point balance.",
+    );
   });
 });

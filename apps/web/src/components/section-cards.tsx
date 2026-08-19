@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { PointsBalanceCard } from "@/components/points-balance-card";
 import {
   Card,
   CardAction,
@@ -11,22 +12,7 @@ import {
 export function SectionCards() {
   return (
     <div className="shared-panel-grid grid-cols-1 *:data-[slot=card]:border-0 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
-      <Card>
-        <CardHeader>
-          <CardDescription>Points balance</CardDescription>
-          <CardTitle className="text-3xl font-medium tabular-nums">
-            100
-          </CardTitle>
-          <CardAction>
-            <Badge variant="success">Available</Badge>
-          </CardAction>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground">
-            Points can be used when booking a resource.
-          </p>
-        </CardContent>
-      </Card>
+      <PointsBalanceCard />
 
       <Card>
         <CardHeader>
