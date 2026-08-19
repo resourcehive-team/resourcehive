@@ -17,4 +17,4 @@ COPY --from=builder /app /app
 EXPOSE 3002
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD wget -qO- http://127.0.0.1:3002/health || exit 1
-CMD ["sh", "-c", "if [ ! -d node_modules/.prisma/client ]; then pnpm --filter booking-service prisma generate && pnpm --filter booking-service prisma migrate deploy; fi && pnpm --filter booking-service run start:prod"]
+CMD ["pnpm", "--filter", "booking-service", "run", "start:prod"]
