@@ -1,13 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { HttpException } from "@nestjs/common";
 import { PrismaService } from "@resourcehive/database";
-import { BookingAuthorizationService } from "../src/authorization/booking-authorization.service";
-import { BookingCreationService } from "../src/bookings/booking-creation.service";
-import { BookingRepository } from "../src/bookings/booking.repository";
-import { BookingValidationService } from "../src/bookings/booking-validation.service";
-import { PointLedgerRepository } from "../src/points/point-ledger.repository";
-import { PointLedgerService } from "../src/points/point-ledger.service";
-import { SlotRepository } from "../src/slots/slot.repository";
+import { BookingAuthorizationService } from "../../src/authorization/booking-authorization.service";
+import { BookingCreationService } from "../../src/bookings/booking-creation.service";
+import { BookingRepository } from "../../src/bookings/booking.repository";
+import { BookingValidationService } from "../../src/bookings/booking-validation.service";
+import { PointLedgerRepository } from "../../src/points/point-ledger.repository";
+import { PointLedgerService } from "../../src/points/point-ledger.service";
+import { SlotRepository } from "../../src/slots/slot.repository";
 
 describe("Concurrent booking creation", () => {
   const prisma = new PrismaService();

@@ -37,6 +37,8 @@ async function bootstrap(): Promise<void> {
   );
 
   await app.listen(Number(process.env.PORT ?? 3002), "0.0.0.0");
+  console.log(`Booking service is running on: ${await app.getUrl()}`);
+  console.log(`Swagger docs are available on: ${await app.getUrl()}/docs`);
 }
 
 void bootstrap();

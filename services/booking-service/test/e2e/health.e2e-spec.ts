@@ -3,7 +3,7 @@ import { Test } from "@nestjs/testing";
 import { PrismaService } from "@resourcehive/database";
 import request from "supertest";
 import { App } from "supertest/types";
-import { AppModule } from "../src/app.module";
+import { AppModule } from "../../src/app.module";
 
 describe("Booking service health (e2e)", () => {
   let app: INestApplication<App>;

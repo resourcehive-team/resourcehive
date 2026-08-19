@@ -8,7 +8,7 @@ import { PrismaService } from "@resourcehive/database";
 import { AuthenticatedRequest, JwtAuthGuard } from "@resourcehive/service-auth";
 import request from "supertest";
 import { App } from "supertest/types";
-import { AppModule } from "../src/app.module";
+import { AppModule } from "../../src/app.module";
 
 describe("Booking slot availability (e2e)", () => {
   let app: INestApplication<App>;
