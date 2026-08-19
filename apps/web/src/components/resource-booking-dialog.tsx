@@ -4,13 +4,10 @@ import * as React from "react";
 import {
   CalendarIcon,
   CalendarX2Icon,
-  CheckIcon,
-  CheckCircle2Icon,
-  CopyIcon,
-  DownloadIcon,
   RefreshCwIcon,
 } from "lucide-react";
 
+import { BookingConfirmation } from "@/components/booking-confirmation";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -48,7 +45,6 @@ import type {
   CreatedBooking,
   ResourceSlot,
 } from "@/lib/booking-service/types";
-import { copyTextToClipboard } from "@/lib/copy-to-clipboard";
 import { cn } from "@/lib/utils";
 
 type SlotListState =
@@ -407,145 +403,6 @@ function SlotTableSkeleton() {
   );
 }
 
-function BookingConfirmation({ booking }: { booking: CreatedBooking }) {
-  const [copyStatus, setCopyStatus] = React.useState<
-    "idle" | "copied" | "error"
-  >("idle");
-  const [receiptStatus, setReceiptStatus] = React.useState<
-    "idle" | "creating" | "downloaded" | "error"
-  >("idle");
-
-  async function copyReference() {
-    try {
-      await copyTextToClipboard(booking.id);
-      setCopyStatus("copied");
-    } catch {
-      setCopyStatus("error");
-    }
-  }
-
-  async function downloadReceipt() {
-    if (receiptStatus === "creating") {
-      return;
-    }
-
-    setReceiptStatus("creating");
-
-    try {
-      const { bookingReceiptFilename, createBookingReceiptPdf } = await import(
-        "@/lib/booking-receipt"
-      );
-      const receipt = await createBookingReceiptPdf(booking);
-
-      downloadPdf(receipt, bookingReceiptFilename(booking.id));
-      setReceiptStatus("downloaded");
-    } catch {
-      setReceiptStatus("error");
-    }
-  }
-
-  return (
-    <>
-      <DialogHeader>
-        <CheckCircle2Icon className="size-6 text-clay" />
-        <p className="eyebrow text-clay">Booking confirmed</p>
-        <DialogTitle className="text-3xl font-normal leading-none">
-          Your slot is reserved.
-        </DialogTitle>
-        <DialogDescription>
-          {formatDateTime(booking.startsAt)} to {formatDateTime(booking.endsAt)}.
-          {booking.pointsDeducted > 0
-            ? ` ${booking.pointsDeducted} points were deducted.`
-            : " No points were required."}
-        </DialogDescription>
-      </DialogHeader>
-      <div className="grid border border-line text-sm sm:grid-cols-[10rem_1fr]">
-        <div className="border-b border-line p-3 text-muted-foreground sm:border-r sm:border-b-0">
-          Reference
-        </div>
-        <div className="flex min-w-0 items-center justify-between gap-3 p-3">
-          <code className="min-w-0 break-all font-mono text-xs font-medium sm:text-sm">
-            {booking.id}
-          </code>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            aria-label={
-              copyStatus === "copied"
-                ? "Booking reference copied"
-                : "Copy booking reference"
-            }
-            onClick={copyReference}
-          >
-            {copyStatus === "copied" ? (
-              <CheckIcon data-icon="inline-start" />
-            ) : (
-              <CopyIcon data-icon="inline-start" />
-            )}
-            {copyStatus === "copied" ? "Copied" : "Copy"}
-          </Button>
-        </div>
-      </div>
-      {copyStatus === "error" ? (
-        <p
-          className="border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive"
-          role="alert"
-        >
-          The booking reference could not be copied. Select it manually and try
-          again.
-        </p>
-      ) : null}
-      {receiptStatus === "error" ? (
-        <p
-          className="border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive"
-          role="alert"
-        >
-          The receipt could not be created. Please try again.
-        </p>
-      ) : null}
-      <DialogFooter>
-        <Button
-          type="button"
-          variant="outline"
-          disabled={receiptStatus === "creating"}
-          onClick={downloadReceipt}
-        >
-          {receiptStatus === "downloaded" ? (
-            <CheckIcon data-icon="inline-start" />
-          ) : (
-            <DownloadIcon data-icon="inline-start" />
-          )}
-          {receiptStatus === "creating"
-            ? "Preparing receipt..."
-            : receiptStatus === "downloaded"
-              ? "Receipt downloaded"
-              : "Download receipt"}
-        </Button>
-        <DialogClose render={<Button />}>Done</DialogClose>
-      </DialogFooter>
-    </>
-  );
-}
-
-function downloadPdf(bytes: Uint8Array, filename: string) {
-  const buffer = bytes.buffer.slice(
-    bytes.byteOffset,
-    bytes.byteOffset + bytes.byteLength,
-  ) as ArrayBuffer;
-  const url = URL.createObjectURL(
-    new Blob([buffer], { type: "application/pdf" }),
-  );
-  const link = document.createElement("a");
-
-  link.href = url;
-  link.download = filename;
-  document.body.append(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 0);
-}
-
 function availableFutureSlots(
   slots: ResourceSlot[],
   earliestStart: Date,
@@ -631,15 +488,3 @@ function formatSlotDuration(slot: ResourceSlot): string {
   return `${hours} hr ${minutes} min`;
 }
 
-function formatDateTime(value: string): string {
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return "Unknown time";
-  }
-
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
-}

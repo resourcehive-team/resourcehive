@@ -19,3 +19,22 @@ export interface CreatedBooking {
   pointsDeducted: number;
   createdAt: string;
 }
+
+export interface UserBooking {
+  id: string;
+  resourceSlotId: string;
+  userId: string;
+  status: string;
+  createdAt: string;
+  cancelledAt?: string | null;
+  completedAt?: string | null;
+  resourceSlot: {
+    startsAt: string;
+    endsAt: string;
+    resource: {
+      id: string;
+      name: string;
+      pointCost: number;
+    };
+  };
+}

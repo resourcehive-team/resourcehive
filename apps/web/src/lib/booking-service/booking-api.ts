@@ -5,6 +5,7 @@ import { apiPathSegment } from "@/lib/resource-service/path";
 import type {
   CreatedBooking,
   ResourceSlot,
+  UserBooking,
 } from "@/lib/booking-service/types";
 
 export interface ResourceSlotListOptions {
@@ -63,6 +64,10 @@ export function createBooking(resourceSlotId: string): Promise<CreatedBooking> {
     method: "POST",
     json: { resourceSlotId: slotId },
   });
+}
+
+export function getMyBookings(signal?: AbortSignal): Promise<UserBooking[]> {
+  return apiRequest<UserBooking[]>("/bookings/me", { signal });
 }
 
 function validDate(value: Date, label: string): Date {
