@@ -45,6 +45,12 @@ export interface CurrentUserResponse {
   };
 }
 
+export interface CurrentUserPointsResponse {
+  userId: string;
+  availablePoints: number;
+  updatedAt: string | null;
+}
+
 export interface RegistrationRequest {
   firstName: string;
   lastName: string;
@@ -309,6 +315,37 @@ export async function getCurrentUser(
   return data;
 }
 
+export async function getCurrentUserPoints(
+  signal?: AbortSignal,
+): Promise<CurrentUserPointsResponse> {
+  let response: Response;
+
+  try {
+    response = await fetchWithSessionRefresh(`${apiUrl}/auth/me/points`, {
+      credentials: "include",
+      cache: "no-store",
+      signal,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw error;
+    }
+
+    throw new Error("Unable to load the current point balance.");
+  }
+
+  if (response.status === 401) {
+    throw new AuthenticationRequiredError();
+  }
+
+  const data: unknown = await response.json().catch(() => null);
+  if (!response.ok || !isCurrentUserPointsResponse(data)) {
+    throw new Error("The identity service returned an invalid point balance.");
+  }
+
+  return data;
+}
+
 export async function register(
   registration: RegistrationRequest,
 ): Promise<RegistrationResponse> {
@@ -481,6 +518,25 @@ function isCurrentUserResponse(data: unknown): data is CurrentUserResponse {
     "role" in organizationContext &&
     (typeof organizationContext.role === "string" ||
       organizationContext.role === null)
+  );
+}
+
+function isCurrentUserPointsResponse(
+  data: unknown,
+): data is CurrentUserPointsResponse {
+  return (
+    !!data &&
+    typeof data === "object" &&
+    "userId" in data &&
+    typeof data.userId === "string" &&
+    "availablePoints" in data &&
+    typeof data.availablePoints === "number" &&
+    Number.isSafeInteger(data.availablePoints) &&
+    data.availablePoints >= 0 &&
+    "updatedAt" in data &&
+    (data.updatedAt === null ||
+      (typeof data.updatedAt === "string" &&
+        !Number.isNaN(Date.parse(data.updatedAt))))
   );
 }
 

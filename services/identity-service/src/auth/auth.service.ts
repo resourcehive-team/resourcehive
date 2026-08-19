@@ -41,6 +41,22 @@ export class AuthService {
     private readonly emailService: EmailService,
   ) {}
 
+  async getCurrentUserPoints(userId: string) {
+    const balance = await this.prisma.userPointBalance.findUnique({
+      where: { userId },
+      select: {
+        availablePoints: true,
+        updatedAt: true,
+      },
+    });
+
+    return {
+      userId,
+      availablePoints: balance?.availablePoints ?? 0,
+      updatedAt: balance?.updatedAt.toISOString() ?? null,
+    };
+  }
+
   private getJwtSecret() {
     const secret = process.env.JWT_SECRET;
     if (!secret || secret === 'change_me') {
