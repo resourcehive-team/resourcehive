@@ -25,7 +25,10 @@ import { BookingReadService } from "./booking-read.service";
 @UseGuards(JwtAuthGuard)
 @Controller("bookings")
 export class BookingsController {
-  constructor(private readonly bookingCreation: BookingCreationService, private readonly bookingRead: BookingReadService) {}
+  constructor(
+    private readonly bookingCreation: BookingCreationService,
+    private readonly bookingRead: BookingReadService,
+  ) {}
 
   @Post()
   @ApiCreatedResponse({
@@ -50,8 +53,8 @@ export class BookingsController {
   ) {
     return this.bookingCreation.create(dto.resourceSlotId, user);
   }
-  @Get('me')
-  @ApiOkResponse({ description: 'List of bookings for the current user' })
+  @Get("me")
+  @ApiOkResponse({ description: "List of bookings for the current user" })
   async getMyBookings(
     @Query() query: GetUserBookingsDto,
     @CurrentUser() user: AuthenticatedUser,
@@ -59,8 +62,8 @@ export class BookingsController {
     return this.bookingRead.getUserBookings(user.userId, query);
   }
 
-  @Get('org')
-  @ApiOkResponse({ description: 'List of bookings for admin\'s organizations' })
+  @Get("org")
+  @ApiOkResponse({ description: "List of bookings for admin's organizations" })
   async getOrgBookings(
     @Query() query: GetOrgBookingsDto,
     @CurrentUser() user: AuthenticatedUser,
@@ -69,4 +72,3 @@ export class BookingsController {
     return this.bookingRead.getOrgBookings(orgIds, query);
   }
 }
-

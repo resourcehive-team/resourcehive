@@ -1,15 +1,18 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '@resourcehive/database';
-import { GetUserBookingsDto } from './dto/get-user-bookings.dto';
-import { GetOrgBookingsDto } from './dto/get-org-bookings.dto';
-import { BookingRecord } from './booking.types';
+import { Injectable } from "@nestjs/common";
+import { PrismaService } from "@resourcehive/database";
+import { GetUserBookingsDto } from "./dto/get-user-bookings.dto";
+import { GetOrgBookingsDto } from "./dto/get-org-bookings.dto";
+import { BookingRecord } from "./booking.types";
 
 @Injectable()
 export class BookingReadService {
   constructor(private readonly prisma: PrismaService) {}
 
   /** Returns bookings made by a specific user with optional pagination and status filter */
-  async getUserBookings(userId: string, query: GetUserBookingsDto): Promise<BookingRecord[]> {
+  async getUserBookings(
+    userId: string,
+    query: GetUserBookingsDto,
+  ): Promise<BookingRecord[]> {
     const { skip, take, status } = query;
     return this.prisma.booking.findMany({
       where: { userId, ...(status ? { status } : {}) },
@@ -28,7 +31,10 @@ export class BookingReadService {
   }
 
   /** Returns bookings for resources owned by given organization IDs (admin view) */
-  async getOrgBookings(orgIds: string[], query: GetOrgBookingsDto): Promise<BookingRecord[]> {
+  async getOrgBookings(
+    orgIds: string[],
+    query: GetOrgBookingsDto,
+  ): Promise<BookingRecord[]> {
     const { skip, take, status } = query;
     return this.prisma.booking.findMany({
       where: {
