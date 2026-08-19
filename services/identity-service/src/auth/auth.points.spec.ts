@@ -10,11 +10,7 @@ describe('AuthService current user points', () => {
   const prisma = {
     userPointBalance,
   } as unknown as PrismaService;
-  const service = new AuthService(
-    prisma,
-    new JwtService(),
-    {} as EmailService,
-  );
+  const service = new AuthService(prisma, new JwtService(), {} as EmailService);
 
   beforeEach(() => {
     jest.clearAllMocks();
