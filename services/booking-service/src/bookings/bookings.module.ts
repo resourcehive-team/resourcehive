@@ -4,7 +4,7 @@ import { BookingAuthorizationModule } from "../authorization/booking-authorizati
 import { PointsModule } from "../points/points.module";
 import { SlotsModule } from "../slots/slots.module";
 import { BookingCreationService } from "./booking-creation.service";
-import { BookingRepository } from "./booking.repository";
+import { BookingReadService } from "./booking-read.service";
 import { BookingValidationService } from "./booking-validation.service";
 import { BookingsController } from "./bookings.controller";
 
@@ -18,7 +18,7 @@ import { BookingsController } from "./bookings.controller";
   controllers: [BookingsController],
   providers: [
     BookingCreationService,
-    BookingRepository,
+    BookingReadService,
     BookingValidationService,
   ],
   exports: [BookingCreationService, BookingValidationService],
