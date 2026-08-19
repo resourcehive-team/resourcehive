@@ -131,6 +131,7 @@ model Resource {
   @@unique([id, rootOrganizationId], map: "resources_id_root_unique")
   @@index([ownerOrganizationId, status], map: "resources_owner_status_idx")
   @@index([rootOrganizationId], map: "resources_root_organization_id_idx")
+  @@index([ownerOrganizationId], map: "resources_owner_organization_id_idx")
   @@map("resources")
 }
 
@@ -178,6 +179,7 @@ model Booking {
 
   @@unique([id, userId], map: "bookings_id_user_unique")
   @@index([userId, status], map: "bookings_user_status_idx")
+@@index([userId], map: "bookings_user_id_idx")
   @@map("bookings")
 }
 
