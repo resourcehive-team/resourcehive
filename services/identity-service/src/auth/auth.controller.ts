@@ -156,6 +156,19 @@ export class AuthController {
     };
   }
 
+  @Get('me/points')
+  @UseGuards(JwtAuthGuard)
+  @Header('Cache-Control', 'private, no-store')
+  getCurrentUserPoints(@Req() request: AuthenticatedRequest) {
+    const user = request.user;
+
+    if (!user) {
+      throw new UnauthorizedException('Authentication is required');
+    }
+
+    return this.authService.getCurrentUserPoints(user.userId);
+  }
+
   @Get('validate')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
