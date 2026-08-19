@@ -10,6 +10,7 @@ import {
 
 import { RequestErrorCard } from "@/components/request-error-card";
 import { ResourceBookingDialog } from "@/components/resource-booking-dialog";
+import { ResourceSlotCreationDialog } from "@/components/resource-slot-creation-dialog";
 import { ScreenHeading } from "@/components/screen-heading";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -107,11 +108,18 @@ export function ResourceDetails({
           resource.description || "No description has been provided for this resource."
         }
         actions={
-          <ResourceBookingDialog
-            disabled={!isActive}
-            resourceId={resource.id}
-            resourceName={resource.name}
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            <ResourceBookingDialog
+              disabled={!isActive}
+              resourceId={resource.id}
+              resourceName={resource.name}
+            />
+            <ResourceSlotCreationDialog
+              disabled={!isActive}
+              resourceId={resource.id}
+              resourceName={resource.name}
+            />
+          </div>
         }
       />
       <section className="grid gap-px border border-line bg-line lg:grid-cols-12">

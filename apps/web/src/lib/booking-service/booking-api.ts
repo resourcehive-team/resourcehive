@@ -66,6 +66,33 @@ export function createBooking(resourceSlotId: string): Promise<CreatedBooking> {
   });
 }
 
+export function createResourceSlot(
+  resourceId: string,
+  startsAt: Date,
+  endsAt: Date,
+): Promise<ResourceSlot> {
+  const id = resourceId.trim();
+  const start = validDate(startsAt, "Slot start");
+  const end = validDate(endsAt, "Slot end");
+
+  if (!id) {
+    throw new Error("Resource ID is required.");
+  }
+
+  if (end.getTime() <= start.getTime()) {
+    throw new Error("Slot end must be later than its start.");
+  }
+
+  return apiRequest<ResourceSlot>("/slots", {
+    method: "POST",
+    json: {
+      resourceId: id,
+      startsAt: start.toISOString(),
+      endsAt: end.toISOString(),
+    },
+  });
+}
+
 export function getMyBookings(signal?: AbortSignal): Promise<UserBooking[]> {
   return apiRequest<UserBooking[]>("/bookings/me", { signal });
 }
