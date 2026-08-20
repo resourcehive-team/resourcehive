@@ -3,8 +3,9 @@ import { Test } from "@nestjs/testing";
 import { JwtAuthGuard } from "@resourcehive/service-auth";
 import request from "supertest";
 import { App } from "supertest/types";
-import { BookingCreationService } from "../src/bookings/booking-creation.service";
-import { BookingsController } from "../src/bookings/bookings.controller";
+import { BookingCreationService } from "../../src/bookings/booking-creation.service";
+import { BookingReadService } from "../../src/bookings/booking-read.service";
+import { BookingsController } from "../../src/bookings/bookings.controller";
 
 describe("BookingsController (e2e)", () => {
   let app: INestApplication<App>;
@@ -13,7 +14,13 @@ describe("BookingsController (e2e)", () => {
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
       controllers: [BookingsController],
-      providers: [{ provide: BookingCreationService, useValue: { create } }],
+      providers: [
+        { provide: BookingCreationService, useValue: { create } },
+        {
+          provide: BookingReadService,
+          useValue: { getUserBookings: jest.fn(), getOrgBookings: jest.fn() },
+        },
+      ],
     })
       .overrideGuard(JwtAuthGuard)
       .useValue({

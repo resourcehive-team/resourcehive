@@ -117,6 +117,33 @@ describe('AuthService refresh sessions', () => {
     expect(result.refreshTokenExpiresAt.getTime()).toBeGreaterThan(Date.now());
   });
 
+  it('identifies an unverified account after validating its password', async () => {
+    user.findUnique.mockResolvedValue({
+      id: 'user-id',
+      email: 'alex@example.edu',
+      passwordHash: await bcrypt.hash('Password123!', 4),
+      status: 'ACTIVE',
+      emailVerifiedAt: null,
+    });
+
+    let loginError: unknown;
+    try {
+      await service.login({
+        email: 'alex@example.edu',
+        password: 'Password123!',
+      });
+    } catch (error) {
+      loginError = error;
+    }
+
+    expect(loginError).toBeInstanceOf(UnauthorizedException);
+    expect((loginError as UnauthorizedException).getResponse()).toEqual({
+      code: 'EMAIL_VERIFICATION_REQUIRED',
+      message: 'Verify your email address before logging in',
+    });
+    expect(refreshToken.create).not.toHaveBeenCalled();
+  });
+
   it('rotates a valid refresh token inside one transaction', async () => {
     const expiresAt = new Date(Date.now() + 60_000);
     refreshToken.findUnique.mockResolvedValue({

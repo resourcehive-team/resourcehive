@@ -3,6 +3,11 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
 const accessTokenCookie = "resourcehive_access_token";
+const anonymousOnlyRoutes = new Set([
+  "/login",
+  "/signup/status",
+  "/verify-email",
+]);
 
 async function hasValidAccessToken(request: NextRequest): Promise<boolean> {
   const token = request.cookies.get(accessTokenCookie)?.value;
@@ -50,14 +55,19 @@ function redirectToLogin(request: NextRequest) {
 
 export async function proxy(request: NextRequest) {
   const isAuthenticated = await hasValidAccessToken(request);
+  const pathname = request.nextUrl.pathname;
 
-  if (request.nextUrl.pathname === "/") {
+  if (pathname === "/") {
     return NextResponse.redirect(
       new URL(isAuthenticated ? "/dashboard" : "/login", request.url),
     );
   }
 
-  if (!isAuthenticated) {
+  if (isAuthenticated && anonymousOnlyRoutes.has(pathname)) {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+
+  if (!isAuthenticated && pathname.startsWith("/dashboard")) {
     return redirectToLogin(request);
   }
 
@@ -65,5 +75,11 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/", "/dashboard/:path*"],
+  matcher: [
+    "/",
+    "/dashboard/:path*",
+    "/login",
+    "/signup/status",
+    "/verify-email",
+  ],
 };

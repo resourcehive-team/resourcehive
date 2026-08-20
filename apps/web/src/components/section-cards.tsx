@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { PointsBalanceCard } from "@/components/points-balance-card";
 import {
   Card,
   CardAction,
@@ -10,28 +11,13 @@ import {
 
 export function SectionCards() {
   return (
-    <div className="grid grid-cols-1 gap-4 px-4 lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
-      <Card>
-        <CardHeader>
-          <CardDescription>Points balance</CardDescription>
-          <CardTitle className="text-2xl font-semibold tabular-nums">
-            100
-          </CardTitle>
-          <CardAction>
-            <Badge variant="outline">Available</Badge>
-          </CardAction>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground">
-            Points can be used when booking a resource.
-          </p>
-        </CardContent>
-      </Card>
+    <div className="shared-panel-grid grid-cols-1 *:data-[slot=card]:border-0 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
+      <PointsBalanceCard />
 
       <Card>
         <CardHeader>
           <CardDescription>Upcoming bookings</CardDescription>
-          <CardTitle className="text-2xl font-semibold tabular-nums">
+          <CardTitle className="text-3xl font-medium tabular-nums">
             0
           </CardTitle>
           <CardAction>
@@ -48,11 +34,11 @@ export function SectionCards() {
       <Card>
         <CardHeader>
           <CardDescription>Memberships</CardDescription>
-          <CardTitle className="text-2xl font-semibold tabular-nums">
+          <CardTitle className="text-3xl font-medium tabular-nums">
             1
           </CardTitle>
           <CardAction>
-            <Badge variant="outline">Approved</Badge>
+            <Badge variant="success">Approved</Badge>
           </CardAction>
         </CardHeader>
         <CardContent>
@@ -65,7 +51,7 @@ export function SectionCards() {
       <Card>
         <CardHeader>
           <CardDescription>Unread notifications</CardDescription>
-          <CardTitle className="text-2xl font-semibold tabular-nums">
+          <CardTitle className="text-3xl font-medium tabular-nums">
             0
           </CardTitle>
           <CardAction>

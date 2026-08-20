@@ -27,6 +27,7 @@ model User {
   createdResources        Resource[]                   @relation("ResourceCreatedBy")
   bookings                Booking[]                    @relation("BookingUser")
   pointTransactions       PointTransaction[]           @relation("PointTransactionUser")
+  pointBalance            UserPointBalance?
   emailVerificationTokens EmailVerificationToken[]
   passwordResetTokens     PasswordResetToken[]
   refreshTokens           RefreshToken[]
@@ -130,6 +131,7 @@ model Resource {
   @@unique([id, rootOrganizationId], map: "resources_id_root_unique")
   @@index([ownerOrganizationId, status], map: "resources_owner_status_idx")
   @@index([rootOrganizationId], map: "resources_root_organization_id_idx")
+  @@index([ownerOrganizationId], map: "resources_owner_organization_id_idx")
   @@map("resources")
 }
 
@@ -177,6 +179,7 @@ model Booking {
 
   @@unique([id, userId], map: "bookings_id_user_unique")
   @@index([userId, status], map: "bookings_user_status_idx")
+@@index([userId], map: "bookings_user_id_idx")
   @@map("bookings")
 }
 
@@ -197,6 +200,18 @@ model PointTransaction {
 
   @@index([userId, createdAt], map: "point_transactions_user_created_at_idx")
   @@map("point_transactions")
+}
+
+/// Current balance projected from the append-only point transaction ledger.
+/// The database trigger owns inserts and updates for this table.
+model UserPointBalance {
+  userId          String   @id @map("user_id") @db.Uuid
+  availablePoints Int      @map("available_points")
+  updatedAt       DateTime @default(now()) @map("updated_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("user_point_balances")
 }
 
 model EmailVerificationToken {

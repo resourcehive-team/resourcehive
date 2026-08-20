@@ -74,10 +74,10 @@ const firstPage: PaginatedResources = {
       allowedOrganizations: [],
     },
   ],
-  total: 11,
+  total: 1,
   page: 1,
-  limit: 10,
-  totalPages: 2,
+  limit: 100,
+  totalPages: 1,
 };
 
 describe("ResourceCatalogue", () => {
@@ -113,26 +113,33 @@ describe("ResourceCatalogue", () => {
     expect(resourcesMock).not.toHaveBeenCalled();
   });
 
-  it("renders accessible resources for the selected organization", async () => {
+  it("renders the combined catalogue with All organizations selected", async () => {
     render(<ResourceCatalogue />);
 
     expect(
       await screen.findByText("Electronics Laboratory"),
     ).toBeDefined();
     expect(screen.getByRole("combobox").textContent).toContain(
-      "Engineering Faculty",
+      "All organizations",
     );
     expect(screen.getByRole("combobox").textContent).not.toContain(
       "organization-1",
     );
     expect(screen.getByText("25 points")).toBeDefined();
-    expect(screen.getByText("Owned by this organization")).toBeDefined();
+    expect(screen.getByText("Owned by Engineering Faculty")).toBeDefined();
+    expect(
+      screen.getByRole("link", { name: "Electronics Laboratory" }).getAttribute(
+        "href",
+      ),
+    ).toBe(
+      "/dashboard/resources/resource-1?organization=organization-1",
+    );
     expect(
       screen.queryByRole("button", { name: "Create resource" }),
     ).toBeNull();
     expect(resourcesMock).toHaveBeenCalledWith("organization-1", {
       page: 1,
-      limit: 10,
+      limit: 100,
       search: "",
       signal: expect.any(AbortSignal),
     });
@@ -194,7 +201,7 @@ describe("ResourceCatalogue", () => {
     render(<ResourceCatalogue />);
     await screen.findByText("Electronics Laboratory");
 
-    fireEvent.change(screen.getByLabelText("Resource name"), {
+    fireEvent.change(screen.getByLabelText("Search resources"), {
       target: { value: "  microscope  " },
     });
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
@@ -202,36 +209,35 @@ describe("ResourceCatalogue", () => {
     expect(await screen.findByText("No matching resources")).toBeDefined();
     expect(resourcesMock).toHaveBeenLastCalledWith("organization-1", {
       page: 1,
-      limit: 10,
+      limit: 100,
       search: "microscope",
       signal: expect.any(AbortSignal),
     });
   });
 
-  it("requests the next page and renders the returned resources", async () => {
-    resourcesMock
-      .mockResolvedValueOnce(firstPage)
-      .mockResolvedValueOnce({
-        ...firstPage,
-        data: [
-          {
-            ...firstPage.data[0],
-            id: "resource-2",
-            name: "Second Laboratory",
-          },
-        ],
-        page: 2,
-      });
+  it("paginates combined organization results in the frontend", async () => {
+    resourcesMock.mockResolvedValue({
+      ...firstPage,
+      data: Array.from({ length: 11 }, (_, index) => ({
+        ...firstPage.data[0],
+        id: `resource-${index + 1}`,
+        name:
+          index === 10
+            ? "Zoology Laboratory"
+            : `Laboratory ${String(index + 1).padStart(2, "0")}`,
+      })),
+      total: 11,
+    });
 
     render(<ResourceCatalogue />);
-    await screen.findByText("Electronics Laboratory");
+    await screen.findByText("Laboratory 01");
 
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
-    expect(await screen.findByText("Second Laboratory")).toBeDefined();
+    expect(await screen.findByText("Zoology Laboratory")).toBeDefined();
     expect(resourcesMock).toHaveBeenLastCalledWith("organization-1", {
-      page: 2,
-      limit: 10,
+      page: 1,
+      limit: 100,
       search: "",
       signal: expect.any(AbortSignal),
     });

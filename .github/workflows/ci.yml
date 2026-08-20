@@ -54,10 +54,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install PostgreSQL client
-        run: |
-          sudo apt-get update
-          sudo apt-get install --yes postgresql-client
+      - name: Check PostgreSQL client
+        run: psql --version
 
       - name: Validate Prisma schema
         run: pnpm run db:validate

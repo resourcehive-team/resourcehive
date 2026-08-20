@@ -1,4 +1,5 @@
 import { RecentActivityCard } from "@/components/recent-activity-card";
+import { ScreenHeading } from "@/components/screen-heading";
 import { SectionCards } from "@/components/section-cards";
 import { SiteHeader } from "@/components/site-header";
 import { UpcomingBookingsCard } from "@/components/upcoming-bookings-card";
@@ -7,17 +8,18 @@ export default function Page() {
   return (
     <>
       <SiteHeader title="Dashboard" />
-      <div className="flex flex-1 flex-col">
-        <div className="@container/main flex flex-1 flex-col gap-2">
-          <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
-            <SectionCards />
-            <div className="grid gap-4 px-4 md:grid-cols-2 lg:px-6">
-              <UpcomingBookingsCard />
-              <RecentActivityCard />
-            </div>
-          </div>
+      <main className="app-page @container/main">
+        <ScreenHeading
+          eyebrow="Campus overview"
+          title="Everything shared, in one place."
+          description="Track the resources, memberships, and activity that connect you to your campus community."
+        />
+        <SectionCards />
+        <div className="shared-panel-grid *:data-[slot=card]:border-0 md:grid-cols-2">
+          <UpcomingBookingsCard />
+          <RecentActivityCard />
         </div>
-      </div>
+      </main>
     </>
   );
 }

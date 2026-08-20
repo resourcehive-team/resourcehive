@@ -23,6 +23,10 @@ export interface PasswordResetResponse {
   message: string;
 }
 
+export interface ResendVerificationResponse {
+  message: string;
+}
+
 export interface CurrentUserResponse {
   user: {
     id: string;
@@ -39,6 +43,12 @@ export interface CurrentUserResponse {
     organizationId: string | null;
     role: string | null;
   };
+}
+
+export interface CurrentUserPointsResponse {
+  userId: string;
+  availablePoints: number;
+  updatedAt: string | null;
 }
 
 export interface RegistrationRequest {
@@ -65,7 +75,6 @@ export interface RegisteredUser {
 export interface RegistrationResponse {
   message: string;
   verificationRequired: true;
-  developmentVerificationUrl?: string;
   user: RegisteredUser;
 }
 
@@ -88,13 +97,18 @@ export interface EmailVerificationResponse {
   };
 }
 
-export interface EmailVerificationStatusResponse {
-  status: "PENDING" | "EXPIRED" | "VERIFIED";
-  emailVerified: boolean;
-}
+export type LoginErrorCode =
+  | "INVALID_CREDENTIALS"
+  | "EMAIL_VERIFICATION_REQUIRED"
+  | "SERVICE_UNAVAILABLE"
+  | "INVALID_RESPONSE"
+  | "REQUEST_FAILED";
 
 export class LoginError extends Error {
-  constructor(message: string) {
+  constructor(
+    message: string,
+    public readonly code: LoginErrorCode = "REQUEST_FAILED",
+  ) {
     super(message);
     this.name = "LoginError";
   }
@@ -128,6 +142,13 @@ export class PasswordResetError extends Error {
   }
 }
 
+export class ResendVerificationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ResendVerificationError";
+  }
+}
+
 export async function login(credentials: LoginRequest): Promise<LoginResponse> {
   let response: Response;
 
@@ -141,16 +162,34 @@ export async function login(credentials: LoginRequest): Promise<LoginResponse> {
       body: JSON.stringify(credentials),
     });
   } catch {
-    throw new LoginError("Unable to connect to the login service.");
+    throw new LoginError(
+      "Unable to connect to the login service.",
+      "SERVICE_UNAVAILABLE",
+    );
   }
 
   if (!response.ok) {
+    const data: unknown = await response.json().catch(() => null);
+
+    if (
+      response.status === 401 &&
+      isApiErrorWithCode(data, "EMAIL_VERIFICATION_REQUIRED")
+    ) {
+      throw new LoginError(
+        "Verify your email address before logging in.",
+        "EMAIL_VERIFICATION_REQUIRED",
+      );
+    }
+
     if (
       response.status === 400 ||
       response.status === 401 ||
       response.status === 404
     ) {
-      throw new LoginError("Email or password is incorrect.");
+      throw new LoginError(
+        "Email or password is incorrect.",
+        "INVALID_CREDENTIALS",
+      );
     }
 
     throw new LoginError("Unable to log in. Please try again.");
@@ -164,7 +203,10 @@ export async function login(credentials: LoginRequest): Promise<LoginResponse> {
     !("message" in data) ||
     data.message !== "user login successfully"
   ) {
-    throw new LoginError("The login service returned an invalid response.");
+    throw new LoginError(
+      "The login service returned an invalid response.",
+      "INVALID_RESPONSE",
+    );
   }
 
   return {
@@ -273,6 +315,37 @@ export async function getCurrentUser(
   return data;
 }
 
+export async function getCurrentUserPoints(
+  signal?: AbortSignal,
+): Promise<CurrentUserPointsResponse> {
+  let response: Response;
+
+  try {
+    response = await fetchWithSessionRefresh(`${apiUrl}/auth/me/points`, {
+      credentials: "include",
+      cache: "no-store",
+      signal,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw error;
+    }
+
+    throw new Error("Unable to load the current point balance.");
+  }
+
+  if (response.status === 401) {
+    throw new AuthenticationRequiredError();
+  }
+
+  const data: unknown = await response.json().catch(() => null);
+  if (!response.ok || !isCurrentUserPointsResponse(data)) {
+    throw new Error("The identity service returned an invalid point balance.");
+  }
+
+  return data;
+}
+
 export async function register(
   registration: RegistrationRequest,
 ): Promise<RegistrationResponse> {
@@ -304,7 +377,41 @@ export async function register(
     );
   }
 
-  return data;
+  return {
+    message: data.message,
+    verificationRequired: true,
+    user: data.user,
+  };
+}
+
+export async function resendVerificationEmail(
+  email: string,
+): Promise<ResendVerificationResponse> {
+  let response: Response;
+
+  try {
+    response = await fetch(`${apiUrl}/auth/resend-verification`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email }),
+    });
+  } catch {
+    throw new ResendVerificationError(
+      "Unable to connect to the email verification service.",
+    );
+  }
+
+  const data: unknown = await response.json().catch(() => null);
+
+  if (!response.ok || !isMessageResponse(data)) {
+    throw new ResendVerificationError(
+      getApiErrorMessage(data, "Unable to resend the verification email."),
+    );
+  }
+
+  return { message: data.message };
 }
 
 export async function verifyEmail(
@@ -344,40 +451,6 @@ export async function verifyEmail(
   return data;
 }
 
-export async function getEmailVerificationStatus(
-  token: string,
-): Promise<EmailVerificationStatusResponse> {
-  let response: Response;
-
-  try {
-    response = await fetch(`${apiUrl}/auth/verification-status`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ token }),
-      cache: "no-store",
-    });
-  } catch {
-    throw new EmailVerificationError(
-      "Unable to check the email verification status.",
-    );
-  }
-
-  const data: unknown = await response.json().catch(() => null);
-
-  if (!response.ok || !isEmailVerificationStatusResponse(data)) {
-    throw new EmailVerificationError(
-      getApiErrorMessage(
-        data,
-        "Unable to check the email verification status.",
-      ),
-    );
-  }
-
-  return data;
-}
-
 function getApiErrorMessage(data: unknown, fallback: string): string {
   if (!data || typeof data !== "object" || !("message" in data)) {
     return fallback;
@@ -395,6 +468,12 @@ function getApiErrorMessage(data: unknown, fallback: string): string {
   }
 
   return fallback;
+}
+
+function isApiErrorWithCode(data: unknown, code: string): boolean {
+  return (
+    !!data && typeof data === "object" && "code" in data && data.code === code
+  );
 }
 
 function isCurrentUserResponse(data: unknown): data is CurrentUserResponse {
@@ -442,6 +521,25 @@ function isCurrentUserResponse(data: unknown): data is CurrentUserResponse {
   );
 }
 
+function isCurrentUserPointsResponse(
+  data: unknown,
+): data is CurrentUserPointsResponse {
+  return (
+    !!data &&
+    typeof data === "object" &&
+    "userId" in data &&
+    typeof data.userId === "string" &&
+    "availablePoints" in data &&
+    typeof data.availablePoints === "number" &&
+    Number.isSafeInteger(data.availablePoints) &&
+    data.availablePoints >= 0 &&
+    "updatedAt" in data &&
+    (data.updatedAt === null ||
+      (typeof data.updatedAt === "string" &&
+        !Number.isNaN(Date.parse(data.updatedAt))))
+  );
+}
+
 function isRegistrationResponse(data: unknown): data is RegistrationResponse {
   if (
     !data ||
@@ -450,8 +548,6 @@ function isRegistrationResponse(data: unknown): data is RegistrationResponse {
     typeof data.message !== "string" ||
     !("verificationRequired" in data) ||
     data.verificationRequired !== true ||
-    ("developmentVerificationUrl" in data &&
-      typeof data.developmentVerificationUrl !== "string") ||
     !("user" in data) ||
     !data.user ||
     typeof data.user !== "object"
@@ -513,29 +609,11 @@ function isEmailVerificationResponse(
   );
 }
 
-function isEmailVerificationStatusResponse(
-  data: unknown,
-): data is EmailVerificationStatusResponse {
-  if (
-    !data ||
-    typeof data !== "object" ||
-    !("status" in data) ||
-    !("emailVerified" in data)
-  ) {
-    return false;
-  }
-
-  return (
-    (data.status === "PENDING" ||
-      data.status === "EXPIRED" ||
-      data.status === "VERIFIED") &&
-    typeof data.emailVerified === "boolean"
-  );
+function isPasswordResetResponse(data: unknown): data is PasswordResetResponse {
+  return isMessageResponse(data);
 }
 
-function isPasswordResetResponse(
-  data: unknown,
-): data is PasswordResetResponse {
+function isMessageResponse(data: unknown): data is { message: string } {
   return (
     !!data &&
     typeof data === "object" &&

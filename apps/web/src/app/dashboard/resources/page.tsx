@@ -1,25 +1,19 @@
 import { ResourceCatalogue } from "@/components/resource-catalogue";
+import { ScreenHeading } from "@/components/screen-heading";
 import { SiteHeader } from "@/components/site-header";
 
 export default function ResourcesPage() {
   return (
     <>
       <SiteHeader title="Resources" />
-      <div className="flex flex-1 flex-col">
-        <div className="@container/main flex flex-1 flex-col gap-2">
-          <div className="flex flex-col gap-6 px-4 py-4 lg:px-6 lg:py-6">
-            <div className="space-y-1">
-              <h2 className="text-2xl font-semibold tracking-tight">
-                Resource catalogue
-              </h2>
-              <p className="text-muted-foreground">
-                Browse resources available through your organizations.
-              </p>
-            </div>
-            <ResourceCatalogue />
-          </div>
-        </div>
-      </div>
+      <main className="app-page @container/main">
+        <ScreenHeading
+          eyebrow="Shared inventory"
+          title="Resource catalogue"
+          description="Browse equipment, spaces, and other resources available through your organizations."
+        />
+        <ResourceCatalogue />
+      </main>
     </>
   );
 }

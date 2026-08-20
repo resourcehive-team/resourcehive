@@ -34,7 +34,7 @@ export function AccountStatusCard({
         <div className="flex items-center justify-between gap-4">
           <span>Email verification</span>
           <Badge
-            variant={account.user.emailVerified ? "secondary" : "destructive"}
+            variant={account.user.emailVerified ? "success" : "destructive"}
           >
             {account.user.emailVerified ? "Verified" : "Not verified"}
           </Badge>
@@ -45,7 +45,7 @@ export function AccountStatusCard({
           <Badge
             variant={
               account.user.status.toUpperCase() === "ACTIVE"
-                ? "secondary"
+                ? "success"
                 : "destructive"
             }
           >
