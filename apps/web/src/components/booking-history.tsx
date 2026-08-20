@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   ArrowRightIcon,
   CalendarDaysIcon,
+  CheckCircle2Icon,
   Clock3Icon,
   MailIcon,
   SearchIcon,
@@ -38,9 +39,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ApiAuthenticationError } from "@/lib/api-client";
+import { completeOrganizationBooking } from "@/lib/booking-service/booking-api";
 import type {
   BookingMember,
   CreatedBooking,
+  OrganizationBooking,
   UserBooking,
 } from "@/lib/booking-service/types";
 import { formatOrganizationLabel } from "@/lib/resource-service/organization-format";
@@ -57,10 +61,12 @@ type BookingTiming =
 export function BookingHistory({
   bookings,
   mode,
+  onBookingCompleted,
   resourceOrganizationIds = {},
 }: {
   bookings: HistoryBooking[];
   mode: BookingHistoryMode;
+  onBookingCompleted?: (booking: OrganizationBooking) => void;
   resourceOrganizationIds?: Record<string, string>;
 }) {
   const [search, setSearch] = React.useState("");
@@ -136,6 +142,7 @@ export function BookingHistory({
               key={booking.id}
               booking={booking}
               mode={mode}
+              onBookingCompleted={onBookingCompleted}
               organizationId={
                 resourceOrganizationIds[booking.resourceSlot.resource.id] ??
                 null
@@ -161,10 +168,12 @@ export function BookingHistory({
 function BookingRow({
   booking,
   mode,
+  onBookingCompleted,
   organizationId,
 }: {
   booking: HistoryBooking;
   mode: BookingHistoryMode;
+  onBookingCompleted?: (booking: OrganizationBooking) => void;
   organizationId: string | null;
 }) {
   const receiptBooking = toCreatedBooking(booking);
@@ -244,13 +253,97 @@ function BookingRow({
             </Link>
           ) : null}
           <CopyBookingReferenceButton referenceId={booking.id} />
-          <DownloadBookingReceiptButton booking={receiptBooking} />
+          {isAdminView ? (
+            booking.status.toUpperCase() === "CONFIRMED" &&
+            onBookingCompleted ? (
+              <MarkBookingCompleteButton
+                bookingId={booking.id}
+                onCompleted={onBookingCompleted}
+              />
+            ) : null
+          ) : (
+            <DownloadBookingReceiptButton booking={receiptBooking} />
+          )}
         </div>
       </article>
       <DialogContent className="rounded-none sm:max-w-xl">
-        <BookingConfirmation booking={receiptBooking} mode="summary" />
+        <BookingConfirmation
+          actions={
+            isAdminView &&
+            booking.status.toUpperCase() === "CONFIRMED" &&
+            onBookingCompleted ? (
+              <MarkBookingCompleteButton
+                bookingId={booking.id}
+                onCompleted={onBookingCompleted}
+              />
+            ) : undefined
+          }
+          booking={receiptBooking}
+          mode="summary"
+          showReceipt={!isAdminView}
+        />
       </DialogContent>
     </Dialog>
+  );
+}
+
+function MarkBookingCompleteButton({
+  bookingId,
+  onCompleted,
+}: {
+  bookingId: string;
+  onCompleted: (booking: OrganizationBooking) => void;
+}) {
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [error, setError] = React.useState("");
+
+  async function markAsComplete() {
+    if (isSubmitting) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError("");
+
+    try {
+      const completedBooking = await completeOrganizationBooking(bookingId);
+      onCompleted(completedBooking);
+    } catch (requestError) {
+      if (requestError instanceof ApiAuthenticationError) {
+        window.location.assign("/login");
+        return;
+      }
+
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "The booking could not be marked as completed.",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <Button
+        type="button"
+        size="sm"
+        disabled={isSubmitting}
+        onClick={markAsComplete}
+      >
+        <CheckCircle2Icon data-icon="inline-start" />
+        {isSubmitting ? "Marking complete..." : "Mark as complete"}
+      </Button>
+      {error ? (
+        <span
+          className="max-w-64 text-right text-xs text-destructive"
+          role="alert"
+        >
+          {error}
+        </span>
+      ) : null}
+    </div>
   );
 }
 

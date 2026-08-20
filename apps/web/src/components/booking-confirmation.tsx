@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { CalendarCheckIcon, CheckCircle2Icon } from "lucide-react";
 
 import {
@@ -17,11 +18,15 @@ import {
 import type { CreatedBooking } from "@/lib/booking-service/types";
 
 export function BookingConfirmation({
+  actions,
   booking,
   mode = "confirmation",
+  showReceipt = true,
 }: {
+  actions?: ReactNode;
   booking: CreatedBooking;
   mode?: "confirmation" | "summary";
+  showReceipt?: boolean;
 }) {
   const isSummary = mode === "summary";
 
@@ -40,7 +45,8 @@ export function BookingConfirmation({
           {isSummary ? booking.resourceName : "Your slot is reserved."}
         </DialogTitle>
         <DialogDescription>
-          {formatDateTime(booking.startsAt)} to {formatDateTime(booking.endsAt)}.
+          {formatDateTime(booking.startsAt)} to {formatDateTime(booking.endsAt)}
+          .
           {booking.pointsDeducted > 0
             ? ` ${booking.pointsDeducted} points were deducted.`
             : " No points were required."}
@@ -58,7 +64,10 @@ export function BookingConfirmation({
         </div>
       </div>
       <DialogFooter>
-        <DownloadBookingReceiptButton booking={booking} />
+        {showReceipt ? (
+          <DownloadBookingReceiptButton booking={booking} />
+        ) : null}
+        {actions}
         <DialogClose render={<Button />}>Done</DialogClose>
       </DialogFooter>
     </>

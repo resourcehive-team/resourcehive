@@ -298,6 +298,24 @@ function ResourceBookingHistory({ resourceId }: { resourceId: string }) {
     return () => controller.abort();
   }, [attempt, resourceId, router]);
 
+  const handleBookingCompleted = React.useCallback(
+    (completedBooking: OrganizationBooking) => {
+      setHistoryState((currentState) => {
+        if (currentState.status !== "loaded") {
+          return currentState;
+        }
+
+        return {
+          status: "loaded",
+          bookings: currentState.bookings.map((booking) =>
+            booking.id === completedBooking.id ? completedBooking : booking,
+          ),
+        };
+      });
+    },
+    [],
+  );
+
   if (historyState.status === "loading") {
     return <BookingHistorySkeleton />;
   }
@@ -316,7 +334,11 @@ function ResourceBookingHistory({ resourceId }: { resourceId: string }) {
   }
 
   return (
-    <BookingHistory bookings={historyState.bookings} mode="resource-admin" />
+    <BookingHistory
+      bookings={historyState.bookings}
+      mode="resource-admin"
+      onBookingCompleted={handleBookingCompleted}
+    />
   );
 }
 

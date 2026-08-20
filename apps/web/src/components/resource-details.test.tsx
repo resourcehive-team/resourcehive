@@ -2,7 +2,10 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ResourceDetails } from "@/components/resource-details";
-import { getOrganizationBookings } from "@/lib/booking-service/booking-api";
+import {
+  completeOrganizationBooking,
+  getOrganizationBookings,
+} from "@/lib/booking-service/booking-api";
 import type { OrganizationBooking } from "@/lib/booking-service/types";
 import { getCurrentUserMemberships } from "@/lib/resource-service/membership-api";
 import { getResourceDetails } from "@/lib/resource-service/resource-api";
@@ -29,6 +32,7 @@ vi.mock("@/lib/resource-service/membership-api", () => ({
 }));
 
 vi.mock("@/lib/booking-service/booking-api", () => ({
+  completeOrganizationBooking: vi.fn(),
   getOrganizationBookings: vi.fn(),
 }));
 
@@ -47,6 +51,7 @@ vi.mock("@/components/resource-slot-creation-dialog", () => ({
 const getResourceDetailsMock = vi.mocked(getResourceDetails);
 const getCurrentUserMembershipsMock = vi.mocked(getCurrentUserMemberships);
 const getOrganizationBookingsMock = vi.mocked(getOrganizationBookings);
+const completeOrganizationBookingMock = vi.mocked(completeOrganizationBooking);
 
 const resource: ResourceDetailsData = {
   id: "resource-1",
@@ -125,6 +130,7 @@ describe("ResourceDetails", () => {
     getOrganizationBookingsMock
       .mockReset()
       .mockResolvedValue([organizationBooking]);
+    completeOrganizationBookingMock.mockReset();
   });
 
   it("shows live booking members and their account details to an administrator", async () => {
@@ -185,6 +191,40 @@ describe("ResourceDetails", () => {
     expect(getOrganizationBookingsMock).not.toHaveBeenCalled();
   });
 
+  it("lets an administrator mark a confirmed booking as completed", async () => {
+    completeOrganizationBookingMock.mockResolvedValue({
+      ...organizationBooking,
+      status: "COMPLETED",
+      completedAt: "2026-08-20T10:00:00.000Z",
+    });
+
+    render(
+      <ResourceDetails
+        organizationId="organization-1"
+        resourceId="resource-1"
+      />,
+    );
+
+    const completeButton = await screen.findByRole("button", {
+      name: "Mark as complete",
+    });
+    expect(
+      screen.queryByRole("button", { name: "Download booking receipt" }),
+    ).toBeNull();
+
+    fireEvent.click(completeButton);
+
+    await waitFor(() => {
+      expect(completeOrganizationBookingMock).toHaveBeenCalledWith(
+        organizationBooking.id,
+      );
+    });
+    expect(await screen.findByText("Completed")).toBeDefined();
+    expect(
+      screen.queryByRole("button", { name: "Mark as complete" }),
+    ).toBeNull();
+  });
+
   it("does not crash when an older booking response lacks member details", async () => {
     getOrganizationBookingsMock.mockResolvedValueOnce([
       {
@@ -200,9 +240,7 @@ describe("ResourceDetails", () => {
       />,
     );
 
-    expect(
-      await screen.findByText("Member details unavailable"),
-    ).toBeDefined();
+    expect(await screen.findByText("Member details unavailable")).toBeDefined();
   });
 
   it("disables booking for an inactive resource", async () => {

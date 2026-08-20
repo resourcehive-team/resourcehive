@@ -152,7 +152,7 @@ describe("ResourceBookingDialog", () => {
     expect(clipboardWriteMock).toHaveBeenCalledWith("booking-1");
 
     fireEvent.click(
-      screen.getByRole("button", { name: "Download receipt" }),
+      screen.getByRole("button", { name: "Download booking receipt" }),
     );
 
     expect(await screen.findByText("Receipt downloaded")).toBeDefined();

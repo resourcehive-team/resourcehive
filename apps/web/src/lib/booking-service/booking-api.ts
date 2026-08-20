@@ -104,6 +104,16 @@ export function getOrganizationBookings(
   return apiRequest<OrganizationBooking[]>("/bookings/org", { signal });
 }
 
+export function completeOrganizationBooking(
+  bookingId: string,
+): Promise<OrganizationBooking> {
+  const booking = apiPathSegment(bookingId, "Booking ID");
+
+  return apiRequest<OrganizationBooking>(`/bookings/${booking}/complete`, {
+    method: "PATCH",
+  });
+}
+
 function validDate(value: Date, label: string): Date {
   if (Number.isNaN(value.getTime())) {
     throw new Error(`${label} must be a valid date.`);
