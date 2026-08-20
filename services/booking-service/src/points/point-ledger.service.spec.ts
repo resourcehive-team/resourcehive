@@ -7,6 +7,7 @@ describe("PointLedgerService", () => {
   const repository = {
     getBalance: jest.fn(),
     appendBookingDeduction: jest.fn(),
+    appendBookingRefund: jest.fn(),
   } as unknown as PointLedgerRepository;
   const service = new PointLedgerService(repository);
 
@@ -29,6 +30,16 @@ describe("PointLedgerService", () => {
   it("rejects non-negative booking deductions", () => {
     expect(() =>
       service.appendBookingDeduction({
+        userId: "user-id",
+        bookingId: "booking-id",
+        amount: 0,
+      }),
+    ).toThrow(BadRequestException);
+  });
+
+  it("rejects non-positive booking refunds", () => {
+    expect(() =>
+      service.appendBookingRefund({
         userId: "user-id",
         bookingId: "booking-id",
         amount: 0,

@@ -60,7 +60,7 @@ const data = {
     },
     {
       title: "My bookings",
-      url: "#",
+      url: "/dashboard/bookings",
       icon: <CalendarDaysIcon />,
     },
     {

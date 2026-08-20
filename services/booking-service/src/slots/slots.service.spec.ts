@@ -84,6 +84,8 @@ describe("SlotsService", () => {
         resourceId: "resource-id",
         startsAt: new Date(Date.now() + 60_000),
         endsAt: new Date(Date.now() + 120_000),
+        status: "PUBLISHED",
+        withdrawnAt: null,
         createdAt: new Date(),
         resource: {
           id: "resource-id",

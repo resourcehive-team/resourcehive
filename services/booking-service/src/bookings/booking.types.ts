@@ -32,6 +32,22 @@ export interface BookingRecord {
   };
 }
 
+export interface OrganizationBookingRecord extends BookingRecord {
+  user: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    status: string;
+    emailVerifiedAt: Date | null;
+    createdAt: Date;
+  };
+}
+
+export interface CancelledBookingRecord extends OrganizationBookingRecord {
+  refundPoints: number;
+  slotStatus: string;
+}
+
 export interface CreatedBooking {
   id: string;
   resourceSlotId: string;

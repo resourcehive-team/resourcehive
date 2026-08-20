@@ -24,6 +24,8 @@ export interface SlotRecord {
   resourceId: string;
   startsAt: Date;
   endsAt: Date;
+  status: string;
+  withdrawnAt: Date | null;
   createdAt: Date;
   resource: {
     id: string;
@@ -41,6 +43,7 @@ export interface SlotView {
   resourceId: string;
   startsAt: Date;
   endsAt: Date;
+  status: string;
   createdAt: Date;
   available: boolean;
 }

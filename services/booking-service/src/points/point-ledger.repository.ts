@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { PrismaService } from "@resourcehive/database";
 import {
   AppendBookingDeductionInput,
+  AppendBookingRefundInput,
   PointLedgerClient,
   PointLedgerEntry,
 } from "./point-ledger.types";
@@ -31,6 +32,21 @@ export class PointLedgerRepository {
         bookingId: input.bookingId,
         amount: input.amount,
         transactionType: "BOOKING",
+        description: input.description,
+      },
+    });
+  }
+
+  appendBookingRefund(
+    input: AppendBookingRefundInput,
+    client: PointLedgerClient = this.prisma,
+  ): Promise<PointLedgerEntry> {
+    return client.pointTransaction.create({
+      data: {
+        userId: input.userId,
+        bookingId: input.bookingId,
+        amount: input.amount,
+        transactionType: "BOOKING_REFUND",
         description: input.description,
       },
     });

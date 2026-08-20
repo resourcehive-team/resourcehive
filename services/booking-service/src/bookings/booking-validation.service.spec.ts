@@ -39,6 +39,8 @@ describe("BookingValidationService", () => {
     resourceId: "resource-id",
     startsAt: new Date("2030-08-01T10:00:00.000Z"),
     endsAt: new Date("2030-08-01T11:00:00.000Z"),
+    status: "PUBLISHED",
+    withdrawnAt: null,
     createdAt: new Date("2026-08-01T09:00:00.000Z"),
     resource: {
       id: "resource-id",

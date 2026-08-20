@@ -21,7 +21,7 @@ type BalanceState =
   | { status: "loaded"; balance: CurrentUserPointsResponse }
   | { status: "error" };
 
-export function PointsBalanceCard() {
+export function PointsBalanceCard({ refreshKey = 0 }: { refreshKey?: number }) {
   const [state, setState] = React.useState<BalanceState>({
     status: "loading",
   });
@@ -40,7 +40,7 @@ export function PointsBalanceCard() {
       });
 
     return () => controller.abort();
-  }, []);
+  }, [refreshKey]);
 
   return (
     <Card aria-busy={state.status === "loading"}>

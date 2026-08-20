@@ -1,3 +1,4 @@
+import { ForbiddenException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import { BookingReadService } from "../../src/bookings/booking-read.service";
 import { PrismaService } from "@resourcehive/database";
@@ -8,10 +9,16 @@ interface MockPrisma {
   booking: {
     findMany: jest.Mock;
   };
+  organizationMembership: {
+    findMany: jest.Mock;
+  };
 }
 
 const mockPrisma: MockPrisma = {
   booking: {
+    findMany: jest.fn(),
+  },
+  organizationMembership: {
     findMany: jest.fn(),
   },
 };
@@ -58,9 +65,22 @@ describe("BookingReadService", () => {
 
   it("should return org bookings without status filter", async () => {
     const dummyResult = [{ id: "b2" }];
+    mockPrisma.organizationMembership.findMany.mockResolvedValue([
+      { organizationId: "org-1" },
+      { organizationId: "org-2" },
+    ]);
     mockPrisma.booking.findMany.mockResolvedValue(dummyResult);
     const query: GetOrgBookingsDto = {};
-    const result = await service.getOrgBookings(["org-1", "org-2"], query);
+    const result = await service.getOrgBookings("user-123", query);
+
+    expect(mockPrisma.organizationMembership.findMany).toHaveBeenCalledWith({
+      where: {
+        userId: "user-123",
+        role: "ADMIN",
+        status: "APPROVED",
+      },
+      select: { organizationId: true },
+    });
     expect(mockPrisma.booking.findMany).toHaveBeenCalledWith({
       where: {
         resourceSlot: {
@@ -70,6 +90,16 @@ describe("BookingReadService", () => {
       skip: undefined,
       take: undefined,
       include: {
+        user: {
+          select: {
+            firstName: true,
+            lastName: true,
+            email: true,
+            status: true,
+            emailVerifiedAt: true,
+            createdAt: true,
+          },
+        },
         resourceSlot: {
           select: {
             startsAt: true,
@@ -80,5 +110,14 @@ describe("BookingReadService", () => {
       },
     });
     expect(result).toBe(dummyResult);
+  });
+
+  it("should reject users without an approved administrator membership", async () => {
+    mockPrisma.organizationMembership.findMany.mockResolvedValue([]);
+
+    await expect(service.getOrgBookings("user-123", {})).rejects.toThrow(
+      ForbiddenException,
+    );
+    expect(mockPrisma.booking.findMany).not.toHaveBeenCalled();
   });
 });
