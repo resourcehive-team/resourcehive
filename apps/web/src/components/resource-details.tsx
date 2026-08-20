@@ -109,8 +109,9 @@ export function ResourceDetails({
               resourceId={resource.id}
               resourceName={resource.name}
             />
-            <ResourceSlotCreationDialog
+            <ProtectedSlotCreationDialog
               disabled={!isActive}
+              ownerOrganizationId={resource.ownerOrganizationId}
               resourceId={resource.id}
               resourceName={resource.name}
             />
@@ -250,6 +251,48 @@ function ProtectedBookingHistory({
 
   return authorizedOrganizationId === ownerOrganizationId ? (
     <ResourceBookingHistory resourceId={resourceId} />
+  ) : null;
+}
+
+function ProtectedSlotCreationDialog({
+  disabled,
+  ownerOrganizationId,
+  resourceId,
+  resourceName,
+}: {
+  disabled: boolean;
+  ownerOrganizationId: string;
+  resourceId: string;
+  resourceName: string;
+}) {
+  const [isAuthorized, setIsAuthorized] = React.useState(false);
+
+  React.useEffect(() => {
+    const controller = new AbortController();
+
+    getCurrentUserMemberships(controller.signal)
+      .then((memberships) => {
+        if (!controller.signal.aborted) {
+          setIsAuthorized(
+            isOwnerOrganizationAdmin(memberships, ownerOrganizationId),
+          );
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setIsAuthorized(false);
+        }
+      });
+
+    return () => controller.abort();
+  }, [ownerOrganizationId]);
+
+  return isAuthorized ? (
+    <ResourceSlotCreationDialog
+      disabled={disabled}
+      resourceId={resourceId}
+      resourceName={resourceName}
+    />
   ) : null;
 }
 
