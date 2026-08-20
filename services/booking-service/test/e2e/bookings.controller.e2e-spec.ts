@@ -86,7 +86,7 @@ describe("BookingsController (e2e GET endpoints)", () => {
       });
 
     expect(getOrgBookings).toHaveBeenCalledWith(
-      ["org-456"],
+      "user-123",
       expect.any(Object),
     );
   });

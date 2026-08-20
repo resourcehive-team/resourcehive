@@ -68,7 +68,6 @@ export class BookingsController {
     @Query() query: GetOrgBookingsDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    const orgIds = user.organizationId ? [user.organizationId] : [];
-    return this.bookingRead.getOrgBookings(orgIds, query);
+    return this.bookingRead.getOrgBookings(user.userId, query);
   }
 }

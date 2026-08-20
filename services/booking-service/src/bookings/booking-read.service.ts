@@ -1,8 +1,8 @@
-import { Injectable } from "@nestjs/common";
+import { ForbiddenException, Injectable } from "@nestjs/common";
 import { PrismaService } from "@resourcehive/database";
 import { GetUserBookingsDto } from "./dto/get-user-bookings.dto";
 import { GetOrgBookingsDto } from "./dto/get-org-bookings.dto";
-import { BookingRecord } from "./booking.types";
+import { BookingRecord, OrganizationBookingRecord } from "./booking.types";
 
 @Injectable()
 export class BookingReadService {
@@ -30,20 +30,52 @@ export class BookingReadService {
     });
   }
 
-  /** Returns bookings for resources owned by given organization IDs (admin view) */
+  /** Returns bookings owned by organizations the user directly administers. */
   async getOrgBookings(
-    orgIds: string[],
+    userId: string,
     query: GetOrgBookingsDto,
-  ): Promise<BookingRecord[]> {
+  ): Promise<OrganizationBookingRecord[]> {
+    const administratorMemberships =
+      await this.prisma.organizationMembership.findMany({
+        where: {
+          userId,
+          role: "ADMIN",
+          status: "APPROVED",
+        },
+        select: { organizationId: true },
+      });
+
+    if (administratorMemberships.length === 0) {
+      throw new ForbiddenException(
+        "Approved administrator membership is required",
+      );
+    }
+
+    const organizationIds = administratorMemberships.map(
+      (membership) => membership.organizationId,
+    );
     const { skip, take, status } = query;
+
     return this.prisma.booking.findMany({
       where: {
-        resourceSlot: { resource: { ownerOrganizationId: { in: orgIds } } },
+        resourceSlot: {
+          resource: { ownerOrganizationId: { in: organizationIds } },
+        },
         ...(status ? { status } : {}),
       },
       skip,
       take,
       include: {
+        user: {
+          select: {
+            firstName: true,
+            lastName: true,
+            email: true,
+            status: true,
+            emailVerifiedAt: true,
+            createdAt: true,
+          },
+        },
         resourceSlot: {
           select: {
             startsAt: true,
