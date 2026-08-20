@@ -38,3 +38,16 @@ export interface UserBooking {
     };
   };
 }
+
+export interface BookingMember {
+  firstName: string;
+  lastName: string;
+  email: string;
+  status: string;
+  emailVerifiedAt: string | null;
+  createdAt: string;
+}
+
+export interface OrganizationBooking extends UserBooking {
+  user: BookingMember;
+}

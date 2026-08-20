@@ -4,6 +4,7 @@ import { apiRequest } from "@/lib/api-client";
 import { apiPathSegment } from "@/lib/resource-service/path";
 import type {
   CreatedBooking,
+  OrganizationBooking,
   ResourceSlot,
   UserBooking,
 } from "@/lib/booking-service/types";
@@ -95,6 +96,12 @@ export function createResourceSlot(
 
 export function getMyBookings(signal?: AbortSignal): Promise<UserBooking[]> {
   return apiRequest<UserBooking[]>("/bookings/me", { signal });
+}
+
+export function getOrganizationBookings(
+  signal?: AbortSignal,
+): Promise<OrganizationBooking[]> {
+  return apiRequest<OrganizationBooking[]>("/bookings/org", { signal });
 }
 
 function validDate(value: Date, label: string): Date {

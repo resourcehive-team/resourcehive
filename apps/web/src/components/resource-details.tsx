@@ -2,47 +2,41 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import {
-  Building2Icon,
-  CalendarDaysIcon,
-  PackageIcon,
-} from "lucide-react";
+import { Building2Icon, CalendarDaysIcon, PackageIcon } from "lucide-react";
 
+import {
+  BookingHistory,
+  BookingHistorySkeleton,
+} from "@/components/booking-history";
 import { RequestErrorCard } from "@/components/request-error-card";
 import { ResourceBookingDialog } from "@/components/resource-booking-dialog";
 import { ResourceSlotCreationDialog } from "@/components/resource-slot-creation-dialog";
 import { ScreenHeading } from "@/components/screen-heading";
 import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import mockBookingHistory from "@/data/mock-booking-history.json";
 import { ApiAuthenticationError } from "@/lib/api-client";
+import { getOrganizationBookings } from "@/lib/booking-service/booking-api";
+import type { OrganizationBooking } from "@/lib/booking-service/types";
+import { getCurrentUserMemberships } from "@/lib/resource-service/membership-api";
 import {
   formatOrganizationDate,
   formatOrganizationLabel,
   formatOrganizationPoints,
 } from "@/lib/resource-service/organization-format";
 import { getResourceDetails } from "@/lib/resource-service/resource-api";
-import type { ResourceDetails as ResourceDetailsData } from "@/lib/resource-service/types";
+import type {
+  MembershipWithOrganization,
+  ResourceDetails as ResourceDetailsData,
+} from "@/lib/resource-service/types";
 
 type ResourceState =
   | { status: "loading" }
   | { status: "loaded"; resource: ResourceDetailsData }
+  | { status: "error"; error: unknown };
+
+type BookingHistoryState =
+  | { status: "loading" }
+  | { status: "loaded"; bookings: OrganizationBooking[] }
   | { status: "error"; error: unknown };
 
 export function ResourceDetails({
@@ -105,7 +99,8 @@ export function ResourceDetails({
         eyebrow="Resource record"
         title={resource.name}
         description={
-          resource.description || "No description has been provided for this resource."
+          resource.description ||
+          "No description has been provided for this resource."
         }
         actions={
           <div className="flex flex-wrap items-center gap-2">
@@ -185,7 +180,10 @@ export function ResourceDetails({
           </div>
         </aside>
       </section>
-      <BookingHistory />
+      <ProtectedBookingHistory
+        ownerOrganizationId={resource.ownerOrganizationId}
+        resourceId={resource.id}
+      />
     </>
   );
 }
@@ -210,54 +208,115 @@ function DetailItem({
   );
 }
 
-function BookingHistory() {
+function ProtectedBookingHistory({
+  ownerOrganizationId,
+  resourceId,
+}: {
+  ownerOrganizationId: string;
+  resourceId: string;
+}) {
+  const router = useRouter();
+  const [authorizedOrganizationId, setAuthorizedOrganizationId] =
+    React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    const controller = new AbortController();
+
+    getCurrentUserMemberships(controller.signal)
+      .then((memberships) => {
+        if (!controller.signal.aborted) {
+          setAuthorizedOrganizationId(
+            isOwnerOrganizationAdmin(memberships, ownerOrganizationId)
+              ? ownerOrganizationId
+              : null,
+          );
+        }
+      })
+      .catch((requestError: unknown) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        setAuthorizedOrganizationId(null);
+
+        if (requestError instanceof ApiAuthenticationError) {
+          router.replace("/login");
+          router.refresh();
+        }
+      });
+
+    return () => controller.abort();
+  }, [ownerOrganizationId, router]);
+
+  return authorizedOrganizationId === ownerOrganizationId ? (
+    <ResourceBookingHistory resourceId={resourceId} />
+  ) : null;
+}
+
+function ResourceBookingHistory({ resourceId }: { resourceId: string }) {
+  const router = useRouter();
+  const [attempt, setAttempt] = React.useState(0);
+  const [historyState, setHistoryState] = React.useState<BookingHistoryState>({
+    status: "loading",
+  });
+
+  React.useEffect(() => {
+    const controller = new AbortController();
+
+    getOrganizationBookings(controller.signal)
+      .then((bookings) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        setHistoryState({
+          status: "loaded",
+          bookings: bookings
+            .filter(
+              (booking) => booking.resourceSlot.resource.id === resourceId,
+            )
+            .sort(
+              (first, second) =>
+                new Date(second.resourceSlot.startsAt).getTime() -
+                new Date(first.resourceSlot.startsAt).getTime(),
+            ),
+        });
+      })
+      .catch((requestError: unknown) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        setHistoryState({ status: "error", error: requestError });
+
+        if (requestError instanceof ApiAuthenticationError) {
+          router.replace("/login");
+          router.refresh();
+        }
+      });
+
+    return () => controller.abort();
+  }, [attempt, resourceId, router]);
+
+  if (historyState.status === "loading") {
+    return <BookingHistorySkeleton />;
+  }
+
+  if (historyState.status === "error") {
+    return (
+      <RequestErrorCard
+        error={historyState.error}
+        subject="Booking history"
+        onRetry={() => {
+          setHistoryState({ status: "loading" });
+          setAttempt((currentAttempt) => currentAttempt + 1);
+        }}
+      />
+    );
+  }
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Booking history</CardTitle>
-        <CardDescription>
-          Recent reservations for this resource. Live history will replace this
-          preview when the booking history API is available.
-        </CardDescription>
-        <CardAction>
-          <Badge variant="outline">Mock data</Badge>
-        </CardAction>
-      </CardHeader>
-      <CardContent className="px-0">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="pl-5">Reference</TableHead>
-              <TableHead>Member</TableHead>
-              <TableHead>From</TableHead>
-              <TableHead>To</TableHead>
-              <TableHead>Points</TableHead>
-              <TableHead className="pr-5 text-right">Status</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {mockBookingHistory.map((booking) => (
-              <TableRow key={booking.id}>
-                <TableCell className="pl-5 font-medium">{booking.id}</TableCell>
-                <TableCell>{booking.member}</TableCell>
-                <TableCell>{formatBookingDateTime(booking.startsAt)}</TableCell>
-                <TableCell>{formatBookingDateTime(booking.endsAt)}</TableCell>
-                <TableCell>{booking.points}</TableCell>
-                <TableCell className="pr-5 text-right">
-                  <Badge
-                    variant={
-                      booking.status === "CANCELLED" ? "outline" : "default"
-                    }
-                  >
-                    {formatOrganizationLabel(booking.status)}
-                  </Badge>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
+    <BookingHistory bookings={historyState.bookings} mode="resource-admin" />
   );
 }
 
@@ -282,9 +341,7 @@ function ResourceDetailsSkeleton() {
   );
 }
 
-function statusVariant(
-  status: string,
-): "default" | "destructive" | "outline" {
+function statusVariant(status: string): "default" | "destructive" | "outline" {
   if (status.toUpperCase() === "ACTIVE") {
     return "default";
   }
@@ -296,15 +353,14 @@ function statusVariant(
   return "outline";
 }
 
-function formatBookingDateTime(value: string): string {
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return "Unknown";
-  }
-
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
+function isOwnerOrganizationAdmin(
+  memberships: MembershipWithOrganization[],
+  ownerOrganizationId: string,
+): boolean {
+  return memberships.some(
+    (membership) =>
+      membership.organizationId === ownerOrganizationId &&
+      membership.status.toUpperCase() === "APPROVED" &&
+      membership.role.toUpperCase() === "ADMIN",
+  );
 }
