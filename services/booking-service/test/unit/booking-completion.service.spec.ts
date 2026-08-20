@@ -34,11 +34,24 @@ const booking = {
   },
 };
 
+interface BookingUpdateInput {
+  data: { completedAt: Date; status: string };
+  where: { id: string };
+}
+
 describe("BookingCompletionService", () => {
+  let bookingUpdate: BookingUpdateInput | undefined;
+  let bookingUpdateResult: unknown;
+  const updateBooking = jest.fn(
+    (input: BookingUpdateInput): Promise<unknown> => {
+      bookingUpdate = input;
+      return Promise.resolve(bookingUpdateResult);
+    },
+  );
   const prisma = {
     booking: {
       findUnique: jest.fn(),
-      update: jest.fn(),
+      update: updateBooking,
     },
     organizationMembership: {
       findFirst: jest.fn(),
@@ -50,6 +63,8 @@ describe("BookingCompletionService", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    bookingUpdate = undefined;
+    bookingUpdateResult = undefined;
     prisma.booking.findUnique.mockResolvedValue(booking);
     prisma.organizationMembership.findFirst.mockResolvedValue({
       id: "membership-1",
@@ -62,7 +77,7 @@ describe("BookingCompletionService", () => {
       status: "COMPLETED",
       completedAt: new Date("2026-08-20T10:00:00.000Z"),
     };
-    prisma.booking.update.mockResolvedValue(completedBooking);
+    bookingUpdateResult = completedBooking;
 
     await expect(service.complete(booking.id, "administrator-1")).resolves.toBe(
       completedBooking,
@@ -77,15 +92,12 @@ describe("BookingCompletionService", () => {
       },
       select: { id: true },
     });
-    expect(prisma.booking.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: booking.id },
-        data: {
-          status: "COMPLETED",
-          completedAt: expect.any(Date),
-        },
-      }),
-    );
+    const update = bookingUpdate;
+    expect(update).toBeDefined();
+    if (!update) throw new Error("Expected the booking to be updated");
+    expect(update.where).toEqual({ id: booking.id });
+    expect(update.data.status).toBe("COMPLETED");
+    expect(update.data.completedAt).toBeInstanceOf(Date);
   });
 
   it("rejects a user who does not administer the resource organization", async () => {
@@ -94,7 +106,7 @@ describe("BookingCompletionService", () => {
     await expect(
       service.complete(booking.id, "member-1"),
     ).rejects.toBeInstanceOf(ForbiddenException);
-    expect(prisma.booking.update).not.toHaveBeenCalled();
+    expect(updateBooking).not.toHaveBeenCalled();
   });
 
   it("rejects a cancelled booking", async () => {
@@ -107,7 +119,7 @@ describe("BookingCompletionService", () => {
     await expect(
       service.complete(booking.id, "administrator-1"),
     ).rejects.toBeInstanceOf(ConflictException);
-    expect(prisma.booking.update).not.toHaveBeenCalled();
+    expect(updateBooking).not.toHaveBeenCalled();
   });
 
   it("rejects an unknown booking", async () => {

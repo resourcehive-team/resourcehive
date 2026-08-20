@@ -38,7 +38,20 @@ const booking = {
   },
 };
 
+interface ResourceSlotUpdateInput {
+  data: { status: string; withdrawnAt: Date | null };
+  where: { id: string };
+}
+
 describe("BookingCancellationService", () => {
+  const appendBookingRefund = jest.fn();
+  let lastResourceSlotUpdate: ResourceSlotUpdateInput | undefined;
+  const updateResourceSlot = jest.fn(
+    (input: ResourceSlotUpdateInput): Promise<unknown> => {
+      lastResourceSlotUpdate = input;
+      return Promise.resolve({});
+    },
+  );
   const transaction = {
     booking: {
       findUnique: jest.fn(),
@@ -51,7 +64,7 @@ describe("BookingCancellationService", () => {
       findFirst: jest.fn(),
     },
     resourceSlot: {
-      update: jest.fn(),
+      update: updateResourceSlot,
     },
   };
   const prisma = {
@@ -61,12 +74,13 @@ describe("BookingCancellationService", () => {
     ),
   } as unknown as PrismaService;
   const points = {
-    appendBookingRefund: jest.fn(),
+    appendBookingRefund,
   } as unknown as PointLedgerService;
   const service = new BookingCancellationService(prisma, points);
 
   beforeEach(() => {
     jest.clearAllMocks();
+    lastResourceSlotUpdate = undefined;
     transaction.booking.findUnique
       .mockReset()
       .mockResolvedValueOnce(booking)
@@ -82,8 +96,7 @@ describe("BookingCancellationService", () => {
     transaction.pointTransaction.findFirst
       .mockReset()
       .mockResolvedValue({ amount: -25 });
-    transaction.resourceSlot.update.mockReset().mockResolvedValue({});
-    jest.spyOn(points, "appendBookingRefund").mockResolvedValue({} as never);
+    appendBookingRefund.mockReset().mockResolvedValue({});
   });
 
   it("refunds half rounded up and republishes the slot for a user cancellation", async () => {
@@ -97,11 +110,11 @@ describe("BookingCancellationService", () => {
       slotStatus: "PUBLISHED",
     });
     expect(transaction.organizationMembership.findFirst).not.toHaveBeenCalled();
-    expect(transaction.resourceSlot.update).toHaveBeenCalledWith({
+    expect(updateResourceSlot).toHaveBeenCalledWith({
       where: { id: booking.resourceSlotId },
       data: { status: "PUBLISHED", withdrawnAt: null },
     });
-    expect(points.appendBookingRefund).toHaveBeenCalledWith(
+    expect(appendBookingRefund).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: booking.userId,
         bookingId: booking.id,
@@ -131,11 +144,13 @@ describe("BookingCancellationService", () => {
       },
       select: { id: true },
     });
-    expect(transaction.resourceSlot.update).toHaveBeenCalledWith({
-      where: { id: booking.resourceSlotId },
-      data: { status: "WITHDRAWN", withdrawnAt: expect.any(Date) },
-    });
-    expect(points.appendBookingRefund).toHaveBeenCalledWith(
+    const slotUpdate = lastResourceSlotUpdate;
+    expect(slotUpdate).toBeDefined();
+    if (!slotUpdate) throw new Error("Expected the slot to be updated");
+    expect(slotUpdate.where).toEqual({ id: booking.resourceSlotId });
+    expect(slotUpdate.data.status).toBe("WITHDRAWN");
+    expect(slotUpdate.data.withdrawnAt).toBeInstanceOf(Date);
+    expect(appendBookingRefund).toHaveBeenCalledWith(
       expect.objectContaining({ amount: 25 }),
       transaction,
     );
