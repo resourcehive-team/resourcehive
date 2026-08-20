@@ -50,4 +50,27 @@ describe("PointLedgerRepository", () => {
     });
     expect(pointTransaction.create).not.toHaveBeenCalled();
   });
+
+  it("appends a booking refund to the supplied transaction client", async () => {
+    const transaction = {
+      pointTransaction: { aggregate: jest.fn(), create: jest.fn() },
+    };
+    transaction.pointTransaction.create.mockResolvedValue({ id: "entry-id" });
+
+    await repository.appendBookingRefund(
+      { userId: "user-id", bookingId: "booking-id", amount: 13 },
+      transaction as unknown as PointLedgerClient,
+    );
+
+    expect(transaction.pointTransaction.create).toHaveBeenCalledWith({
+      data: {
+        userId: "user-id",
+        bookingId: "booking-id",
+        amount: 13,
+        transactionType: "BOOKING_REFUND",
+        description: undefined,
+      },
+    });
+    expect(pointTransaction.create).not.toHaveBeenCalled();
+  });
 });

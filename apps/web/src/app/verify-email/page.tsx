@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { AuthShell } from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -43,37 +44,25 @@ export default async function VerifyEmailPage({
   }
 
   return (
-    <main className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
+    <AuthShell>
       {verifiedEmail && (
         <SignupVerificationSync verifiedEmail={verifiedEmail} />
       )}
-      <div className="w-full max-w-sm">
-        <Card>
-          <CardHeader>
-            <CardTitle>{title}</CardTitle>
-            <CardDescription>{message}</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-2 sm:flex-row">
-            {verifiedEmail && (
-              <Button
-                className="w-full sm:w-auto"
-                nativeButton={false}
-                render={<Link href="/signup/status" />}
-              >
-                View signup status
-              </Button>
-            )}
-            <Button
-              className="w-full sm:w-auto"
-              variant={verifiedEmail ? "outline" : "default"}
-              nativeButton={false}
-              render={<Link href="/login" />}
-            >
-              Go to login
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    </main>
+      <Card className="auth-form-card">
+        <CardHeader>
+          <CardTitle className="auth-form-title">{title}</CardTitle>
+          <CardDescription>{message}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button
+            className="w-full sm:w-auto"
+            nativeButton={false}
+            render={<Link href="/login" />}
+          >
+            Go to login
+          </Button>
+        </CardContent>
+      </Card>
+    </AuthShell>
   );
 }

@@ -12,6 +12,13 @@ export interface AppendBookingDeductionInput {
   description?: string;
 }
 
+export interface AppendBookingRefundInput {
+  userId: string;
+  bookingId: string;
+  amount: number;
+  description?: string;
+}
+
 export interface PointLedgerEntry {
   id: string;
   userId: string;

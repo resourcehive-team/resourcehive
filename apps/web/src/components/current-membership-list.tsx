@@ -89,7 +89,7 @@ export function CurrentMembershipList() {
   }
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+    <div className="shared-panel-grid *:data-[slot=card]:border-0 md:grid-cols-2 xl:grid-cols-3">
       {state.memberships.map((membership) => (
         <MembershipCard key={membership.id} membership={membership} />
       ))}
@@ -188,7 +188,7 @@ function CurrentMembershipListSkeleton() {
     <div
       aria-busy="true"
       aria-label="Loading memberships"
-      className="grid gap-4 md:grid-cols-2 xl:grid-cols-3"
+      className="shared-panel-grid *:data-[slot=card]:border-0 md:grid-cols-2 xl:grid-cols-3"
     >
       {Array.from({ length: 3 }, (_, index) => (
         <Card key={index}>

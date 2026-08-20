@@ -29,6 +29,12 @@ interface CurrentUserResponse {
   };
 }
 
+interface CurrentUserPointsResponse {
+  userId: string;
+  availablePoints: number;
+  updatedAt: string | null;
+}
+
 interface RegistrationResponse {
   developmentVerificationUrl: string;
   user: {
@@ -167,6 +173,26 @@ describe('Authentication Flow (e2e)', () => {
 
   it('rejects current-user requests without an authentication cookie', async () => {
     await request(app.getHttpServer()).get('/auth/me').expect(401);
+  });
+
+  it('returns the current user point balance', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/auth/me/points')
+      .set('Cookie', authenticationCookie)
+      .expect(200);
+
+    const body = response.body as CurrentUserPointsResponse;
+    expect(response.headers['cache-control']).toBe('private, no-store');
+    expect(typeof body.userId).toBe('string');
+    expect(Number.isInteger(body.availablePoints)).toBe(true);
+    expect(body.availablePoints).toBeGreaterThanOrEqual(0);
+    expect(
+      body.updatedAt === null || !Number.isNaN(Date.parse(body.updatedAt)),
+    ).toBe(true);
+  });
+
+  it('rejects point balance requests without an authentication cookie', async () => {
+    await request(app.getHttpServer()).get('/auth/me/points').expect(401);
   });
 
   it('rejects an invalid JWT', async () => {

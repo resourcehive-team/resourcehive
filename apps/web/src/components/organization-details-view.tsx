@@ -99,13 +99,19 @@ export function OrganizationDetailsView({
   }
 
   return (
-    <div className="flex flex-col gap-8">
-      <OrganizationOverview organization={state.organization} />
-      <MembershipRequestCard
-        organizationId={state.organization.id}
-        organizationName={state.organization.name}
-      />
-      <ChildOrganizationList organizations={state.organization.children} />
+    <div className="grid gap-8 lg:grid-cols-12">
+      <div className="lg:col-span-8">
+        <OrganizationOverview organization={state.organization} />
+      </div>
+      <div className="lg:col-span-4 lg:pt-20">
+        <MembershipRequestCard
+          organizationId={state.organization.id}
+          organizationName={state.organization.name}
+        />
+      </div>
+      <div className="lg:col-span-12">
+        <ChildOrganizationList organizations={state.organization.children} />
+      </div>
     </div>
   );
 }
@@ -118,18 +124,19 @@ function OrganizationOverview({
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="space-y-1">
-          <h2 className="text-2xl font-semibold tracking-tight">
+        <div>
+          <p className="eyebrow mb-3 text-clay">Organization profile</p>
+          <h2 className="screen-title">
             {organization.name}
           </h2>
-          <p className="text-muted-foreground">
+          <p className="screen-description">
             {formatOrganizationLabel(organization.type)}
           </p>
         </div>
         <Badge
           variant={
             organization.status.toUpperCase() === "ACTIVE"
-              ? "default"
+              ? "success"
               : "outline"
           }
         >
@@ -196,7 +203,7 @@ function ChildOrganizationList({
         <div className="space-y-1">
           <h3
             id="child-organizations-heading"
-            className="text-xl font-semibold tracking-tight"
+            className="font-serif text-3xl font-normal tracking-[-0.035em]"
           >
             Child organizations
           </h3>
@@ -220,7 +227,7 @@ function ChildOrganizationList({
           </CardHeader>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="shared-panel-grid *:data-[slot=card]:border-0 md:grid-cols-2 xl:grid-cols-3">
           {organizations.map((organization) => (
             <OrganizationSummaryCard
               key={organization.id}

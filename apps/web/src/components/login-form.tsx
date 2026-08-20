@@ -5,7 +5,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { login, LoginError } from "@/lib/auth-api";
-import { markSignupEmailVerified } from "@/lib/auth-storage";
+import {
+  hasPendingSignupForEmail,
+  markSignupEmailVerified,
+  storePendingVerificationEmail,
+} from "@/lib/auth-storage";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -78,6 +82,18 @@ export function LoginForm({
       router.replace(redirectTo);
       router.refresh();
     } catch (loginError) {
+      if (
+        loginError instanceof LoginError &&
+        (loginError.code === "EMAIL_VERIFICATION_REQUIRED" ||
+          (loginError.code === "INVALID_CREDENTIALS" &&
+            hasPendingSignupForEmail(email)))
+      ) {
+        storePendingVerificationEmail(email);
+        router.replace("/signup/status");
+        router.refresh();
+        return;
+      }
+
       setError(
         loginError instanceof LoginError
           ? loginError.message
@@ -90,9 +106,9 @@ export function LoginForm({
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <Card>
+      <Card className="auth-form-card">
         <CardHeader>
-          <CardTitle>Welcome back</CardTitle>
+          <CardTitle className="auth-form-title">Welcome back</CardTitle>
           <CardDescription>
             Enter your institutional email to continue to ResourceHive.
           </CardDescription>
@@ -139,7 +155,10 @@ export function LoginForm({
                       *
                     </span>
                   </FieldLabel>
-                  <Link className="text-sm underline-offset-4 hover:underline" href="/forgot-password">
+                  <Link
+                    className="text-sm underline-offset-4 hover:underline"
+                    href="/forgot-password"
+                  >
                     Forgot password?
                   </Link>
                 </div>

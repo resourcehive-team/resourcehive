@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { PrismaService } from "@resourcehive/database";
-import { SlotRepository } from "../src/slots/slot.repository";
+import { SlotRepository } from "../../src/slots/slot.repository";
 
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 const describeWithDatabase = testDatabaseUrl ? describe : describe.skip;

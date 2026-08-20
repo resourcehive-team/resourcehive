@@ -109,8 +109,10 @@ export class SlotsService {
       resourceId: slot.resourceId,
       startsAt: slot.startsAt,
       endsAt: slot.endsAt,
+      status: slot.status,
       createdAt: slot.createdAt,
       available:
+        slot.status === "PUBLISHED" &&
         slot.resource.status === "ACTIVE" &&
         slot.endsAt > new Date() &&
         slot.bookings.length === 0,

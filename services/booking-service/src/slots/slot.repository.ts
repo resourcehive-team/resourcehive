@@ -36,6 +36,7 @@ export class SlotRepository {
     return client.resourceSlot.findFirst({
       where: {
         id: slotId,
+        status: "PUBLISHED",
         resource: { rootOrganizationId },
       },
       include: slotWithResource,
@@ -54,6 +55,7 @@ export class SlotRepository {
     return this.prisma.resourceSlot.findMany({
       where: {
         resourceId: query.resourceId,
+        status: "PUBLISHED",
         resource: { rootOrganizationId: query.rootOrganizationId },
         ...(startsAt ? { startsAt } : {}),
       },

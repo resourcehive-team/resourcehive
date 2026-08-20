@@ -11,13 +11,13 @@ export function MembershipStatusBadge({ status }: { status: string }) {
 
 function membershipStatusVariant(
   status: string,
-): "default" | "secondary" | "destructive" | "outline" {
+): "success" | "warning" | "destructive" | "outline" {
   if (status === "APPROVED") {
-    return "default";
+    return "success";
   }
 
   if (status === "PENDING") {
-    return "secondary";
+    return "warning";
   }
 
   if (status === "REJECTED") {

@@ -126,11 +126,12 @@ export function OrganizationMemberList({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="space-y-1">
-        <h2 className="text-2xl font-semibold tracking-tight">
+      <div>
+        <p className="eyebrow mb-3 text-clay">Organization administration</p>
+        <h2 className="screen-title">
           {state.organization.name}
         </h2>
-        <p className="text-muted-foreground">
+        <p className="screen-description">
           Review members and membership requests for this organization.
         </p>
       </div>
@@ -161,7 +162,7 @@ function OrganizationMembersTable({
           </Badge>
         </CardAction>
       </CardHeader>
-      <CardContent>
+      <CardContent className="px-0">
         <Table>
           <TableCaption className="sr-only">
             Members and membership requests
@@ -295,11 +296,11 @@ function memberInitials(user: OrganizationMemberUser): string {
 
 function accountStatusVariant(
   status: string,
-): "secondary" | "destructive" | "outline" {
+): "success" | "destructive" | "outline" {
   const normalizedStatus = status.toUpperCase();
 
   if (normalizedStatus === "ACTIVE") {
-    return "secondary";
+    return "success";
   }
 
   if (normalizedStatus === "SUSPENDED") {
