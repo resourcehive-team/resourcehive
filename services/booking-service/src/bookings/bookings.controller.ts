@@ -1,4 +1,14 @@
-import { Body, Controller, Post, UseGuards, Get, Query } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from "@nestjs/common";
 import {
   ApiBearerAuth,
   ApiConflictResponse,
@@ -15,6 +25,9 @@ import {
   JwtAuthGuard,
 } from "@resourcehive/service-auth";
 import { BookingCreationService } from "./booking-creation.service";
+import { BookingCompletionService } from "./booking-completion.service";
+import { BookingCancellationService } from "./booking-cancellation.service";
+import { CancelBookingDto } from "./dto/cancel-booking.dto";
 import { CreateBookingDto } from "./dto/create-booking.dto";
 import { GetUserBookingsDto } from "./dto/get-user-bookings.dto";
 import { GetOrgBookingsDto } from "./dto/get-org-bookings.dto";
@@ -28,6 +41,8 @@ export class BookingsController {
   constructor(
     private readonly bookingCreation: BookingCreationService,
     private readonly bookingRead: BookingReadService,
+    private readonly bookingCompletion: BookingCompletionService,
+    private readonly bookingCancellation: BookingCancellationService,
   ) {}
 
   @Post()
@@ -68,7 +83,39 @@ export class BookingsController {
     @Query() query: GetOrgBookingsDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    const orgIds = user.organizationId ? [user.organizationId] : [];
-    return this.bookingRead.getOrgBookings(orgIds, query);
+    return this.bookingRead.getOrgBookings(user.userId, query);
+  }
+
+  @Patch(":bookingId/complete")
+  @ApiOkResponse({ description: "Booking marked as completed" })
+  @ApiForbiddenResponse({
+    description: "The user does not administer the resource's organization",
+  })
+  @ApiNotFoundResponse({ description: "Booking not found" })
+  @ApiConflictResponse({
+    description: "The booking is not in a confirmable state",
+  })
+  complete(
+    @Param("bookingId", ParseUUIDPipe) bookingId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.bookingCompletion.complete(bookingId, user.userId);
+  }
+
+  @Patch(":bookingId/cancel")
+  @ApiOkResponse({ description: "Booking cancelled and points refunded" })
+  @ApiForbiddenResponse({
+    description: "The user cannot cancel this booking",
+  })
+  @ApiNotFoundResponse({ description: "Booking not found" })
+  @ApiConflictResponse({
+    description: "The booking cannot be cancelled in its current state",
+  })
+  cancel(
+    @Param("bookingId", ParseUUIDPipe) bookingId: string,
+    @Body() dto: CancelBookingDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.bookingCancellation.cancel(bookingId, user.userId, dto);
   }
 }

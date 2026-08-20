@@ -35,6 +35,7 @@ describe("SlotRepository", () => {
     expect(resourceSlot.findFirst).toHaveBeenCalledWith({
       where: {
         id: "slot-id",
+        status: "PUBLISHED",
         resource: { rootOrganizationId: "tenant-id" },
       },
       include: {
@@ -74,6 +75,7 @@ describe("SlotRepository", () => {
       expect.objectContaining({
         where: {
           resourceId: "resource-id",
+          status: "PUBLISHED",
           resource: { rootOrganizationId: "tenant-id" },
           startsAt: { gte: start, lt: end },
         },

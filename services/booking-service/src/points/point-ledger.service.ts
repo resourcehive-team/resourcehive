@@ -3,6 +3,7 @@ import { InsufficientPointsError } from "./point-ledger.errors";
 import { PointLedgerRepository } from "./point-ledger.repository";
 import {
   AppendBookingDeductionInput,
+  AppendBookingRefundInput,
   PointLedgerClient,
   PointLedgerEntry,
 } from "./point-ledger.types";
@@ -42,5 +43,17 @@ export class PointLedgerService {
       );
     }
     return this.repository.appendBookingDeduction(input, client);
+  }
+
+  appendBookingRefund(
+    input: AppendBookingRefundInput,
+    client?: PointLedgerClient,
+  ): Promise<PointLedgerEntry> {
+    if (!Number.isInteger(input.amount) || input.amount <= 0) {
+      throw new BadRequestException(
+        "Booking refund amount must be a positive integer",
+      );
+    }
+    return this.repository.appendBookingRefund(input, client);
   }
 }

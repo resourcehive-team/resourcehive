@@ -6,10 +6,7 @@ import {
   createBooking,
   getResourceSlots,
 } from "@/lib/booking-service/booking-api";
-import type {
-  CreatedBooking,
-  ResourceSlot,
-} from "@/lib/booking-service/types";
+import type { CreatedBooking, ResourceSlot } from "@/lib/booking-service/types";
 import {
   bookingReceiptFilename,
   createBookingReceiptPdf,
@@ -97,7 +94,9 @@ describe("ResourceBookingDialog", () => {
 
     expect(await screen.findByText("Book Study Room")).toBeDefined();
     expect(await screen.findByRole("radio")).toBeDefined();
-    expect(screen.getByRole("columnheader", { name: "Date" })).toBeDefined();
+    expect(
+      screen.getByRole("columnheader", { name: "Date range" }),
+    ).toBeDefined();
     expect(screen.getByRole("columnheader", { name: "From" })).toBeDefined();
     expect(screen.getByRole("columnheader", { name: "To" })).toBeDefined();
     expect(screen.getByText("1 hr 30 min")).toBeDefined();
@@ -152,7 +151,7 @@ describe("ResourceBookingDialog", () => {
     expect(clipboardWriteMock).toHaveBeenCalledWith("booking-1");
 
     fireEvent.click(
-      screen.getByRole("button", { name: "Download receipt" }),
+      screen.getByRole("button", { name: "Download booking receipt" }),
     );
 
     expect(await screen.findByText("Receipt downloaded")).toBeDefined();
