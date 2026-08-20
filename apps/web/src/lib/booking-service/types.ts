@@ -5,6 +5,7 @@ export interface ResourceSlot {
   endsAt: string;
   createdAt: string;
   available: boolean;
+  status?: string;
 }
 
 export interface CreatedBooking {
@@ -50,4 +51,9 @@ export interface BookingMember {
 
 export interface OrganizationBooking extends UserBooking {
   user: BookingMember;
+}
+
+export interface CancelledBooking extends OrganizationBooking {
+  refundPoints: number;
+  slotStatus: string;
 }

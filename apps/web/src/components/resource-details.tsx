@@ -298,8 +298,8 @@ function ResourceBookingHistory({ resourceId }: { resourceId: string }) {
     return () => controller.abort();
   }, [attempt, resourceId, router]);
 
-  const handleBookingCompleted = React.useCallback(
-    (completedBooking: OrganizationBooking) => {
+  const handleBookingUpdated = React.useCallback(
+    (updatedBooking: OrganizationBooking) => {
       setHistoryState((currentState) => {
         if (currentState.status !== "loaded") {
           return currentState;
@@ -308,7 +308,7 @@ function ResourceBookingHistory({ resourceId }: { resourceId: string }) {
         return {
           status: "loaded",
           bookings: currentState.bookings.map((booking) =>
-            booking.id === completedBooking.id ? completedBooking : booking,
+            booking.id === updatedBooking.id ? updatedBooking : booking,
           ),
         };
       });
@@ -337,7 +337,7 @@ function ResourceBookingHistory({ resourceId }: { resourceId: string }) {
     <BookingHistory
       bookings={historyState.bookings}
       mode="resource-admin"
-      onBookingCompleted={handleBookingCompleted}
+      onBookingUpdated={handleBookingUpdated}
     />
   );
 }

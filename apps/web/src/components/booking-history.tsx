@@ -6,13 +6,13 @@ import {
   ArrowRightIcon,
   CalendarDaysIcon,
   CheckCircle2Icon,
-  Clock3Icon,
   MailIcon,
   SearchIcon,
   UserRoundIcon,
 } from "lucide-react";
 
 import { BookingConfirmation } from "@/components/booking-confirmation";
+import { BookingCancellationDialog } from "@/components/booking-cancellation-dialog";
 import {
   CopyBookingReferenceButton,
   DownloadBookingReceiptButton,
@@ -61,12 +61,12 @@ type BookingTiming =
 export function BookingHistory({
   bookings,
   mode,
-  onBookingCompleted,
+  onBookingUpdated,
   resourceOrganizationIds = {},
 }: {
   bookings: HistoryBooking[];
   mode: BookingHistoryMode;
-  onBookingCompleted?: (booking: OrganizationBooking) => void;
+  onBookingUpdated?: (booking: OrganizationBooking) => void;
   resourceOrganizationIds?: Record<string, string>;
 }) {
   const [search, setSearch] = React.useState("");
@@ -142,7 +142,7 @@ export function BookingHistory({
               key={booking.id}
               booking={booking}
               mode={mode}
-              onBookingCompleted={onBookingCompleted}
+              onBookingUpdated={onBookingUpdated}
               organizationId={
                 resourceOrganizationIds[booking.resourceSlot.resource.id] ??
                 null
@@ -168,16 +168,17 @@ export function BookingHistory({
 function BookingRow({
   booking,
   mode,
-  onBookingCompleted,
+  onBookingUpdated,
   organizationId,
 }: {
   booking: HistoryBooking;
   mode: BookingHistoryMode;
-  onBookingCompleted?: (booking: OrganizationBooking) => void;
+  onBookingUpdated?: (booking: OrganizationBooking) => void;
   organizationId: string | null;
 }) {
   const receiptBooking = toCreatedBooking(booking);
-  const timing = getBookingTiming(booking, Date.now());
+  const [now] = React.useState(Date.now);
+  const timing = getBookingTiming(booking, now);
   const isAdminView = mode === "resource-admin";
   const resourceHref = createResourceHref(
     booking.resourceSlot.resource.id,
@@ -231,11 +232,7 @@ function BookingRow({
         <div className="pointer-events-none relative z-10 grid gap-1 text-sm">
           <p className="flex items-center gap-2 font-medium">
             <CalendarDaysIcon className="size-4 text-clay" />
-            {formatBookingDate(booking.resourceSlot.startsAt)}
-          </p>
-          <p className="flex items-center gap-2 text-muted-foreground">
-            <Clock3Icon className="size-4" />
-            {formatBookingTimeRange(
+            {formatBookingSchedule(
               booking.resourceSlot.startsAt,
               booking.resourceSlot.endsAt,
             )}
@@ -253,30 +250,26 @@ function BookingRow({
             </Link>
           ) : null}
           <CopyBookingReferenceButton referenceId={booking.id} />
-          {isAdminView ? (
-            booking.status.toUpperCase() === "CONFIRMED" &&
-            onBookingCompleted ? (
-              <MarkBookingCompleteButton
-                bookingId={booking.id}
-                onCompleted={onBookingCompleted}
-              />
-            ) : null
-          ) : (
+          {!isAdminView ? (
             <DownloadBookingReceiptButton booking={receiptBooking} />
-          )}
+          ) : null}
+          <BookingMutationActions
+            booking={booking}
+            canUserCancel={timing === "upcoming"}
+            isAdmin={isAdminView}
+            onBookingUpdated={onBookingUpdated}
+          />
         </div>
       </article>
       <DialogContent className="rounded-none sm:max-w-xl">
         <BookingConfirmation
           actions={
-            isAdminView &&
-            booking.status.toUpperCase() === "CONFIRMED" &&
-            onBookingCompleted ? (
-              <MarkBookingCompleteButton
-                bookingId={booking.id}
-                onCompleted={onBookingCompleted}
-              />
-            ) : undefined
+            <BookingMutationActions
+              booking={booking}
+              canUserCancel={timing === "upcoming"}
+              isAdmin={isAdminView}
+              onBookingUpdated={onBookingUpdated}
+            />
           }
           booking={receiptBooking}
           mode="summary"
@@ -284,6 +277,40 @@ function BookingRow({
         />
       </DialogContent>
     </Dialog>
+  );
+}
+
+function BookingMutationActions({
+  booking,
+  canUserCancel,
+  isAdmin,
+  onBookingUpdated,
+}: {
+  booking: HistoryBooking;
+  canUserCancel: boolean;
+  isAdmin: boolean;
+  onBookingUpdated?: (booking: OrganizationBooking) => void;
+}) {
+  if (booking.status.toUpperCase() !== "CONFIRMED" || !onBookingUpdated) {
+    return null;
+  }
+
+  return (
+    <>
+      {isAdmin ? (
+        <MarkBookingCompleteButton
+          bookingId={booking.id}
+          onCompleted={onBookingUpdated}
+        />
+      ) : null}
+      {isAdmin || canUserCancel ? (
+        <BookingCancellationDialog
+          booking={booking}
+          isAdmin={isAdmin}
+          onCancelled={onBookingUpdated}
+        />
+      ) : null}
+    </>
   );
 }
 
@@ -610,14 +637,21 @@ function accountStatusVariant(
   return "outline";
 }
 
-function formatBookingDate(value: string): string {
-  const date = new Date(value);
+function formatBookingSchedule(startsAt: string, endsAt: string): string {
+  const start = new Date(startsAt);
+  const end = new Date(endsAt);
 
-  if (Number.isNaN(date.getTime())) {
-    return "Unknown date";
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return "Unknown schedule";
   }
 
-  return new Intl.DateTimeFormat(undefined, {
+  return isSameCalendarDate(start, end)
+    ? `${formatBookingDate(start)} · ${formatBookingTime(start)}–${formatBookingTime(end)}`
+    : `${formatBookingDate(start)}, ${formatBookingTime(start)} → ${formatBookingDate(end)}, ${formatBookingTime(end)}`;
+}
+
+function formatBookingDate(date: Date): string {
+  return new Intl.DateTimeFormat("en-US", {
     weekday: "short",
     year: "numeric",
     month: "short",
@@ -625,18 +659,16 @@ function formatBookingDate(value: string): string {
   }).format(date);
 }
 
-function formatBookingTimeRange(startsAt: string, endsAt: string): string {
-  return `${formatBookingTime(startsAt)}–${formatBookingTime(endsAt)}`;
+function isSameCalendarDate(first: Date, second: Date): boolean {
+  return (
+    first.getFullYear() === second.getFullYear() &&
+    first.getMonth() === second.getMonth() &&
+    first.getDate() === second.getDate()
+  );
 }
 
-function formatBookingTime(value: string): string {
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return "Unknown time";
-  }
-
-  return new Intl.DateTimeFormat(undefined, {
+function formatBookingTime(date: Date): string {
+  return new Intl.DateTimeFormat("en-US", {
     hour: "numeric",
     minute: "2-digit",
   }).format(date);

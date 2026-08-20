@@ -24,7 +24,10 @@ import {
 } from "@/components/ui/card";
 import { ApiAuthenticationError, ApiError } from "@/lib/api-client";
 import { getMyBookings } from "@/lib/booking-service/booking-api";
-import type { UserBooking } from "@/lib/booking-service/types";
+import type {
+  OrganizationBooking,
+  UserBooking,
+} from "@/lib/booking-service/types";
 import { getCurrentUserMemberships } from "@/lib/resource-service/membership-api";
 import { getResourceDetails } from "@/lib/resource-service/resource-api";
 
@@ -43,6 +46,7 @@ export function MyBookings() {
     status: "loading",
   });
   const [requestAttempt, setRequestAttempt] = React.useState(0);
+  const [balanceRefreshKey, setBalanceRefreshKey] = React.useState(0);
 
   React.useEffect(() => {
     const controller = new AbortController();
@@ -88,11 +92,34 @@ export function MyBookings() {
     return () => controller.abort();
   }, [requestAttempt, router]);
 
+  const handleBookingUpdated = React.useCallback(
+    (updatedBooking: OrganizationBooking) => {
+      setState((currentState) => {
+        if (currentState.status !== "loaded") {
+          return currentState;
+        }
+
+        return {
+          ...currentState,
+          bookings: currentState.bookings.map((booking) =>
+            booking.id === updatedBooking.id ? updatedBooking : booking,
+          ),
+        };
+      });
+      setBalanceRefreshKey((currentKey) => currentKey + 1);
+    },
+    [],
+  );
+
   const bookings = state.status === "loaded" ? state.bookings : [];
 
   return (
     <div className="grid gap-8">
-      <BookingMetrics bookings={bookings} loading={state.status !== "loaded"} />
+      <BookingMetrics
+        balanceRefreshKey={balanceRefreshKey}
+        bookings={bookings}
+        loading={state.status !== "loaded"}
+      />
 
       {state.status === "loading" ? <BookingHistorySkeleton /> : null}
 
@@ -115,6 +142,7 @@ export function MyBookings() {
         <BookingHistory
           bookings={state.bookings}
           mode="personal"
+          onBookingUpdated={handleBookingUpdated}
           resourceOrganizationIds={state.resourceOrganizationIds}
         />
       ) : null}
@@ -123,13 +151,15 @@ export function MyBookings() {
 }
 
 function BookingMetrics({
+  balanceRefreshKey,
   bookings,
   loading,
 }: {
+  balanceRefreshKey: number;
   bookings: UserBooking[];
   loading: boolean;
 }) {
-  const now = Date.now();
+  const [now] = React.useState(Date.now);
   const active = bookings.filter((booking) => {
     const timing = getBookingTiming(booking, now);
     return timing === "upcoming" || timing === "in-progress";
@@ -159,7 +189,7 @@ function BookingMetrics({
         badge={past === 1 ? "1 record" : `${past} records`}
         description="Reservations whose published time has passed."
       />
-      <PointsBalanceCard />
+      <PointsBalanceCard refreshKey={balanceRefreshKey} />
     </div>
   );
 }

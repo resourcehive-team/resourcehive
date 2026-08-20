@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ResourceDetails } from "@/components/resource-details";
 import {
+  cancelBooking,
   completeOrganizationBooking,
   getOrganizationBookings,
 } from "@/lib/booking-service/booking-api";
@@ -32,6 +33,7 @@ vi.mock("@/lib/resource-service/membership-api", () => ({
 }));
 
 vi.mock("@/lib/booking-service/booking-api", () => ({
+  cancelBooking: vi.fn(),
   completeOrganizationBooking: vi.fn(),
   getOrganizationBookings: vi.fn(),
 }));
@@ -52,6 +54,7 @@ const getResourceDetailsMock = vi.mocked(getResourceDetails);
 const getCurrentUserMembershipsMock = vi.mocked(getCurrentUserMemberships);
 const getOrganizationBookingsMock = vi.mocked(getOrganizationBookings);
 const completeOrganizationBookingMock = vi.mocked(completeOrganizationBooking);
+const cancelBookingMock = vi.mocked(cancelBooking);
 
 const resource: ResourceDetailsData = {
   id: "resource-1",
@@ -131,6 +134,7 @@ describe("ResourceDetails", () => {
       .mockReset()
       .mockResolvedValue([organizationBooking]);
     completeOrganizationBookingMock.mockReset();
+    cancelBookingMock.mockReset();
   });
 
   it("shows live booking members and their account details to an administrator", async () => {
@@ -220,6 +224,48 @@ describe("ResourceDetails", () => {
       );
     });
     expect(await screen.findByText("Completed")).toBeDefined();
+    expect(
+      screen.queryByRole("button", { name: "Mark as complete" }),
+    ).toBeNull();
+  });
+
+  it("lets an administrator cancel a booking and withdraw its slot", async () => {
+    cancelBookingMock.mockResolvedValue({
+      ...organizationBooking,
+      status: "CANCELLED",
+      cancelledAt: "2026-08-20T08:30:00.000Z",
+      refundPoints: 10,
+      slotStatus: "WITHDRAWN",
+    });
+
+    render(
+      <ResourceDetails
+        organizationId="organization-1"
+        resourceId="resource-1"
+      />,
+    );
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Cancel booking" }),
+    );
+    expect(await screen.findByText("What happens to the slot?")).toBeDefined();
+    expect(screen.getByText("Make slot available again")).toBeDefined();
+
+    fireEvent.click(screen.getByRole("radio", { name: /Withdraw slot/ }));
+    fireEvent.change(screen.getByLabelText(/Reason/), {
+      target: { value: "Resource unavailable" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Confirm cancellation" }),
+    );
+
+    await waitFor(() => {
+      expect(cancelBookingMock).toHaveBeenCalledWith(organizationBooking.id, {
+        reason: "Resource unavailable",
+        makeSlotAvailable: false,
+      });
+    });
+    expect(await screen.findByText("Cancelled")).toBeDefined();
     expect(
       screen.queryByRole("button", { name: "Mark as complete" }),
     ).toBeNull();

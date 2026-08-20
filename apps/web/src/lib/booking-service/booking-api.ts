@@ -3,11 +3,17 @@ import "client-only";
 import { apiRequest } from "@/lib/api-client";
 import { apiPathSegment } from "@/lib/resource-service/path";
 import type {
+  CancelledBooking,
   CreatedBooking,
   OrganizationBooking,
   ResourceSlot,
   UserBooking,
 } from "@/lib/booking-service/types";
+
+export interface CancelBookingOptions {
+  makeSlotAvailable?: boolean;
+  reason?: string;
+}
 
 export interface ResourceSlotListOptions {
   startsAtOrAfter?: Date;
@@ -111,6 +117,24 @@ export function completeOrganizationBooking(
 
   return apiRequest<OrganizationBooking>(`/bookings/${booking}/complete`, {
     method: "PATCH",
+  });
+}
+
+export function cancelBooking(
+  bookingId: string,
+  options: CancelBookingOptions = {},
+): Promise<CancelledBooking> {
+  const booking = apiPathSegment(bookingId, "Booking ID");
+  const reason = options.reason?.trim();
+
+  return apiRequest<CancelledBooking>(`/bookings/${booking}/cancel`, {
+    method: "PATCH",
+    json: {
+      ...(reason ? { reason } : {}),
+      ...(options.makeSlotAvailable === undefined
+        ? {}
+        : { makeSlotAvailable: options.makeSlotAvailable }),
+    },
   });
 }
 

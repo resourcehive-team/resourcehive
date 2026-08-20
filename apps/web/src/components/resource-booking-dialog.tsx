@@ -1,11 +1,7 @@
 "use client";
 
 import * as React from "react";
-import {
-  CalendarIcon,
-  CalendarX2Icon,
-  RefreshCwIcon,
-} from "lucide-react";
+import { CalendarIcon, CalendarX2Icon, RefreshCwIcon } from "lucide-react";
 
 import { BookingConfirmation } from "@/components/booking-confirmation";
 import { Button } from "@/components/ui/button";
@@ -19,10 +15,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  RadioGroup,
-  RadioGroupItem,
-} from "@/components/ui/radio-group";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -41,10 +34,7 @@ import {
   createBooking,
   getResourceSlots,
 } from "@/lib/booking-service/booking-api";
-import type {
-  CreatedBooking,
-  ResourceSlot,
-} from "@/lib/booking-service/types";
+import type { CreatedBooking, ResourceSlot } from "@/lib/booking-service/types";
 import { cn } from "@/lib/utils";
 
 type SlotListState =
@@ -314,7 +304,7 @@ function SlotSelection({
               <TableHead className="w-12">
                 <span className="sr-only">Select</span>
               </TableHead>
-              <TableHead>Date</TableHead>
+              <TableHead>Date range</TableHead>
               <TableHead>From</TableHead>
               <TableHead>To</TableHead>
               <TableHead>Duration</TableHead>
@@ -328,10 +318,7 @@ function SlotSelection({
               return (
                 <TableRow
                   key={slot.id}
-                  className={cn(
-                    "cursor-pointer",
-                    disabled && "cursor-wait",
-                  )}
+                  className={cn("cursor-pointer", disabled && "cursor-wait")}
                   data-state={selected ? "selected" : undefined}
                   onClick={() => {
                     if (!disabled) {
@@ -355,7 +342,7 @@ function SlotSelection({
                       className="cursor-pointer font-medium"
                       htmlFor={controlId}
                     >
-                      {formatSlotDate(slot.startsAt)}
+                      {formatSlotDateRange(slot.startsAt, slot.endsAt)}
                     </label>
                   </TableCell>
                   <TableCell>{formatSlotTime(slot.startsAt)}</TableCell>
@@ -459,6 +446,16 @@ function formatSlotDate(value: string): string {
   }).format(new Date(value));
 }
 
+function formatSlotDateRange(startsAt: string, endsAt: string): string {
+  const start = new Date(startsAt);
+  const end = new Date(endsAt);
+  const startLabel = formatSlotDate(startsAt);
+
+  return isSameCalendarDate(start, end)
+    ? startLabel
+    : `${startLabel} → ${formatSlotDate(endsAt)}`;
+}
+
 function formatSlotTime(value: string): string {
   return new Intl.DateTimeFormat(undefined, {
     hour: "numeric",
@@ -467,7 +464,15 @@ function formatSlotTime(value: string): string {
 }
 
 function formatSlotRange(slot: ResourceSlot): string {
-  return `${formatSlotDate(slot.startsAt)}, ${formatSlotTime(slot.startsAt)} to ${formatSlotTime(slot.endsAt)}`;
+  return `${formatSlotDateRange(slot.startsAt, slot.endsAt)}, ${formatSlotTime(slot.startsAt)} to ${formatSlotTime(slot.endsAt)}`;
+}
+
+function isSameCalendarDate(first: Date, second: Date): boolean {
+  return (
+    first.getFullYear() === second.getFullYear() &&
+    first.getMonth() === second.getMonth() &&
+    first.getDate() === second.getDate()
+  );
 }
 
 function formatSlotDuration(slot: ResourceSlot): string {
@@ -487,4 +492,3 @@ function formatSlotDuration(slot: ResourceSlot): string {
 
   return `${hours} hr ${minutes} min`;
 }
-
