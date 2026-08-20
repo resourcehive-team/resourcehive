@@ -43,6 +43,11 @@ export interface OrganizationBookingRecord extends BookingRecord {
   };
 }
 
+export interface CancelledBookingRecord extends OrganizationBookingRecord {
+  refundPoints: number;
+  slotStatus: string;
+}
+
 export interface CreatedBooking {
   id: string;
   resourceSlotId: string;

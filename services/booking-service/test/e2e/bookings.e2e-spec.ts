@@ -3,6 +3,7 @@ import { Test } from "@nestjs/testing";
 import { JwtAuthGuard } from "@resourcehive/service-auth";
 import request from "supertest";
 import { App } from "supertest/types";
+import { BookingCancellationService } from "../../src/bookings/booking-cancellation.service";
 import { BookingCompletionService } from "../../src/bookings/booking-completion.service";
 import { BookingCreationService } from "../../src/bookings/booking-creation.service";
 import { BookingReadService } from "../../src/bookings/booking-read.service";
@@ -20,6 +21,10 @@ describe("BookingsController (e2e)", () => {
         {
           provide: BookingCompletionService,
           useValue: { complete: jest.fn() },
+        },
+        {
+          provide: BookingCancellationService,
+          useValue: { cancel: jest.fn() },
         },
         {
           provide: BookingReadService,

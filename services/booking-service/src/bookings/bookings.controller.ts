@@ -26,6 +26,8 @@ import {
 } from "@resourcehive/service-auth";
 import { BookingCreationService } from "./booking-creation.service";
 import { BookingCompletionService } from "./booking-completion.service";
+import { BookingCancellationService } from "./booking-cancellation.service";
+import { CancelBookingDto } from "./dto/cancel-booking.dto";
 import { CreateBookingDto } from "./dto/create-booking.dto";
 import { GetUserBookingsDto } from "./dto/get-user-bookings.dto";
 import { GetOrgBookingsDto } from "./dto/get-org-bookings.dto";
@@ -40,6 +42,7 @@ export class BookingsController {
     private readonly bookingCreation: BookingCreationService,
     private readonly bookingRead: BookingReadService,
     private readonly bookingCompletion: BookingCompletionService,
+    private readonly bookingCancellation: BookingCancellationService,
   ) {}
 
   @Post()
@@ -97,5 +100,22 @@ export class BookingsController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.bookingCompletion.complete(bookingId, user.userId);
+  }
+
+  @Patch(":bookingId/cancel")
+  @ApiOkResponse({ description: "Booking cancelled and points refunded" })
+  @ApiForbiddenResponse({
+    description: "The user cannot cancel this booking",
+  })
+  @ApiNotFoundResponse({ description: "Booking not found" })
+  @ApiConflictResponse({
+    description: "The booking cannot be cancelled in its current state",
+  })
+  cancel(
+    @Param("bookingId", ParseUUIDPipe) bookingId: string,
+    @Body() dto: CancelBookingDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.bookingCancellation.cancel(bookingId, user.userId, dto);
   }
 }

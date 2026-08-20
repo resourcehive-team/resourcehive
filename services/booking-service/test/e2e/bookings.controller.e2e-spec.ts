@@ -2,6 +2,7 @@ import { INestApplication, ValidationPipe } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import { JwtAuthGuard } from "@resourcehive/service-auth";
 import request from "supertest";
+import { BookingCancellationService } from "../../src/bookings/booking-cancellation.service";
 import { BookingCompletionService } from "../../src/bookings/booking-completion.service";
 import { BookingCreationService } from "../../src/bookings/booking-creation.service";
 import { BookingReadService } from "../../src/bookings/booking-read.service";
@@ -12,6 +13,7 @@ describe("BookingsController (e2e read and completion endpoints)", () => {
   const getUserBookings = jest.fn();
   const getOrgBookings = jest.fn();
   const complete = jest.fn();
+  const cancel = jest.fn();
   const create = jest.fn();
 
   beforeAll(async () => {
@@ -24,6 +26,7 @@ describe("BookingsController (e2e read and completion endpoints)", () => {
         },
         { provide: BookingCreationService, useValue: { create } },
         { provide: BookingCompletionService, useValue: { complete } },
+        { provide: BookingCancellationService, useValue: { cancel } },
       ],
     })
       .overrideGuard(JwtAuthGuard)
@@ -58,6 +61,7 @@ describe("BookingsController (e2e read and completion endpoints)", () => {
     getUserBookings.mockReset();
     getOrgBookings.mockReset();
     complete.mockReset();
+    cancel.mockReset();
     create.mockReset();
   });
 
@@ -107,5 +111,36 @@ describe("BookingsController (e2e read and completion endpoints)", () => {
       });
 
     expect(complete).toHaveBeenCalledWith(bookingId, "user-123");
+  });
+
+  it("PATCH /bookings/:bookingId/cancel cancels and refunds a booking", async () => {
+    const bookingId = "d5000000-0000-4000-8000-000000000001";
+    cancel.mockResolvedValue({
+      id: bookingId,
+      status: "CANCELLED",
+      refundPoints: 25,
+      slotStatus: "WITHDRAWN",
+    });
+
+    await request(app.getHttpServer() as Parameters<typeof request>[0])
+      .patch(`/bookings/${bookingId}/cancel`)
+      .send({
+        reason: "Resource unavailable",
+        makeSlotAvailable: false,
+      })
+      .expect(200)
+      .expect((res) => {
+        expect(res.body).toMatchObject({
+          id: bookingId,
+          status: "CANCELLED",
+          refundPoints: 25,
+          slotStatus: "WITHDRAWN",
+        });
+      });
+
+    expect(cancel).toHaveBeenCalledWith(bookingId, "user-123", {
+      reason: "Resource unavailable",
+      makeSlotAvailable: false,
+    });
   });
 });
