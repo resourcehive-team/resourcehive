@@ -7,12 +7,25 @@
 
 	@identity path /auth /auth/*
 	@resourceSlots path_regexp resourceSlots ^/resources/[^/]+/slots/?$
-	@resource path /organizations /organizations/* /memberships /memberships/* /resources /resources/* /api/docs /api/docs/*
+	@resource path /organizations /organizations/* /memberships /memberships/* /resources /resources/*
 	@booking path /slots /slots/* /bookings /bookings/* /points /points/*
 	@notifications path /notifications /notifications/*
 
+	@resourceDocs path /resource/api/docs /resource/api/docs/*
+	@bookingDocs path /booking/api/docs /booking/api/docs/*
+
 	route {
 		respond /health "ok" 200
+
+		route @resourceDocs {
+			uri strip_prefix /resource
+			reverse_proxy resource-service:3004
+		}
+
+		route @bookingDocs {
+			uri strip_prefix /booking/api
+			reverse_proxy booking-service:3002
+		}
 
 		reverse_proxy @identity identity-service:3000
 		reverse_proxy @resourceSlots booking-service:3002
