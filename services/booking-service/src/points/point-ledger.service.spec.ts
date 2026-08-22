@@ -27,23 +27,23 @@ describe("PointLedgerService", () => {
     ).rejects.toEqual(new InsufficientPointsError(19, 20));
   });
 
-  it("rejects non-negative booking deductions", () => {
-    expect(() =>
+  it("rejects non-negative booking deductions", async () => {
+    await expect(
       service.appendBookingDeduction({
         userId: "user-id",
         bookingId: "booking-id",
         amount: 0,
       }),
-    ).toThrow(BadRequestException);
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it("rejects non-positive booking refunds", () => {
-    expect(() =>
+  it("rejects non-positive booking refunds", async () => {
+    await expect(
       service.appendBookingRefund({
         userId: "user-id",
         bookingId: "booking-id",
         amount: 0,
       }),
-    ).toThrow(BadRequestException);
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 });

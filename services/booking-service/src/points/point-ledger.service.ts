@@ -1,9 +1,14 @@
-import { BadRequestException, Injectable } from "@nestjs/common";
-import { InsufficientPointsError } from "./point-ledger.errors";
+import { HttpException, Injectable } from "@nestjs/common";
+import {
+  InsufficientPointsError,
+  InvalidPointDeductionError,
+  InvalidPointRefundError,
+  InvalidPointRequirementError,
+  PointLedgerOperationError,
+} from "./point-ledger.errors";
 import { PointLedgerRepository } from "./point-ledger.repository";
 import {
-  AppendBookingDeductionInput,
-  AppendBookingRefundInput,
+  AppendBookingEntryInput,
   PointLedgerClient,
   PointLedgerEntry,
 } from "./point-ledger.types";
@@ -12,8 +17,15 @@ import {
 export class PointLedgerService {
   constructor(private readonly repository: PointLedgerRepository) {}
 
-  getBalance(userId: string, client?: PointLedgerClient): Promise<number> {
-    return this.repository.getBalance(userId, client);
+  async getBalance(
+    userId: string,
+    client?: PointLedgerClient,
+  ): Promise<number> {
+    try {
+      return await this.repository.getBalance(userId, client);
+    } catch (error) {
+      this.handleError(error, "retrieve");
+    }
   }
 
   async assertSufficientBalance(
@@ -21,39 +33,50 @@ export class PointLedgerService {
     required: number,
     client?: PointLedgerClient,
   ): Promise<number> {
-    if (!Number.isInteger(required) || required < 0) {
-      throw new BadRequestException(
-        "Required points must be a non-negative integer",
-      );
+    try {
+      if (!Number.isInteger(required) || required < 0) {
+        throw new InvalidPointRequirementError();
+      }
+      const balance = await this.repository.getBalance(userId, client);
+      if (balance < required) {
+        throw new InsufficientPointsError(balance, required);
+      }
+      return balance;
+    } catch (error) {
+      this.handleError(error, "validate");
     }
-    const balance = await this.repository.getBalance(userId, client);
-    if (balance < required) {
-      throw new InsufficientPointsError(balance, required);
-    }
-    return balance;
   }
 
-  appendBookingDeduction(
-    input: AppendBookingDeductionInput,
+  async appendBookingDeduction(
+    input: AppendBookingEntryInput,
     client?: PointLedgerClient,
   ): Promise<PointLedgerEntry> {
-    if (!Number.isInteger(input.amount) || input.amount >= 0) {
-      throw new BadRequestException(
-        "Booking deduction amount must be a negative integer",
-      );
+    try {
+      if (!Number.isInteger(input.amount) || input.amount >= 0) {
+        throw new InvalidPointDeductionError();
+      }
+      return await this.repository.appendBookingDeduction(input, client);
+    } catch (error) {
+      this.handleError(error, "deduct");
     }
-    return this.repository.appendBookingDeduction(input, client);
   }
 
-  appendBookingRefund(
-    input: AppendBookingRefundInput,
+  async appendBookingRefund(
+    input: AppendBookingEntryInput,
     client?: PointLedgerClient,
   ): Promise<PointLedgerEntry> {
-    if (!Number.isInteger(input.amount) || input.amount <= 0) {
-      throw new BadRequestException(
-        "Booking refund amount must be a positive integer",
-      );
+    try {
+      if (!Number.isInteger(input.amount) || input.amount <= 0) {
+        throw new InvalidPointRefundError();
+      }
+      return await this.repository.appendBookingRefund(input, client);
+    } catch (error) {
+      this.handleError(error, "refund");
     }
-    return this.repository.appendBookingRefund(input, client);
+  }
+
+  private handleError(error: unknown, operation: string): never {
+    if (error instanceof HttpException) throw error;
+    throw new PointLedgerOperationError(operation);
   }
 }

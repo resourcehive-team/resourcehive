@@ -15,6 +15,16 @@ export interface CreateConfirmedBookingInput {
   userId: string;
 }
 
+export interface ValidatedBookingContext {
+  userId: string;
+  rootOrganizationId: string;
+  resourceId: string;
+  resourceSlotId: string;
+  pointCost: number;
+  startsAt: Date;
+  endsAt: Date;
+}
+
 export interface BookingRecord {
   id: string;
   resourceSlotId: string;

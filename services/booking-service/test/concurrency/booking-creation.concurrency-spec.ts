@@ -2,9 +2,8 @@ import { randomUUID } from "node:crypto";
 import { HttpException } from "@nestjs/common";
 import { PrismaService } from "@resourcehive/database";
 import { BookingAuthorizationService } from "../../src/authorization/booking-authorization.service";
-import { BookingCreationService } from "../../src/bookings/booking-creation.service";
 import { BookingRepository } from "../../src/bookings/booking.repository";
-import { BookingValidationService } from "../../src/bookings/booking-validation.service";
+import { BookingService } from "../../src/bookings/booking.service";
 import { PointLedgerRepository } from "../../src/points/point-ledger.repository";
 import { PointLedgerService } from "../../src/points/point-ledger.service";
 import { SlotRepository } from "../../src/slots/slot.repository";
@@ -14,12 +13,12 @@ describe("Concurrent booking creation", () => {
   const authorization = new BookingAuthorizationService(prisma);
   const slots = new SlotRepository(prisma);
   const points = new PointLedgerService(new PointLedgerRepository(prisma));
-  const validation = new BookingValidationService(authorization, slots, points);
-  const service = new BookingCreationService(
+  const service = new BookingService(
     prisma,
-    validation,
-    new BookingRepository(),
+    authorization,
+    slots,
     points,
+    new BookingRepository(),
   );
 
   beforeAll(async () => {
@@ -87,8 +86,8 @@ describe("Concurrent booking creation", () => {
         role: "member",
       };
       const attempts = await Promise.allSettled([
-        service.create(slotId, user),
-        service.create(slotId, user),
+        service.createBooking(slotId, user),
+        service.createBooking(slotId, user),
       ]);
       const successful = attempts.filter(
         (attempt) => attempt.status === "fulfilled",

@@ -1,9 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { PrismaService } from "@resourcehive/database";
+import { Prisma, PrismaService } from "@resourcehive/database";
 import { BookingAuthorizationService } from "../../src/authorization/booking-authorization.service";
-import { BookingCreationService } from "../../src/bookings/booking-creation.service";
 import { BookingRepository } from "../../src/bookings/booking.repository";
-import { BookingValidationService } from "../../src/bookings/booking-validation.service";
+import { BookingService } from "../../src/bookings/booking.service";
 import { PointLedgerRepository } from "../../src/points/point-ledger.repository";
 import { PointLedgerService } from "../../src/points/point-ledger.service";
 import { SlotRepository } from "../../src/slots/slot.repository";
@@ -16,13 +15,6 @@ describeWithDatabase("Atomic booking creation integration", () => {
   const authorization = new BookingAuthorizationService(prisma);
   const slots = new SlotRepository(prisma);
   const points = new PointLedgerService(new PointLedgerRepository(prisma));
-  const validation = new BookingValidationService(authorization, slots, points);
-  const service = new BookingCreationService(
-    prisma,
-    validation,
-    new BookingRepository(),
-    points,
-  );
   const rollbackFixture = new Error("rollback atomic booking fixture");
 
   beforeAll(async () => {
@@ -93,16 +85,24 @@ describeWithDatabase("Atomic booking creation integration", () => {
             },
           });
 
-          const result = await service.createWithinTransaction(
-            slotId,
-            {
-              userId,
-              email: `atomic-booking-${userId}@example.edu`,
-              organizationId,
-              role: "member",
-            },
-            transaction,
+          const transactionalPrisma = {
+            $transaction: <T>(
+              callback: (client: Prisma.TransactionClient) => Promise<T>,
+            ): Promise<T> => callback(transaction),
+          } as unknown as PrismaService;
+          const service = new BookingService(
+            transactionalPrisma,
+            authorization,
+            slots,
+            points,
+            new BookingRepository(),
           );
+          const result = await service.createBooking(slotId, {
+            userId,
+            email: `atomic-booking-${userId}@example.edu`,
+            organizationId,
+            role: "member",
+          });
 
           await expect(
             transaction.booking.count({
@@ -128,10 +128,16 @@ describeWithDatabase("Atomic booking creation integration", () => {
 
           throw rollbackFixture;
         },
-        { maxWait: 10000, timeout: 30000 },
+        {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+          maxWait: 10000,
+          timeout: 30000,
+        },
       );
     } catch (error) {
-      if (error !== rollbackFixture) throw error;
+      if (error !== rollbackFixture) {
+        throw error;
+      }
     }
   });
 

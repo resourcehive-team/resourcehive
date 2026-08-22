@@ -2,6 +2,8 @@ import {
   Body,
   Controller,
   Get,
+  HttpException,
+  InternalServerErrorException,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -24,26 +26,20 @@ import {
   CurrentUser,
   JwtAuthGuard,
 } from "@resourcehive/service-auth";
-import { BookingCreationService } from "./booking-creation.service";
-import { BookingCompletionService } from "./booking-completion.service";
-import { BookingCancellationService } from "./booking-cancellation.service";
-import { CancelBookingDto } from "./dto/cancel-booking.dto";
-import { CreateBookingDto } from "./dto/create-booking.dto";
-import { GetUserBookingsDto } from "./dto/get-user-bookings.dto";
-import { GetOrgBookingsDto } from "./dto/get-org-bookings.dto";
-import { BookingReadService } from "./booking-read.service";
+import { BookingService } from "./booking.service";
+import {
+  CancelBookingDto,
+  CreateBookingDto,
+  GetOrgBookingsDto,
+  GetUserBookingsDto,
+} from "./bookings.dto";
 
 @ApiTags("bookings")
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 @Controller("bookings")
 export class BookingsController {
-  constructor(
-    private readonly bookingCreation: BookingCreationService,
-    private readonly bookingRead: BookingReadService,
-    private readonly bookingCompletion: BookingCompletionService,
-    private readonly bookingCancellation: BookingCancellationService,
-  ) {}
+  constructor(private readonly bookings: BookingService) {}
 
   @Post()
   @ApiCreatedResponse({
@@ -62,11 +58,15 @@ export class BookingsController {
     description:
       "The slot is unavailable, points are insufficient, or a concurrent update prevented booking",
   })
-  create(
+  async create(
     @Body() dto: CreateBookingDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.bookingCreation.create(dto.resourceSlotId, user);
+    try {
+      return await this.bookings.createBooking(dto.resourceSlotId, user);
+    } catch (error) {
+      this.handleError(error);
+    }
   }
   @Get("me")
   @ApiOkResponse({ description: "List of bookings for the current user" })
@@ -74,7 +74,11 @@ export class BookingsController {
     @Query() query: GetUserBookingsDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.bookingRead.getUserBookings(user.userId, query);
+    try {
+      return await this.bookings.getUserBookings(user.userId, query);
+    } catch (error) {
+      this.handleError(error);
+    }
   }
 
   @Get("org")
@@ -83,7 +87,11 @@ export class BookingsController {
     @Query() query: GetOrgBookingsDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.bookingRead.getOrgBookings(user.userId, query);
+    try {
+      return await this.bookings.getOrgBookings(user.userId, query);
+    } catch (error) {
+      this.handleError(error);
+    }
   }
 
   @Patch(":bookingId/complete")
@@ -95,11 +103,15 @@ export class BookingsController {
   @ApiConflictResponse({
     description: "The booking is not in a confirmable state",
   })
-  complete(
+  async complete(
     @Param("bookingId", ParseUUIDPipe) bookingId: string,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.bookingCompletion.complete(bookingId, user.userId);
+    try {
+      return await this.bookings.completeBooking(bookingId, user.userId);
+    } catch (error) {
+      this.handleError(error);
+    }
   }
 
   @Patch(":bookingId/cancel")
@@ -111,11 +123,20 @@ export class BookingsController {
   @ApiConflictResponse({
     description: "The booking cannot be cancelled in its current state",
   })
-  cancel(
+  async cancel(
     @Param("bookingId", ParseUUIDPipe) bookingId: string,
     @Body() dto: CancelBookingDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.bookingCancellation.cancel(bookingId, user.userId, dto);
+    try {
+      return await this.bookings.cancelBooking(bookingId, user.userId, dto);
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  private handleError(error: unknown): never {
+    if (error instanceof HttpException) throw error;
+    throw new InternalServerErrorException("Unable to process booking request");
   }
 }

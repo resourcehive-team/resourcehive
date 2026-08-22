@@ -8,8 +8,7 @@ import {
 import { Prisma } from "@resourcehive/database";
 import { AuthenticatedUser } from "@resourcehive/service-auth";
 import { BookingAuthorizationService } from "../authorization/booking-authorization.service";
-import { CreateSlotDto } from "./dto/create-slot.dto";
-import { ListSlotsDto } from "./dto/list-slots.dto";
+import { CreateSlotDto, ListSlotsDto } from "./slot.dto";
 import { SlotResourceNotFoundError } from "./slot.errors";
 import { SlotRepository } from "./slot.repository";
 import { SlotRecord, SlotView } from "./slot.types";
