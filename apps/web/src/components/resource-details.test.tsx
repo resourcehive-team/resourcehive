@@ -175,7 +175,7 @@ describe("ResourceDetails", () => {
   });
 
   it("omits organization booking history for a normal member", async () => {
-    getCurrentUserMembershipsMock.mockResolvedValueOnce([
+    getCurrentUserMembershipsMock.mockResolvedValue([
       { ...administratorMembership, role: "MEMBER" },
     ]);
 
