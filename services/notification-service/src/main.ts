@@ -1,7 +1,9 @@
 import { ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
+import { MicroserviceOptions } from "@nestjs/microservices";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { AppModule } from "./app.module";
+import { getNotificationKafkaConfig } from "./kafka/kafka.config";
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
@@ -33,6 +35,12 @@ async function bootstrap(): Promise<void> {
     app,
     SwaggerModule.createDocument(app, swaggerConfig),
   );
+
+  const kafka = getNotificationKafkaConfig();
+  if (kafka.enabled) {
+    app.connectMicroservice<MicroserviceOptions>(kafka.options);
+    await app.startAllMicroservices();
+  }
 
   await app.listen(Number(process.env.PORT ?? 3003), "0.0.0.0");
 }
