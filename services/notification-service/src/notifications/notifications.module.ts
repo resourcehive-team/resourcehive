@@ -5,15 +5,20 @@ import { NotificationRepository } from "./notification.repository";
 import { NotificationReadService } from "./notification-read.service";
 import { NotificationsController } from "./notifications.controller";
 import { NotificationGateway } from "../websocket/notification.gateway";
+import { NotificationCommandService } from "../events/notification-command.service";
+import { NotificationEventController } from "../events/notification-event.controller";
+import { NotificationTemplateService } from "../events/notification-template.service";
 
 @Module({
   imports: [ServiceAuthModule],
-  controllers: [NotificationsController],
+  controllers: [NotificationsController, NotificationEventController],
   providers: [
     NotificationRepository,
     NotificationPersistenceService,
     NotificationReadService,
     NotificationGateway,
+    NotificationCommandService,
+    NotificationTemplateService,
   ],
   exports: [NotificationPersistenceService, NotificationReadService],
 })

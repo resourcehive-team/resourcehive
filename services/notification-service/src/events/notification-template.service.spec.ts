@@ -1,0 +1,28 @@
+import { NotificationCommandV1 } from "../contracts";
+import { NotificationTemplateService } from "./notification-template.service";
+
+describe("NotificationTemplateService", () => {
+  it("renders an approved command without accepting producer HTML", () => {
+    const command: NotificationCommandV1 = {
+      kind: "notification.command",
+      commandId: "11111111-1111-4111-8111-111111111111",
+      idempotencyKey: "booking-confirmed/booking-id/user-id",
+      producer: "booking-service",
+      recipient: { userId: "22222222-2222-4222-8222-222222222222" },
+      channels: ["IN_APP"],
+      template: {
+        key: "booking.confirmed.v1",
+        version: 1,
+        variables: { message: "Your Robotics Lab booking is confirmed." },
+      },
+      correlationId: "33333333-3333-4333-8333-333333333333",
+      occurredAt: "2026-08-31T12:00:00.000Z",
+    };
+    expect(new NotificationTemplateService().render(command)).toEqual(
+      expect.objectContaining({
+        title: "Booking Confirmed",
+        message: "Your Robotics Lab booking is confirmed.",
+      }),
+    );
+  });
+});
