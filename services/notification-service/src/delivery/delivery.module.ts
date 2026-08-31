@@ -8,9 +8,11 @@ import { DeliveryWorkerController } from "./delivery-worker.controller";
 import { DeliveryWorkerService } from "./delivery-worker.service";
 import { RetrySchedulerService } from "./retry-scheduler.service";
 import { ResendEmailProvider } from "../providers/resend/resend-email.provider";
+import { ResendWebhookController } from "../providers/resend/resend-webhook.controller";
+import { ResendWebhookService } from "../providers/resend/resend-webhook.service";
 
 @Module({
-  controllers: [DeliveryWorkerController],
+  controllers: [DeliveryWorkerController, ResendWebhookController],
   providers: [
     DeliveryRepository,
     DeliveryWorkerService,
@@ -18,6 +20,7 @@ import { ResendEmailProvider } from "../providers/resend/resend-email.provider";
     ConsoleEmailProvider,
     ConsolePushProvider,
     ResendEmailProvider,
+    ResendWebhookService,
   ],
   exports: [DeliveryWorkerService],
 })

@@ -6,7 +6,7 @@ import { AppModule } from "./app.module";
 import { getNotificationKafkaConfig } from "./kafka/kafka.config";
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { rawBody: true });
   const allowedOrigins = (process.env.CORS_ORIGINS ?? "http://localhost:3000")
     .split(",")
     .map((origin) => origin.trim())
