@@ -34,17 +34,17 @@ export class FcmPushProvider implements DeliveryProvider {
           : message.deliveryId;
       const providerMessageId = await getMessaging().send({
         token: message.destination,
-        notification: { title: message.title, body: message.message },
+        notification: { title: message.subject, body: message.body },
         data: { notificationId },
         android: { priority: "high" },
         apns: { payload: { aps: { sound: "default" } } },
       });
-      return { providerMessageId, status: "ACCEPTED" };
+      return { providerMessageId };
     } catch (error) {
       if (isInvalidFcmTarget(error)) {
         await this.prisma.userDevice.updateMany({
-          where: { installationId: message.destination },
-          data: { status: "INVALID", invalidatedAt: new Date() },
+          where: { token: message.destination },
+          data: { active: false },
         });
       }
       throw classifyFcmError(error);
