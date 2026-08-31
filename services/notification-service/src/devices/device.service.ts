@@ -10,20 +10,16 @@ import { DeviceRepository } from "./device.repository";
 export class DeviceService {
   constructor(private readonly devices: DeviceRepository) {}
   async register(userId: string, input: RegisterDeviceDto) {
-    const installationId = input.installationId.trim();
-    const existing = await this.devices.findByInstallationId(installationId);
+    const token = input.token.trim();
+    const existing = await this.devices.findByToken(token);
     if (existing && existing.userId !== userId) {
       throw new ConflictException(
         "Device registration belongs to another user",
       );
     }
     const device = existing
-      ? await this.devices.update(existing.id, {
-          identifierType: input.identifierType,
-          platform: input.platform,
-          appVersion: input.appVersion,
-        })
-      : await this.devices.create(userId, { ...input, installationId });
+      ? await this.devices.update(existing.id, input.platform)
+      : await this.devices.create(userId, { token, platform: input.platform });
     return this.view(device);
   }
   async list(userId: string) {
@@ -36,19 +32,15 @@ export class DeviceService {
   }
   private view(device: {
     id: string;
-    identifierType: string;
     platform: string;
-    status: string;
-    appVersion: string | null;
-    lastRegisteredAt: Date;
+    active: boolean;
+    updatedAt: Date;
   }) {
     return {
       id: device.id,
-      identifierType: device.identifierType,
       platform: device.platform,
-      status: device.status,
-      appVersion: device.appVersion,
-      lastRegisteredAt: device.lastRegisteredAt,
+      active: device.active,
+      updatedAt: device.updatedAt,
     };
   }
 }
