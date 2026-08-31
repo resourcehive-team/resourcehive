@@ -8,7 +8,6 @@ export class NotificationConfigurationService implements OnModuleInit {
     if (process.env.RESEND_ENABLED === "true") {
       this.require("RESEND_API_KEY");
       this.require("RESEND_FROM_EMAIL");
-      this.require("RESEND_WEBHOOK_SECRET");
     }
     if (process.env.FCM_ENABLED === "true") {
       this.require("FIREBASE_PROJECT_ID");
