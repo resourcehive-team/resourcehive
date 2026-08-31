@@ -5,7 +5,6 @@ import { NotificationConfigurationModule } from "./config/notification-configura
 import { HealthModule } from "./health/health.module";
 import { DeliveryModule } from "./delivery/delivery.module";
 import { DeviceModule } from "./devices/device.module";
-import { KafkaModule } from "./kafka/kafka.module";
 import { NotificationsModule } from "./notifications/notifications.module";
 
 @Module({
@@ -16,7 +15,6 @@ import { NotificationsModule } from "./notifications/notifications.module";
     HealthModule,
     DeliveryModule,
     DeviceModule,
-    KafkaModule,
     NotificationsModule,
   ],
 })

@@ -2,8 +2,6 @@ export const NOTIFICATION_TOPICS = {
   commands: "resourcehive.notification.commands.v1",
   identityCommands: "resourcehive.identity.notification-commands.v1",
   bookingEvents: "resourcehive.booking.events.v1",
-  deliveryJobs: "resourcehive.notification.delivery-jobs.v1",
-  deadLetter: "resourcehive.notification.dlq.v1",
 } as const;
 
 export const NOTIFICATION_TEMPLATES = {
@@ -45,20 +43,4 @@ export interface NotificationCommandV1 {
   };
   correlationId: string;
   occurredAt: string;
-}
-
-export interface DeliveryJobV1 {
-  kind: "notification.delivery-job";
-  deliveryId: string;
-  occurredAt: string;
-}
-
-export interface DeadLetterMessageV1 {
-  kind: "notification.dead-letter";
-  sourceTopic: string;
-  sourcePartition: number;
-  sourceOffset: string;
-  errorCode: string;
-  errorMessage: string;
-  failedAt: string;
 }
