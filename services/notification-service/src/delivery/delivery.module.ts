@@ -7,6 +7,7 @@ import { DeliveryRepository } from "./delivery.repository";
 import { DeliveryWorkerController } from "./delivery-worker.controller";
 import { DeliveryWorkerService } from "./delivery-worker.service";
 import { RetrySchedulerService } from "./retry-scheduler.service";
+import { ResendEmailProvider } from "../providers/resend/resend-email.provider";
 
 @Module({
   controllers: [DeliveryWorkerController],
@@ -16,6 +17,7 @@ import { RetrySchedulerService } from "./retry-scheduler.service";
     RetrySchedulerService,
     ConsoleEmailProvider,
     ConsolePushProvider,
+    ResendEmailProvider,
   ],
   exports: [DeliveryWorkerService],
 })
