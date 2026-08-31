@@ -6,12 +6,20 @@ import {
   parseNotificationCommand,
 } from "../contracts";
 import { NotificationTemplateService } from "./notification-template.service";
+import { NotificationGateway } from "../websocket/notification.gateway";
 
 const CONSUMER_NAME = "notification-command-consumer-v1";
 
 export interface NotificationProcessingResult {
   duplicate: boolean;
   notificationId?: string;
+  notification?: {
+    id: string;
+    type: string;
+    title: string;
+    message: string;
+    createdAt: Date;
+  };
 }
 
 @Injectable()
@@ -19,18 +27,23 @@ export class NotificationCommandService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly templates: NotificationTemplateService,
+    private readonly gateway: NotificationGateway,
   ) {}
 
-  process(input: unknown): Promise<NotificationProcessingResult> {
+  async process(input: unknown): Promise<NotificationProcessingResult> {
     const command = parseNotificationCommand(input);
     if (!command.recipient.userId) {
       throw new UnauthorizedException(
         "Notification commands currently require a ResourceHive user",
       );
     }
-    return this.prisma.$transaction((transaction) =>
+    const result = await this.prisma.$transaction((transaction) =>
       this.processWithinTransaction(command, transaction),
     );
+    if (!result.duplicate && result.notification) {
+      this.gateway.emitCreated(command.recipient.userId, result.notification);
+    }
+    return result;
   }
 
   private async processWithinTransaction(
@@ -111,6 +124,16 @@ export class NotificationCommandService {
       });
     }
 
-    return { duplicate: false, notificationId: notification.id };
+    return {
+      duplicate: false,
+      notificationId: notification.id,
+      notification: {
+        id: notification.id,
+        type: notification.type,
+        title: notification.title,
+        message: notification.message,
+        createdAt: notification.createdAt,
+      },
+    };
   }
 }

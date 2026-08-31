@@ -85,6 +85,27 @@ export class NotificationGateway
     this.logger.log(`Disconnected notification socket ${client.id}`);
   }
 
+  emitCreated(
+    userId: string,
+    notification: {
+      id: string;
+      type: string;
+      title: string;
+      message: string;
+      createdAt: Date;
+    },
+  ): void {
+    this.server.to(this.roomFor(userId)).emit("notification.created", {
+      eventType: "notification.created",
+      eventVersion: 1,
+      occurredAt: new Date().toISOString(),
+      notification: {
+        ...notification,
+        createdAt: notification.createdAt.toISOString(),
+      },
+    });
+  }
+
   private async authenticate(
     socket: AuthenticatedNotificationSocket,
   ): Promise<AuthenticatedUser> {

@@ -11,6 +11,18 @@ export interface NotificationServerEvents {
     eventVersion: 1;
     occurredAt: string;
   }) => void;
+  "notification.created": (payload: {
+    eventType: "notification.created";
+    eventVersion: 1;
+    occurredAt: string;
+    notification: {
+      id: string;
+      type: string;
+      title: string;
+      message: string;
+      createdAt: string;
+    };
+  }) => void;
 }
 
 export type AuthenticatedNotificationSocket = Socket<
