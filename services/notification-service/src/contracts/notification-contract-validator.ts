@@ -82,6 +82,26 @@ export function parseNotificationCommand(
       "Identity templates may only be requested by Identity Service",
     );
   }
+  const usesEmail = value.channels.includes("EMAIL");
+  const isVerification =
+    template.key === NOTIFICATION_TEMPLATES.identityVerifyEmail;
+  if (usesEmail && !isVerification) {
+    throw new NotificationContractError(
+      "CHANNEL_FORBIDDEN",
+      "Email is reserved for Identity Service verification commands",
+    );
+  }
+  if (
+    isVerification &&
+    (value.producer !== "identity-service" ||
+      value.channels.length !== 1 ||
+      value.channels[0] !== "EMAIL")
+  ) {
+    throw new NotificationContractError(
+      "CHANNEL_FORBIDDEN",
+      "Email verification commands must use only the EMAIL channel",
+    );
+  }
   if (template.version !== 1) {
     throw new NotificationContractError(
       "UNSUPPORTED_VERSION",

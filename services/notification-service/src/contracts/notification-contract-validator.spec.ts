@@ -9,7 +9,7 @@ const validCommand = {
   idempotencyKey: "booking-confirmed/booking-id/user-id",
   producer: "booking-service",
   recipient: { userId: "22222222-2222-4222-8222-222222222222" },
-  channels: ["IN_APP", "EMAIL", "PUSH"],
+  channels: ["IN_APP", "PUSH"],
   template: {
     key: "booking.confirmed.v1",
     version: 1,
@@ -37,5 +37,29 @@ describe("notification command contract", () => {
     expect(() =>
       parseNotificationCommand({ ...validCommand, recipient: {} }),
     ).toThrow("recipient requires userId or email");
+  });
+
+  it("rejects email for non-verification notifications", () => {
+    expect(() =>
+      parseNotificationCommand({
+        ...validCommand,
+        channels: ["EMAIL"],
+      }),
+    ).toThrow("Email is reserved for Identity Service verification commands");
+  });
+
+  it("accepts verification email as the only email use case", () => {
+    const verification = {
+      ...validCommand,
+      producer: "identity-service",
+      channels: ["EMAIL"],
+      template: {
+        key: "identity.verify-email.v1",
+        version: 1,
+        variables: { verificationUrl: "https://app.example/verify?token=x" },
+      },
+    };
+
+    expect(parseNotificationCommand(verification)).toEqual(verification);
   });
 });

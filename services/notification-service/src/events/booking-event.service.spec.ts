@@ -2,7 +2,7 @@ import { BookingEventService } from "./booking-event.service";
 import { NotificationCommandService } from "./notification-command.service";
 
 describe("BookingEventService", () => {
-  it("maps confirmation to all channels", () => {
+  it("maps confirmation to in-app and push channels", () => {
     const service = new BookingEventService({} as NotificationCommandService);
     const command = service.toCommand({
       kind: "booking.event",
@@ -18,6 +18,6 @@ describe("BookingEventService", () => {
         resourceName: "Robotics Lab",
       },
     });
-    expect(command.channels).toEqual(["IN_APP", "EMAIL", "PUSH"]);
+    expect(command.channels).toEqual(["IN_APP", "PUSH"]);
   });
 });

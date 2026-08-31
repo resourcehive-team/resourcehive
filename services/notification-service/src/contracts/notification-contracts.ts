@@ -8,8 +8,6 @@ export const NOTIFICATION_TOPICS = {
 
 export const NOTIFICATION_TEMPLATES = {
   identityVerifyEmail: "identity.verify-email.v1",
-  identityPasswordReset: "identity.password-reset.v1",
-  identityPasswordChanged: "identity.password-changed.v1",
   bookingConfirmed: "booking.confirmed.v1",
   bookingCancelled: "booking.cancelled.v1",
   bookingCompleted: "booking.completed.v1",

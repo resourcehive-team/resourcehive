@@ -8,10 +8,4 @@ describe("Identity email templates", () => {
     } as unknown as NotificationCommandV1;
     expect(() => renderIdentityEmail(command)).toThrow("verificationUrl");
   });
-  it("renders a password-change security notice", () => {
-    const command = {
-      template: { key: "identity.password-changed.v1", variables: {} },
-    } as unknown as NotificationCommandV1;
-    expect(renderIdentityEmail(command).type).toBe("PASSWORD_CHANGED");
-  });
 });

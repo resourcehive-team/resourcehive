@@ -23,10 +23,7 @@ export class BookingEventService {
       idempotencyKey: `${event.eventType}/${event.payload.bookingId}/${event.payload.userId}`,
       producer: "booking-service",
       recipient: { userId: event.payload.userId, email: event.payload.email },
-      channels:
-        event.eventType === "booking.completed"
-          ? ["IN_APP", "PUSH"]
-          : ["IN_APP", "EMAIL", "PUSH"],
+      channels: ["IN_APP", "PUSH"],
       template: { key, version: 1, variables: { ...event.payload } },
       correlationId: event.correlationId,
       occurredAt: event.occurredAt,
