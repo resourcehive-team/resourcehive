@@ -95,6 +95,20 @@ services:
     environment:
       <<: *service-environment
       PORT: 3003
+      KAFKA_ENABLED: ${KAFKA_ENABLED:-false}
+      KAFKA_BROKERS: ${KAFKA_BROKERS:-localhost:9092}
+      KAFKA_CLIENT_ID: ${KAFKA_CLIENT_ID:-notification-service}
+      KAFKA_CONSUMER_GROUP: ${KAFKA_CONSUMER_GROUP:-notification-service-v1}
+      KAFKA_SSL: ${KAFKA_SSL:-true}
+      KAFKA_SASL_USERNAME: ${KAFKA_SASL_USERNAME:-}
+      KAFKA_SASL_PASSWORD: ${KAFKA_SASL_PASSWORD:-}
+      RESEND_ENABLED: ${RESEND_ENABLED:-false}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-}
+      RESEND_WEBHOOK_SECRET: ${RESEND_WEBHOOK_SECRET:-}
+      FCM_ENABLED: ${FCM_ENABLED:-false}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
+      GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS:-}
 
   migrate:
     image: ghcr.io/resourcehive-team/resourcehive-identity:${IMAGE_TAG:?Set IMAGE_TAG in .env.production}
