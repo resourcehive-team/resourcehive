@@ -1,5 +1,4 @@
 import { Injectable } from "@nestjs/common";
-import { randomUUID } from "node:crypto";
 import { ResendEmailProvider } from "../providers/resend/resend-email.provider";
 import { FcmPushProvider } from "../providers/fcm/fcm-push.provider";
 import { DeliveryProvider } from "./delivery-provider";
@@ -14,29 +13,27 @@ export class DeliveryWorkerService {
     private readonly push: FcmPushProvider,
   ) {}
   async process(id: string): Promise<void> {
-    const delivery = await this.repository.claim(id, randomUUID());
+    const delivery = await this.repository.claim(id);
     if (!delivery) return;
     const provider = this.providerFor(delivery.channel);
     try {
+      if (!delivery.subject || !delivery.body) {
+        throw new Error("Delivery content is missing");
+      }
       const result = await provider.send({
         deliveryId: id,
         destination: delivery.destination,
-        title: delivery.notification.title,
-        message: delivery.notification.message,
-        data: delivery.notification.data as Record<string, unknown>,
+        subject: delivery.subject,
+        body: delivery.body,
+        data: delivery.data as Record<string, unknown>,
       });
       await this.repository.complete(
         id,
-        delivery.attemptCount,
-        result.status,
         result.providerMessageId,
+        delivery.channel === "EMAIL",
       );
     } catch (error) {
-      await this.repository.fail(
-        id,
-        delivery.attemptCount,
-        decideRetry(error, delivery.attemptCount),
-      );
+      await this.repository.fail(id, decideRetry(error, delivery.attemptCount));
     }
   }
   private providerFor(channel: string): DeliveryProvider {

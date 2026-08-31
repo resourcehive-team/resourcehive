@@ -1,14 +1,13 @@
 export interface DeliveryMessage {
   deliveryId: string;
   destination: string;
-  title: string;
-  message: string;
+  subject: string;
+  body: string;
   data: Record<string, unknown>;
 }
 
 export interface DeliveryProviderResult {
   providerMessageId?: string;
-  status: "ACCEPTED" | "SENT";
 }
 
 export interface DeliveryProvider {

@@ -15,7 +15,6 @@ export class ConsoleEmailProvider implements DeliveryProvider {
     );
     return Promise.resolve({
       providerMessageId: `console:${message.deliveryId}`,
-      status: "SENT",
     });
   }
 }
@@ -28,7 +27,6 @@ export class ConsolePushProvider implements DeliveryProvider {
     this.logger.log(`Console push accepted for delivery ${message.deliveryId}`);
     return Promise.resolve({
       providerMessageId: `console:${message.deliveryId}`,
-      status: "ACCEPTED",
     });
   }
 }
