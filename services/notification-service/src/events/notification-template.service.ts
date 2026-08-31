@@ -4,6 +4,7 @@ import {
   NotificationTemplateKey,
   TemplateVariables,
 } from "../contracts";
+import { renderIdentityEmail } from "./templates/identity-email.templates";
 
 export interface RenderedNotification {
   type: string;
@@ -16,6 +17,9 @@ export interface RenderedNotification {
 @Injectable()
 export class NotificationTemplateService {
   render(command: NotificationCommandV1): RenderedNotification {
+    if (command.template.key.startsWith("identity.")) {
+      return renderIdentityEmail(command);
+    }
     const title = this.defaultTitle(command.template.key);
     const message = this.text(command.template.variables, "message") ?? title;
     return {

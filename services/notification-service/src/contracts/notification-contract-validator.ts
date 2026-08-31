@@ -73,6 +73,15 @@ export function parseNotificationCommand(
       "template key is not approved",
     );
   }
+  if (
+    String(template.key).startsWith("identity.") &&
+    value.producer !== "identity-service"
+  ) {
+    throw new NotificationContractError(
+      "TEMPLATE_FORBIDDEN",
+      "Identity templates may only be requested by Identity Service",
+    );
+  }
   if (template.version !== 1) {
     throw new NotificationContractError(
       "UNSUPPORTED_VERSION",
