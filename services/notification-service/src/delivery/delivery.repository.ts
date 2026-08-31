@@ -5,88 +5,74 @@ import { PrismaService } from "@resourcehive/database";
 export class DeliveryRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async claim(id: string, workerId: string) {
+  async claim(id: string) {
+    const now = new Date();
     const result = await this.prisma.notificationDelivery.updateMany({
       where: {
         id,
-        status: { in: ["QUEUED", "RETRY_SCHEDULED"] },
-        OR: [{ leaseExpiresAt: null }, { leaseExpiresAt: { lt: new Date() } }],
+        OR: [
+          { status: "QUEUED" },
+          { status: "RETRY_SCHEDULED", nextAttemptAt: { lte: now } },
+        ],
       },
       data: {
         status: "PROCESSING",
-        leaseOwner: workerId,
-        leaseExpiresAt: new Date(Date.now() + 60_000),
         attemptCount: { increment: 1 },
       },
     });
     if (result.count !== 1) return null;
-    return this.prisma.notificationDelivery.findUnique({
+    return this.prisma.notificationDelivery.findUnique({ where: { id } });
+  }
+
+  complete(id: string, providerMessageId?: string, scrubContent = false) {
+    return this.prisma.notificationDelivery.update({
       where: { id },
-      include: { notification: true },
+      data: {
+        status: "SENT",
+        providerMessageId,
+        nextAttemptAt: null,
+        lastError: null,
+        ...(scrubContent ? { subject: null, body: null, data: {} } : {}),
+      },
     });
   }
 
-  async complete(
+  fail(
     id: string,
-    attempt: number,
-    status: "ACCEPTED" | "SENT",
-    providerMessageId?: string,
-  ) {
-    const now = new Date();
-    await this.prisma.$transaction([
-      this.prisma.notificationDelivery.update({
-        where: { id },
-        data: {
-          status,
-          providerMessageId,
-          leaseOwner: null,
-          leaseExpiresAt: null,
-          nextAttemptAt: null,
-          acceptedAt: now,
-          ...(status === "SENT" ? { sentAt: now } : {}),
-          lastErrorCode: null,
-          lastErrorMessage: null,
-        },
-      }),
-      this.prisma.notificationDeliveryAttempt.create({
-        data: {
-          deliveryId: id,
-          attemptNumber: attempt,
-          outcome: status,
-          providerResponseCode: providerMessageId,
-          finishedAt: now,
-        },
-      }),
-    ]);
-  }
-
-  async fail(
-    id: string,
-    attempt: number,
     decision: ReturnType<typeof import("./retry-policy").decideRetry>,
   ) {
-    await this.prisma.$transaction([
-      this.prisma.notificationDelivery.update({
-        where: { id },
-        data: {
-          status: decision.retry ? "RETRY_SCHEDULED" : "FAILED",
-          nextAttemptAt: decision.nextAttemptAt,
-          lastErrorCode: decision.code,
-          lastErrorMessage: decision.message.slice(0, 1000),
-          leaseOwner: null,
-          leaseExpiresAt: null,
-        },
-      }),
-      this.prisma.notificationDeliveryAttempt.create({
-        data: {
-          deliveryId: id,
-          attemptNumber: attempt,
-          outcome: decision.retry ? "RETRY_SCHEDULED" : "FAILED",
-          errorMessage: decision.message.slice(0, 1000),
-          providerResponseCode: decision.code,
-          finishedAt: new Date(),
-        },
-      }),
-    ]);
+    return this.prisma.notificationDelivery.update({
+      where: { id },
+      data: {
+        status: decision.retry ? "RETRY_SCHEDULED" : "FAILED",
+        nextAttemptAt: decision.nextAttemptAt,
+        lastError: `${decision.code}: ${decision.message}`.slice(0, 1000),
+      },
+    });
+  }
+
+  findDue(limit = 50) {
+    const now = new Date();
+    return this.prisma.notificationDelivery.findMany({
+      where: {
+        OR: [
+          { status: "QUEUED" },
+          { status: "RETRY_SCHEDULED", nextAttemptAt: { lte: now } },
+        ],
+      },
+      select: { id: true },
+      orderBy: { createdAt: "asc" },
+      take: limit,
+    });
+  }
+
+  requeueStale() {
+    return this.prisma.notificationDelivery.updateMany({
+      where: {
+        status: "PROCESSING",
+        updatedAt: { lt: new Date(Date.now() - 5 * 60_000) },
+      },
+      data: { status: "QUEUED" },
+    });
   }
 }
