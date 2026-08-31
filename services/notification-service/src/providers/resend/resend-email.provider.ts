@@ -29,8 +29,8 @@ export class ResendEmailProvider implements DeliveryProvider {
       {
         from,
         to: message.destination,
-        subject: message.title,
-        text: message.message,
+        subject: message.subject,
+        text: message.body,
       },
       { idempotencyKey: message.deliveryId },
     );
@@ -40,6 +40,6 @@ export class ResendEmailProvider implements DeliveryProvider {
         name: "EMPTY_RESPONSE",
         message: "Resend returned no email ID",
       });
-    return { providerMessageId: data.id, status: "SENT" };
+    return { providerMessageId: data.id };
   }
 }
