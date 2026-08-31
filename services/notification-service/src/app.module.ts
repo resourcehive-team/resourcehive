@@ -3,6 +3,7 @@ import { PrismaModule } from "@resourcehive/database";
 import { ServiceAuthModule } from "@resourcehive/service-auth";
 import { HealthModule } from "./health/health.module";
 import { DeliveryModule } from "./delivery/delivery.module";
+import { DeviceModule } from "./devices/device.module";
 import { KafkaModule } from "./kafka/kafka.module";
 import { NotificationsModule } from "./notifications/notifications.module";
 
@@ -12,6 +13,7 @@ import { NotificationsModule } from "./notifications/notifications.module";
     ServiceAuthModule,
     HealthModule,
     DeliveryModule,
+    DeviceModule,
     KafkaModule,
     NotificationsModule,
   ],
