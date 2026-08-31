@@ -6,11 +6,24 @@ import {
   Payload,
 } from "@nestjs/microservices";
 import { NOTIFICATION_TOPICS } from "../contracts";
+import { BookingEventService } from "./booking-event.service";
 import { NotificationCommandService } from "./notification-command.service";
 
 @Controller()
 export class NotificationEventController {
-  constructor(private readonly commands: NotificationCommandService) {}
+  constructor(
+    private readonly commands: NotificationCommandService,
+    private readonly bookings: BookingEventService,
+  ) {}
+
+  @EventPattern(NOTIFICATION_TOPICS.bookingEvents)
+  async handleBookingEvent(
+    @Payload() payload: unknown,
+    @Ctx() context: KafkaContext,
+  ) {
+    await this.bookings.handle(payload);
+    await this.commit(context);
+  }
 
   @EventPattern(NOTIFICATION_TOPICS.commands)
   handleCommand(@Payload() payload: unknown, @Ctx() context: KafkaContext) {
@@ -30,6 +43,10 @@ export class NotificationEventController {
     context: KafkaContext,
   ): Promise<void> {
     await this.commands.process(payload);
+    await this.commit(context);
+  }
+
+  private async commit(context: KafkaContext): Promise<void> {
     const offset = (BigInt(context.getMessage().offset) + 1n).toString();
     await context.getConsumer().commitOffsets([
       {

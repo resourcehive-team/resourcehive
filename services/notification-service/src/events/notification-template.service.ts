@@ -5,6 +5,7 @@ import {
   TemplateVariables,
 } from "../contracts";
 import { renderIdentityEmail } from "./templates/identity-email.templates";
+import { renderBooking } from "./templates/booking.templates";
 
 export interface RenderedNotification {
   type: string;
@@ -19,6 +20,9 @@ export class NotificationTemplateService {
   render(command: NotificationCommandV1): RenderedNotification {
     if (command.template.key.startsWith("identity.")) {
       return renderIdentityEmail(command);
+    }
+    if (command.template.key.startsWith("booking.")) {
+      return renderBooking(command);
     }
     const title = this.defaultTitle(command.template.key);
     const message = this.text(command.template.variables, "message") ?? title;

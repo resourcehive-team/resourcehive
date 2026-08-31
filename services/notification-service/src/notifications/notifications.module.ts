@@ -8,6 +8,7 @@ import { NotificationGateway } from "../websocket/notification.gateway";
 import { NotificationCommandService } from "../events/notification-command.service";
 import { NotificationEventController } from "../events/notification-event.controller";
 import { NotificationTemplateService } from "../events/notification-template.service";
+import { BookingEventService } from "../events/booking-event.service";
 
 @Module({
   imports: [ServiceAuthModule],
@@ -19,6 +20,7 @@ import { NotificationTemplateService } from "../events/notification-template.ser
     NotificationGateway,
     NotificationCommandService,
     NotificationTemplateService,
+    BookingEventService,
   ],
   exports: [NotificationPersistenceService, NotificationReadService],
 })
