@@ -1,6 +1,10 @@
 import { Injectable, UnauthorizedException } from "@nestjs/common";
 import { Prisma, PrismaService } from "@resourcehive/database";
-import { NotificationCommandV1, parseNotificationCommand } from "../contracts";
+import {
+  NOTIFICATION_TOPICS,
+  NotificationCommandV1,
+  parseNotificationCommand,
+} from "../contracts";
 import { NotificationTemplateService } from "./notification-template.service";
 
 const CONSUMER_NAME = "notification-command-consumer-v1";
@@ -86,10 +90,24 @@ export class NotificationCommandService {
         })),
       );
     }
-    if (deliveries.length > 0) {
-      await transaction.notificationDelivery.createMany({
-        data: deliveries,
-        skipDuplicates: true,
+    for (const delivery of deliveries) {
+      const created = await transaction.notificationDelivery.create({
+        data: delivery,
+      });
+      await transaction.outboxEvent.create({
+        data: {
+          topic: NOTIFICATION_TOPICS.deliveryJobs,
+          partitionKey: created.id,
+          eventType: "notification.delivery.requested",
+          producer: "notification-service",
+          correlationId: command.correlationId,
+          payload: {
+            kind: "notification.delivery-job",
+            deliveryId: created.id,
+            occurredAt: new Date().toISOString(),
+          },
+          occurredAt: new Date(),
+        },
       });
     }
 
