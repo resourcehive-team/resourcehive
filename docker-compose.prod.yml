@@ -95,6 +95,7 @@ services:
     environment:
       <<: *service-environment
       PORT: 3003
+      DELIVERY_POLL_INTERVAL_MS: ${DELIVERY_POLL_INTERVAL_MS:-5000}
       KAFKA_ENABLED: ${KAFKA_ENABLED:-false}
       KAFKA_BROKERS: ${KAFKA_BROKERS:-localhost:9092}
       KAFKA_CLIENT_ID: ${KAFKA_CLIENT_ID:-notification-service}

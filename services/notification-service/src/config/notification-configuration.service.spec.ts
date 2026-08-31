@@ -41,4 +41,12 @@ describe("NotificationConfigurationService", () => {
       "FIREBASE_PROJECT_ID",
     );
   });
+
+  it("rejects an unsafe delivery polling interval", () => {
+    process.env.DELIVERY_POLL_INTERVAL_MS = "100";
+
+    expect(() => new NotificationConfigurationService().onModuleInit()).toThrow(
+      "DELIVERY_POLL_INTERVAL_MS",
+    );
+  });
 });

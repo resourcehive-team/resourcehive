@@ -5,6 +5,10 @@ import { getNotificationKafkaConfig } from "../kafka/kafka.config";
 export class NotificationConfigurationService implements OnModuleInit {
   onModuleInit(): void {
     getNotificationKafkaConfig();
+    const pollInterval = Number(process.env.DELIVERY_POLL_INTERVAL_MS ?? 5_000);
+    if (!Number.isFinite(pollInterval) || pollInterval < 1_000) {
+      throw new Error("DELIVERY_POLL_INTERVAL_MS must be at least 1000");
+    }
     if (process.env.RESEND_ENABLED === "true") {
       this.require("RESEND_API_KEY");
       this.require("RESEND_FROM_EMAIL");
