@@ -8,10 +8,13 @@ recipient-scoped read APIs, and the authenticated WebSocket connection
 foundation. Business-event delivery and email fallback remain later
 milestones.
 
-Approved contracts:
+Architecture and contracts:
 
+- [Architecture](docs/architecture.md)
 - [Notification API](docs/api-contract.md)
 - [Consumed booking events](docs/event-contracts.md)
+- [Delivery semantics](docs/delivery-semantics.md)
+- [Provider configuration](docs/provider-configuration.md)
 
 ## Local development
 
