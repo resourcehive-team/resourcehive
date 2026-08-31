@@ -1,10 +1,6 @@
 import { Injectable, UnauthorizedException } from "@nestjs/common";
 import { Prisma, PrismaService } from "@resourcehive/database";
-import {
-  NOTIFICATION_TOPICS,
-  NotificationCommandV1,
-  parseNotificationCommand,
-} from "../contracts";
+import { NotificationCommandV1, parseNotificationCommand } from "../contracts";
 import { NotificationTemplateService } from "./notification-template.service";
 import { NotificationGateway } from "../websocket/notification.gateway";
 
@@ -68,72 +64,63 @@ export class NotificationCommandService {
       throw new UnauthorizedException("An active recipient is required");
 
     const rendered = this.templates.render(command);
-    const notification = await transaction.notification.create({
-      data: {
-        userId: user.id,
-        type: rendered.type,
-        title: rendered.title,
-        message: rendered.message,
-        data: command.template.variables,
-        dedupeKey: command.idempotencyKey,
-        sourceEventId: command.commandId,
-      },
-    });
+    const createsNotification =
+      command.channels.includes("IN_APP") || command.channels.includes("PUSH");
+    const notification = createsNotification
+      ? await transaction.notification.create({
+          data: {
+            userId: user.id,
+            type: rendered.type,
+            title: rendered.title,
+            message: rendered.message,
+            data: command.template.variables,
+          },
+        })
+      : null;
 
     const deliveries: Prisma.NotificationDeliveryCreateManyInput[] = [];
     if (command.channels.includes("EMAIL")) {
       deliveries.push({
-        notificationId: notification.id,
+        userId: user.id,
         channel: "EMAIL",
-        provider: "RESEND",
         destination: command.recipient.email ?? user.email,
+        subject: rendered.emailSubject,
+        body: rendered.emailText,
       });
     }
     if (command.channels.includes("PUSH")) {
       const devices = await transaction.userDevice.findMany({
-        where: { userId: user.id, status: "ACTIVE" },
-        select: { installationId: true },
+        where: { userId: user.id, active: true },
+        select: { token: true },
       });
       deliveries.push(
-        ...devices.map(({ installationId }) => ({
-          notificationId: notification.id,
+        ...devices.map(({ token }) => ({
+          userId: user.id,
+          notificationId: notification?.id,
           channel: "PUSH",
-          provider: "FCM",
-          destination: installationId,
+          destination: token,
+          subject: rendered.title,
+          body: rendered.message,
+          data: notification ? { notificationId: notification.id } : {},
         })),
       );
     }
-    for (const delivery of deliveries) {
-      const created = await transaction.notificationDelivery.create({
-        data: delivery,
-      });
-      await transaction.outboxEvent.create({
-        data: {
-          topic: NOTIFICATION_TOPICS.deliveryJobs,
-          partitionKey: created.id,
-          eventType: "notification.delivery.requested",
-          producer: "notification-service",
-          correlationId: command.correlationId,
-          payload: {
-            kind: "notification.delivery-job",
-            deliveryId: created.id,
-            occurredAt: new Date().toISOString(),
-          },
-          occurredAt: new Date(),
-        },
-      });
+    if (deliveries.length > 0) {
+      await transaction.notificationDelivery.createMany({ data: deliveries });
     }
 
     return {
       duplicate: false,
-      notificationId: notification.id,
-      notification: {
-        id: notification.id,
-        type: notification.type,
-        title: notification.title,
-        message: notification.message,
-        createdAt: notification.createdAt,
-      },
+      notificationId: notification?.id,
+      notification: notification
+        ? {
+            id: notification.id,
+            type: notification.type,
+            title: notification.title,
+            message: notification.message,
+            createdAt: notification.createdAt,
+          }
+        : undefined,
     };
   }
 }
