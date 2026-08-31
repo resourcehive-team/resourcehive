@@ -10,10 +10,6 @@ Authenticated user endpoints:
 - `GET /notifications/devices`
 - `DELETE /notifications/devices/:deviceId`
 
-Provider callback endpoint:
-
-- `POST /notifications/webhooks/resend`
-
-The webhook endpoint is authenticated by the Resend signature rather than a
-user JWT. It must receive the unmodified request body.
-
+Register a device with `{ "token": "<FCM registration token>", "platform":
+"ANDROID" | "IOS" }`. Registering the same token again reactivates it for the
+same user. Deleting a device deactivates the token.

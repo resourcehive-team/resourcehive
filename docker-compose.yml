@@ -21,7 +21,11 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
     healthcheck:
-      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:29092 --list >/dev/null 2>&1"]
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:29092 --list >/dev/null 2>&1",
+        ]
       interval: 10s
       timeout: 10s
       retries: 10
@@ -40,9 +44,7 @@ services:
         for topic in \
           resourcehive.notification.commands.v1 \
           resourcehive.identity.notification-commands.v1 \
-          resourcehive.booking.events.v1 \
-          resourcehive.notification.delivery-jobs.v1 \
-          resourcehive.notification.dlq.v1; do
+          resourcehive.booking.events.v1; do
           /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 \
             --create --if-not-exists --topic "$$topic" \
             --partitions 1 --replication-factor 1
