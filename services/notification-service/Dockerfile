@@ -1,4 +1,4 @@
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 WORKDIR /app
 RUN apk add --no-cache openssl
 RUN npm install -g pnpm@10.34.5
@@ -8,7 +8,7 @@ RUN pnpm --filter @resourcehive/database run build
 RUN pnpm --filter @resourcehive/service-auth run build
 RUN pnpm --filter notification-service run build
 
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 WORKDIR /app
 RUN apk add --no-cache openssl
 RUN npm install -g pnpm@10.34.5
