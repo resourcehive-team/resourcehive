@@ -10,6 +10,7 @@ import { RetrySchedulerService } from "./retry-scheduler.service";
 import { ResendEmailProvider } from "../providers/resend/resend-email.provider";
 import { ResendWebhookController } from "../providers/resend/resend-webhook.controller";
 import { ResendWebhookService } from "../providers/resend/resend-webhook.service";
+import { FcmPushProvider } from "../providers/fcm/fcm-push.provider";
 
 @Module({
   controllers: [DeliveryWorkerController, ResendWebhookController],
@@ -21,6 +22,7 @@ import { ResendWebhookService } from "../providers/resend/resend-webhook.service
     ConsolePushProvider,
     ResendEmailProvider,
     ResendWebhookService,
+    FcmPushProvider,
   ],
   exports: [DeliveryWorkerService],
 })

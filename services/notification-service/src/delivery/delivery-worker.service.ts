@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
-import { ConsolePushProvider } from "./console-delivery.providers";
 import { ResendEmailProvider } from "../providers/resend/resend-email.provider";
+import { FcmPushProvider } from "../providers/fcm/fcm-push.provider";
 import { DeliveryProvider } from "./delivery-provider";
 import { DeliveryRepository } from "./delivery.repository";
 import { decideRetry } from "./retry-policy";
@@ -11,7 +11,7 @@ export class DeliveryWorkerService {
   constructor(
     private readonly repository: DeliveryRepository,
     private readonly email: ResendEmailProvider,
-    private readonly push: ConsolePushProvider,
+    private readonly push: FcmPushProvider,
   ) {}
   async process(id: string): Promise<void> {
     const delivery = await this.repository.claim(id, randomUUID());

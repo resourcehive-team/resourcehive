@@ -29,6 +29,7 @@
     "@resourcehive/service-auth": "workspace:*",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
+    "firebase-admin": "13.9.0",
     "kafkajs": "2.2.4",
     "reflect-metadata": "^0.2.2",
     "resend": "^6.25.0",
