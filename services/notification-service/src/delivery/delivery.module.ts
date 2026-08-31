@@ -3,21 +3,20 @@ import {
   ConsoleEmailProvider,
   ConsolePushProvider,
 } from "./console-delivery.providers";
+import { DeliveryDispatcherService } from "./delivery-dispatcher.service";
 import { DeliveryRepository } from "./delivery.repository";
-import { DeliveryWorkerController } from "./delivery-worker.controller";
 import { DeliveryWorkerService } from "./delivery-worker.service";
-import { RetrySchedulerService } from "./retry-scheduler.service";
 import { ResendEmailProvider } from "../providers/resend/resend-email.provider";
 import { ResendWebhookController } from "../providers/resend/resend-webhook.controller";
 import { ResendWebhookService } from "../providers/resend/resend-webhook.service";
 import { FcmPushProvider } from "../providers/fcm/fcm-push.provider";
 
 @Module({
-  controllers: [DeliveryWorkerController, ResendWebhookController],
+  controllers: [ResendWebhookController],
   providers: [
     DeliveryRepository,
     DeliveryWorkerService,
-    RetrySchedulerService,
+    DeliveryDispatcherService,
     ConsoleEmailProvider,
     ConsolePushProvider,
     ResendEmailProvider,
