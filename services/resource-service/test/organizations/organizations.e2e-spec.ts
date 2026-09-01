@@ -165,16 +165,16 @@ describe('OrganizationsController (e2e)', () => {
     });
     await prisma.organization
       .delete({ where: { id: grandchildOrgId } })
-      .catch(() => {});
+      .catch(() => { });
     await prisma.organization
       .delete({ where: { id: childOrgId } })
-      .catch(() => {});
+      .catch(() => { });
     await prisma.organization
       .delete({ where: { id: rootOrgId } })
-      .catch(() => {});
+      .catch(() => { });
     await prisma.organization
       .delete({ where: { id: otherTenantOrgId } })
-      .catch(() => {});
+      .catch(() => { });
     await prisma.user.deleteMany({ where: { id: deepAdminUserId } });
     await app.close();
   });
