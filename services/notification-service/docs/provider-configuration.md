@@ -30,6 +30,8 @@ the APNs authentication key in Firebase; it is not stored by this service.
 
 Before setting `FCM_ENABLED=true`, configure `FIREBASE_PROJECT_ID` and mount a
 least-privilege service-account file at `GOOGLE_APPLICATION_CREDENTIALS`.
+For local Android setup and a real push smoke test without Booking Service, see
+[`android-fcm-local-testing.md`](android-fcm-local-testing.md).
 
 ### Production Firebase secret
 

@@ -25,6 +25,9 @@ pnpm --filter @resourcehive/database run build
 pnpm --filter notification-service run start:dev
 ```
 
+Real Android FCM setup and the development-only push smoke test are documented
+in [`docs/android-fcm-local-testing.md`](docs/android-fcm-local-testing.md).
+
 - Internal port: `3003`
 - Readiness: `GET /health`
 - Swagger UI: `GET /docs`
