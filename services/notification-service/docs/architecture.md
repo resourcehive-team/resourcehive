@@ -1,7 +1,7 @@
 # Notification Service Architecture
 
 The Notification Service owns notification persistence, approved templates,
-delivery retries, WebSocket fan-out, verification email, and push delivery.
+delivery retries, verification email, and browser push delivery.
 Domain services own the business decision that a notification is required.
 
 ## Flow
@@ -26,6 +26,6 @@ delivery UUID as its idempotency key.
 - Provider credentials exist only in Notification Service.
 - Identity owns verification tokens and is the only email-command producer.
 - Email is restricted to `identity.verify-email.v1`.
-- Booking and other application events use in-app and push channels.
+- Booking and other application events use in-app and web push channels.
 - Kafka payload bodies and token-bearing URLs must never be logged.
-- WebSocket failure never rolls back a persisted notification.
+- In-app notifications are read through REST; browser alerts are delivered by FCM.

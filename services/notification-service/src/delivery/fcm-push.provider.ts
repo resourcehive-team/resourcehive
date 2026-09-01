@@ -55,9 +55,9 @@ export class FcmPushProvider implements DeliveryProvider {
 
   private notificationUrl(): string {
     const origin =
-      process.env.WEB_APP_URL ??
-      process.env.CORS_ORIGINS?.split(",")[0] ??
+      process.env.WEB_APP_URL?.trim() ||
+      process.env.CORS_ORIGINS?.split(",")[0]?.trim() ||
       "http://localhost:3000";
-    return `${origin.trim().replace(/\/$/, "")}/dashboard/notifications`;
+    return `${origin.replace(/\/$/, "")}/dashboard/notifications`;
   }
 }

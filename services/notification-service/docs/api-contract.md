@@ -6,10 +6,10 @@ Authenticated user endpoints:
 - `GET /notifications/:notificationId`
 - `PATCH /notifications/:notificationId/read`
 - `PATCH /notifications/read-all`
-- `POST /notifications/devices`
-- `GET /notifications/devices`
-- `DELETE /notifications/devices/:deviceId`
+- `POST /notifications/push-subscriptions`
+- `GET /notifications/push-subscriptions`
+- `DELETE /notifications/push-subscriptions/:subscriptionId`
 
-Register a device with `{ "token": "<FCM registration token>", "platform":
-"ANDROID" | "IOS" }`. Registering the same token again reactivates it for the
-same user. Deleting a device deactivates the token.
+Register a browser with `{ "token": "<FCM web registration token>" }`.
+Registering the same token again reactivates it for the authenticated user.
+Deleting a subscription deactivates the token.

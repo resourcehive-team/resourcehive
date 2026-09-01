@@ -108,6 +108,7 @@ services:
       RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-}
       FCM_ENABLED: ${FCM_ENABLED:-false}
       FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
+      WEB_APP_URL: ${WEB_APP_URL:-}
       GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/firebase-service-account.json
     secrets:
       - source: firebase_service_account

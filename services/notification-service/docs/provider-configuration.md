@@ -25,13 +25,14 @@ version deliberately does not retain webhook event history.
 ## Firebase Cloud Messaging
 
 Use separate development and production Firebase projects and Application
-Default Credentials. Register Android and iOS applications in Firebase. Upload
-the APNs authentication key in Firebase; it is not stored by this service.
+Default Credentials. Register a Firebase Web App and generate a Web Push
+certificate for the browser client.
 
 Before setting `FCM_ENABLED=true`, configure `FIREBASE_PROJECT_ID` and mount a
 least-privilege service-account file at `GOOGLE_APPLICATION_CREDENTIALS`.
-For local Android setup and a real push smoke test without Booking Service, see
-[`android-fcm-local-testing.md`](android-fcm-local-testing.md).
+Set `WEB_APP_URL` so clicking a browser notification opens the notifications
+page. For browser setup and a real push smoke test without Booking Service, see
+[`web-fcm-local-testing.md`](web-fcm-local-testing.md).
 
 ### Production Firebase secret
 
