@@ -65,7 +65,7 @@ const data = {
     },
     {
       title: "Notifications",
-      url: "#",
+      url: "/dashboard/notifications",
       icon: <BellIcon />,
     },
     {

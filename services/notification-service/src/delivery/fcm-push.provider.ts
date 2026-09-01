@@ -36,6 +36,10 @@ export class FcmPushProvider implements DeliveryProvider {
         token: message.destination,
         notification: { title: message.subject, body: message.body },
         data: { notificationId },
+        webpush: {
+          notification: { icon: "/resourcehive-mark.svg" },
+          fcmOptions: { link: this.notificationUrl() },
+        },
       });
       return { providerMessageId };
     } catch (error) {
@@ -47,5 +51,13 @@ export class FcmPushProvider implements DeliveryProvider {
       }
       throw classifyFcmError(error);
     }
+  }
+
+  private notificationUrl(): string {
+    const origin =
+      process.env.WEB_APP_URL ??
+      process.env.CORS_ORIGINS?.split(",")[0] ??
+      "http://localhost:3000";
+    return `${origin.trim().replace(/\/$/, "")}/dashboard/notifications`;
   }
 }
