@@ -74,6 +74,15 @@ export function parseNotificationCommand(
     );
   }
   if (
+    template.key === NOTIFICATION_TEMPLATES.developmentTestPush &&
+    process.env.NODE_ENV === "production"
+  ) {
+    throw new NotificationContractError(
+      "TEMPLATE_FORBIDDEN",
+      "Development test pushes are unavailable in production",
+    );
+  }
+  if (
     String(template.key).startsWith("identity.") &&
     value.producer !== "identity-service"
   ) {

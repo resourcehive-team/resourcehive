@@ -77,4 +77,24 @@ describe("notification command contract", () => {
 
     expect(parseNotificationCommand(testPush)).toEqual(testPush);
   });
+
+  it("rejects the development push template in production", () => {
+    const previousNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = "production";
+    try {
+      expect(() =>
+        parseNotificationCommand({
+          ...validCommand,
+          producer: "notification-service",
+          template: {
+            key: "development.test-push.v1",
+            version: 1,
+            variables: {},
+          },
+        }),
+      ).toThrow("Development test pushes are unavailable in production");
+    } finally {
+      process.env.NODE_ENV = previousNodeEnv;
+    }
+  });
 });
