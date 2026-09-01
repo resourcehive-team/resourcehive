@@ -62,4 +62,19 @@ describe("notification command contract", () => {
 
     expect(parseNotificationCommand(verification)).toEqual(verification);
   });
+
+  it("accepts the development push template without email", () => {
+    const testPush = {
+      ...validCommand,
+      producer: "notification-service",
+      channels: ["IN_APP", "PUSH"],
+      template: {
+        key: "development.test-push.v1",
+        version: 1,
+        variables: {},
+      },
+    };
+
+    expect(parseNotificationCommand(testPush)).toEqual(testPush);
+  });
 });

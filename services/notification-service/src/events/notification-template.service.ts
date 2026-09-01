@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import {
+  NOTIFICATION_TEMPLATES,
   NotificationCommandV1,
   NotificationTemplateKey,
   TemplateVariables,
@@ -18,6 +19,15 @@ export interface RenderedNotification {
 @Injectable()
 export class NotificationTemplateService {
   render(command: NotificationCommandV1): RenderedNotification {
+    if (command.template.key === NOTIFICATION_TEMPLATES.developmentTestPush) {
+      return {
+        type: "DEVELOPMENT_TEST_PUSH",
+        title: "ResourceHive test notification",
+        message: "Local Firebase Cloud Messaging is configured correctly.",
+        emailSubject: "",
+        emailText: "",
+      };
+    }
     if (command.template.key.startsWith("identity.")) {
       return renderIdentityEmail(command);
     }

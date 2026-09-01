@@ -9,6 +9,7 @@ export const NOTIFICATION_TEMPLATES = {
   bookingConfirmed: "booking.confirmed.v1",
   bookingCancelled: "booking.cancelled.v1",
   bookingCompleted: "booking.completed.v1",
+  developmentTestPush: "development.test-push.v1",
 } as const;
 
 export type NotificationTemplateKey =
