@@ -4,6 +4,7 @@ import {
   Param,
   ParseUUIDPipe,
   Patch,
+  Post,
   Query,
   UseGuards,
 } from "@nestjs/common";
@@ -11,6 +12,7 @@ import {
   ApiBearerAuth,
   ApiNotFoundResponse,
   ApiOkResponse,
+  ApiOperation,
   ApiTags,
 } from "@nestjs/swagger";
 import {
@@ -19,6 +21,7 @@ import {
   JwtAuthGuard,
 } from "@resourcehive/service-auth";
 import { ListNotificationsDto } from "./dto/list-notifications.dto";
+import { DevelopmentPushService } from "./development-push.service";
 import { NotificationReadService } from "./notification-read.service";
 
 @ApiTags("notifications")
@@ -26,7 +29,10 @@ import { NotificationReadService } from "./notification-read.service";
 @UseGuards(JwtAuthGuard)
 @Controller("notifications")
 export class NotificationsController {
-  constructor(private readonly notifications: NotificationReadService) {}
+  constructor(
+    private readonly notifications: NotificationReadService,
+    private readonly developmentPush: DevelopmentPushService,
+  ) {}
 
   @Get()
   @ApiOkResponse({ description: "Authenticated user's notifications" })
@@ -41,6 +47,16 @@ export class NotificationsController {
   @ApiOkResponse({ description: "All unread notifications marked read" })
   markAllRead(@CurrentUser() user: AuthenticatedUser) {
     return this.notifications.markAllRead(user);
+  }
+
+  @Post("test-push")
+  @ApiOperation({
+    summary: "Queue a push to the authenticated user's devices (local only)",
+  })
+  @ApiOkResponse({ description: "Development push queued" })
+  @ApiNotFoundResponse({ description: "Unavailable in production" })
+  sendTestPush(@CurrentUser() user: AuthenticatedUser) {
+    return this.developmentPush.queue(user.userId);
   }
 
   @Get(":notificationId")

@@ -9,6 +9,7 @@ import { NotificationCommandService } from "../events/notification-command.servi
 import { NotificationEventController } from "../events/notification-event.controller";
 import { NotificationTemplateService } from "../events/notification-template.service";
 import { BookingEventService } from "../events/booking-event.service";
+import { DevelopmentPushService } from "./development-push.service";
 
 @Module({
   imports: [ServiceAuthModule],
@@ -21,6 +22,7 @@ import { BookingEventService } from "../events/booking-event.service";
     NotificationCommandService,
     NotificationTemplateService,
     BookingEventService,
+    DevelopmentPushService,
   ],
   exports: [NotificationPersistenceService, NotificationReadService],
 })
