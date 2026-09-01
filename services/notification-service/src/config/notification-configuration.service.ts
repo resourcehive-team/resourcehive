@@ -1,4 +1,5 @@
 import { Injectable, OnModuleInit } from "@nestjs/common";
+import { existsSync } from "node:fs";
 import { getNotificationKafkaConfig } from "../kafka/kafka.config";
 
 @Injectable()
@@ -15,7 +16,12 @@ export class NotificationConfigurationService implements OnModuleInit {
     }
     if (process.env.FCM_ENABLED === "true") {
       this.require("FIREBASE_PROJECT_ID");
-      this.require("GOOGLE_APPLICATION_CREDENTIALS");
+      const credentialsPath = this.require("GOOGLE_APPLICATION_CREDENTIALS");
+      if (!existsSync(credentialsPath)) {
+        throw new Error(
+          `GOOGLE_APPLICATION_CREDENTIALS does not point to an existing file: ${credentialsPath}`,
+        );
+      }
     }
   }
 
@@ -31,9 +37,11 @@ export class NotificationConfigurationService implements OnModuleInit {
     };
   }
 
-  private require(name: string): void {
-    if (!process.env[name]?.trim()) {
+  private require(name: string): string {
+    const value = process.env[name]?.trim();
+    if (!value) {
       throw new Error(`${name} is required when its provider is enabled`);
     }
+    return value;
   }
 }

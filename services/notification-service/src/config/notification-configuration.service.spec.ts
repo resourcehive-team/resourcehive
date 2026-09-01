@@ -42,6 +42,27 @@ describe("NotificationConfigurationService", () => {
     );
   });
 
+  it("fails fast when the FCM credential file cannot be found", () => {
+    process.env.FCM_ENABLED = "true";
+    process.env.FIREBASE_PROJECT_ID = "resourcehive-test";
+    process.env.GOOGLE_APPLICATION_CREDENTIALS =
+      "C:/missing/firebase-service-account.json";
+
+    expect(() => new NotificationConfigurationService().onModuleInit()).toThrow(
+      "does not point to an existing file",
+    );
+  });
+
+  it("accepts an existing FCM credential file", () => {
+    process.env.FCM_ENABLED = "true";
+    process.env.FIREBASE_PROJECT_ID = "resourcehive-test";
+    process.env.GOOGLE_APPLICATION_CREDENTIALS = __filename;
+
+    expect(() =>
+      new NotificationConfigurationService().onModuleInit(),
+    ).not.toThrow();
+  });
+
   it("rejects an unsafe delivery polling interval", () => {
     process.env.DELIVERY_POLL_INTERVAL_MS = "100";
 
