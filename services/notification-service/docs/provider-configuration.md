@@ -31,6 +31,30 @@ the APNs authentication key in Firebase; it is not stored by this service.
 Before setting `FCM_ENABLED=true`, configure `FIREBASE_PROJECT_ID` and mount a
 least-privilege service-account file at `GOOGLE_APPLICATION_CREDENTIALS`.
 
+### Production Firebase secret
+
+Production uses the protected GitHub `production` environment as the secret
+source. Create a repository environment secret named
+`FIREBASE_SERVICE_ACCOUNT_JSON` containing the complete service-account JSON.
+The deployment workflow validates the required JSON fields, transfers it over
+SSH, and atomically installs it on Linode at:
+
+```text
+/home/deploy/resourcehive/secrets/firebase-service-account.json
+```
+
+The directory is mode `700`, the file is mode `600`, and Docker Compose mounts
+the file read-only into only Notification Service at:
+
+```text
+/run/secrets/firebase-service-account.json
+```
+
+The JSON must not be added to `.env.production`, the repository, a container
+image, or GitHub Actions logs. To rotate the credential, replace the GitHub
+environment secret and run the deployment workflow again; the remote file is
+replaced atomically before the container is recreated.
+
 ## Deployment gate
 
 Provider flags default to `false`. The service uses non-delivering console

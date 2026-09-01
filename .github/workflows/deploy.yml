@@ -102,6 +102,38 @@ jobs:
           scp docker-compose.prod.yml "$target:~/resourcehive/docker-compose.prod.yml"
           scp services/api-gateway/Caddyfile "$target:~/resourcehive/services/api-gateway/Caddyfile"
 
+      - name: Install Firebase service account on Linode
+        shell: bash
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+          LINODE_HOST: ${{ secrets.LINODE_HOST }}
+          LINODE_USERNAME: ${{ secrets.LINODE_USERNAME }}
+        run: |
+          test -n "$FIREBASE_SERVICE_ACCOUNT_JSON"
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" |
+            jq -e '
+              .type == "service_account" and
+              (.project_id | type == "string" and length > 0) and
+              (.client_email | type == "string" and length > 0) and
+              (.private_key | type == "string" and length > 0)
+            ' >/dev/null
+
+          target="${LINODE_USERNAME}@${LINODE_HOST}"
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" |
+            ssh "$target" '
+              set -eu
+              secret_directory="$HOME/resourcehive/secrets"
+              secret_path="$secret_directory/firebase-service-account.json"
+
+              install -d -m 700 "$secret_directory"
+              temporary_secret="$(mktemp "$secret_directory/firebase-service-account.XXXXXX")"
+              trap '\''rm -f "$temporary_secret"'\'' EXIT
+              cat >"$temporary_secret"
+              chmod 600 "$temporary_secret"
+              mv -f "$temporary_secret" "$secret_path"
+              trap - EXIT
+            '
+
       - name: Log the Linode in to GHCR
         shell: bash
         env:
@@ -125,6 +157,8 @@ jobs:
           ssh "$target" "IMAGE_TAG='$IMAGE_TAG' bash -se" <<'REMOTE'
           cd ~/resourcehive
           test -f .env.production
+          test -f secrets/firebase-service-account.json
+          test "$(stat -c '%a' secrets/firebase-service-account.json)" = "600"
 
           compose="docker compose --env-file .env.production -f docker-compose.prod.yml"
           $compose config --quiet

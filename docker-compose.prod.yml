@@ -108,7 +108,10 @@ services:
       RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-}
       FCM_ENABLED: ${FCM_ENABLED:-false}
       FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
-      GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS:-}
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/firebase-service-account.json
+    secrets:
+      - source: firebase_service_account
+        target: firebase-service-account.json
 
   migrate:
     image: ghcr.io/resourcehive-team/resourcehive-identity:${IMAGE_TAG:?Set IMAGE_TAG in .env.production}
@@ -131,3 +134,7 @@ services:
 volumes:
   caddy_data:
   caddy_config:
+
+secrets:
+  firebase_service_account:
+    file: ./secrets/firebase-service-account.json

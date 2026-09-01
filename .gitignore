@@ -30,6 +30,7 @@ redis/
 !.env.example
 !.env.production.example
 .neon
+/secrets/
 
 # OS files
 .DS_Store
