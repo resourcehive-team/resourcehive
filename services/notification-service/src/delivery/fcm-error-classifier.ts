@@ -1,10 +1,9 @@
-import { DeliveryProviderError } from "../../delivery/delivery-provider";
+import { DeliveryProviderError } from "./delivery-provider";
 
 const transientCodes = new Set([
   "messaging/internal-error",
   "messaging/server-unavailable",
   "messaging/message-rate-exceeded",
-  "messaging/device-message-rate-exceeded",
 ]);
 const invalidTargetCodes = new Set([
   "messaging/invalid-registration-token",

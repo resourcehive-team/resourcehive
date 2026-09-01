@@ -74,4 +74,27 @@ export class NotificationRepository {
     });
     return Boolean(user);
   }
+
+  registerWebPush(userId: string, token: string) {
+    return this.prisma.webPushSubscription.upsert({
+      where: { token },
+      create: { userId, token },
+      update: { userId, active: true },
+    });
+  }
+
+  listWebPush(userId: string) {
+    return this.prisma.webPushSubscription.findMany({
+      where: { userId, active: true },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  async removeWebPush(id: string, userId: string): Promise<boolean> {
+    const result = await this.prisma.webPushSubscription.updateMany({
+      where: { id, userId },
+      data: { active: false },
+    });
+    return result.count === 1;
+  }
 }

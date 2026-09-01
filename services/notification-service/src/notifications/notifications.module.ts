@@ -1,10 +1,8 @@
 import { Module } from "@nestjs/common";
 import { ServiceAuthModule } from "@resourcehive/service-auth";
-import { NotificationPersistenceService } from "./notification-persistence.service";
 import { NotificationRepository } from "./notification.repository";
 import { NotificationReadService } from "./notification-read.service";
 import { NotificationsController } from "./notifications.controller";
-import { NotificationGateway } from "../websocket/notification.gateway";
 import { NotificationCommandService } from "../events/notification-command.service";
 import { NotificationEventController } from "../events/notification-event.controller";
 import { NotificationTemplateService } from "../events/notification-template.service";
@@ -16,14 +14,12 @@ import { DevelopmentPushService } from "./development-push.service";
   controllers: [NotificationsController, NotificationEventController],
   providers: [
     NotificationRepository,
-    NotificationPersistenceService,
     NotificationReadService,
-    NotificationGateway,
     NotificationCommandService,
     NotificationTemplateService,
     BookingEventService,
     DevelopmentPushService,
   ],
-  exports: [NotificationPersistenceService, NotificationReadService],
+  exports: [NotificationReadService],
 })
 export class NotificationsModule {}

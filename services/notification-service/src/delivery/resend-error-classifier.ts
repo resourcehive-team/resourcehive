@@ -1,4 +1,4 @@
-import { DeliveryProviderError } from "../../delivery/delivery-provider";
+import { DeliveryProviderError } from "./delivery-provider";
 
 export function classifyResendError(error: unknown): DeliveryProviderError {
   const value = (error ?? {}) as {

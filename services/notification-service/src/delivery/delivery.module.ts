@@ -6,8 +6,8 @@ import {
 import { DeliveryDispatcherService } from "./delivery-dispatcher.service";
 import { DeliveryRepository } from "./delivery.repository";
 import { DeliveryWorkerService } from "./delivery-worker.service";
-import { ResendEmailProvider } from "../providers/resend/resend-email.provider";
-import { FcmPushProvider } from "../providers/fcm/fcm-push.provider";
+import { ResendEmailProvider } from "./resend-email.provider";
+import { FcmPushProvider } from "./fcm-push.provider";
 
 @Module({
   providers: [

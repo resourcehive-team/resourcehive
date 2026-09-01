@@ -2,7 +2,6 @@ import { Injectable, UnauthorizedException } from "@nestjs/common";
 import { Prisma, PrismaService } from "@resourcehive/database";
 import { NotificationCommandV1, parseNotificationCommand } from "../contracts";
 import { NotificationTemplateService } from "./notification-template.service";
-import { NotificationGateway } from "../websocket/notification.gateway";
 
 const CONSUMER_NAME = "notification-command-consumer-v1";
 
@@ -23,7 +22,6 @@ export class NotificationCommandService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly templates: NotificationTemplateService,
-    private readonly gateway: NotificationGateway,
   ) {}
 
   async process(input: unknown): Promise<NotificationProcessingResult> {
@@ -36,9 +34,6 @@ export class NotificationCommandService {
     const result = await this.prisma.$transaction((transaction) =>
       this.processWithinTransaction(command, transaction),
     );
-    if (!result.duplicate && result.notification) {
-      this.gateway.emitCreated(command.recipient.userId, result.notification);
-    }
     return result;
   }
 
@@ -89,12 +84,12 @@ export class NotificationCommandService {
       });
     }
     if (command.channels.includes("PUSH")) {
-      const devices = await transaction.userDevice.findMany({
+      const subscriptions = await transaction.webPushSubscription.findMany({
         where: { userId: user.id, active: true },
         select: { token: true },
       });
       deliveries.push(
-        ...devices.map(({ token }) => ({
+        ...subscriptions.map(({ token }) => ({
           userId: user.id,
           notificationId: notification?.id,
           channel: "PUSH",

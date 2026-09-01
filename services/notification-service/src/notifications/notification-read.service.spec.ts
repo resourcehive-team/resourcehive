@@ -9,6 +9,9 @@ describe("NotificationReadService", () => {
     findByIdForUser: jest.fn(),
     markReadForUser: jest.fn(),
     markAllReadForUser: jest.fn(),
+    registerWebPush: jest.fn(),
+    listWebPush: jest.fn(),
+    removeWebPush: jest.fn(),
   } as unknown as NotificationRepository;
   const service = new NotificationReadService(repository);
   const user = {
@@ -58,5 +61,22 @@ describe("NotificationReadService", () => {
       updatedCount: 3,
     });
     expect(markAll).toHaveBeenCalledWith("user-id");
+  });
+
+  it("registers a trimmed web push token for the authenticated user", async () => {
+    const registerWebPush = jest
+      .spyOn(repository, "registerWebPush")
+      .mockResolvedValue({
+        id: "subscription-id",
+        userId: user.userId,
+        token: "fcm-token",
+        active: true,
+        createdAt: new Date(),
+        updatedAt: new Date("2026-09-01T08:00:00.000Z"),
+      });
+
+    await service.registerWebPush(user, { token: " fcm-token " });
+
+    expect(registerWebPush).toHaveBeenCalledWith(user.userId, "fcm-token");
   });
 });

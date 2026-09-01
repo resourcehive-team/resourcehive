@@ -1,11 +1,11 @@
 import { Injectable } from "@nestjs/common";
 import { Resend } from "resend";
-import { ConsoleEmailProvider } from "../../delivery/console-delivery.providers";
+import { ConsoleEmailProvider } from "./console-delivery.providers";
 import {
   DeliveryMessage,
   DeliveryProvider,
   DeliveryProviderResult,
-} from "../../delivery/delivery-provider";
+} from "./delivery-provider";
 import { classifyResendError } from "./resend-error-classifier";
 
 @Injectable()

@@ -4,10 +4,10 @@ import { NotificationCommandService } from "../events/notification-command.servi
 import { DevelopmentPushService } from "./development-push.service";
 
 describe("DevelopmentPushService", () => {
-  const countDevices = jest.fn();
+  const countSubscriptions = jest.fn();
   const processCommand = jest.fn();
   const prisma = {
-    userDevice: { count: countDevices },
+    webPushSubscription: { count: countSubscriptions },
   } as unknown as PrismaService;
   const commands = {
     process: processCommand,
@@ -31,7 +31,7 @@ describe("DevelopmentPushService", () => {
     await expect(service.queue(userId)).rejects.toBeInstanceOf(
       NotFoundException,
     );
-    expect(countDevices).not.toHaveBeenCalled();
+    expect(countSubscriptions).not.toHaveBeenCalled();
   });
 
   it("requires the real FCM provider", async () => {
@@ -42,8 +42,8 @@ describe("DevelopmentPushService", () => {
     );
   });
 
-  it("requires an active registered device", async () => {
-    countDevices.mockResolvedValue(0);
+  it("requires an active browser subscription", async () => {
+    countSubscriptions.mockResolvedValue(0);
 
     await expect(service.queue(userId)).rejects.toBeInstanceOf(
       BadRequestException,
@@ -51,8 +51,8 @@ describe("DevelopmentPushService", () => {
     expect(processCommand).not.toHaveBeenCalled();
   });
 
-  it("queues in-app and push delivery for every active device", async () => {
-    countDevices.mockResolvedValue(2);
+  it("queues in-app and push delivery for every active browser", async () => {
+    countSubscriptions.mockResolvedValue(2);
     processCommand.mockResolvedValue({
       duplicate: false,
       notificationId: "44444444-4444-4444-8444-444444444444",

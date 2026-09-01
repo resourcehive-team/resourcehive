@@ -2,12 +2,12 @@ import { Injectable } from "@nestjs/common";
 import { applicationDefault, getApps, initializeApp } from "firebase-admin/app";
 import { getMessaging } from "firebase-admin/messaging";
 import { PrismaService } from "@resourcehive/database";
-import { ConsolePushProvider } from "../../delivery/console-delivery.providers";
+import { ConsolePushProvider } from "./console-delivery.providers";
 import {
   DeliveryMessage,
   DeliveryProvider,
   DeliveryProviderResult,
-} from "../../delivery/delivery-provider";
+} from "./delivery-provider";
 import { classifyFcmError, isInvalidFcmTarget } from "./fcm-error-classifier";
 
 @Injectable()
@@ -36,13 +36,11 @@ export class FcmPushProvider implements DeliveryProvider {
         token: message.destination,
         notification: { title: message.subject, body: message.body },
         data: { notificationId },
-        android: { priority: "high" },
-        apns: { payload: { aps: { sound: "default" } } },
       });
       return { providerMessageId };
     } catch (error) {
       if (isInvalidFcmTarget(error)) {
-        await this.prisma.userDevice.updateMany({
+        await this.prisma.webPushSubscription.updateMany({
           where: { token: message.destination },
           data: { active: false },
         });

@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
-import { ResendEmailProvider } from "../providers/resend/resend-email.provider";
-import { FcmPushProvider } from "../providers/fcm/fcm-push.provider";
+import { ResendEmailProvider } from "./resend-email.provider";
+import { FcmPushProvider } from "./fcm-push.provider";
 import { DeliveryProvider } from "./delivery-provider";
 import { DeliveryRepository } from "./delivery.repository";
 import { decideRetry } from "./retry-policy";

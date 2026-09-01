@@ -1,5 +1,7 @@
 import {
+  Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseUUIDPipe,
@@ -21,6 +23,7 @@ import {
   JwtAuthGuard,
 } from "@resourcehive/service-auth";
 import { ListNotificationsDto } from "./dto/list-notifications.dto";
+import { RegisterWebPushDto } from "./dto/register-web-push.dto";
 import { DevelopmentPushService } from "./development-push.service";
 import { NotificationReadService } from "./notification-read.service";
 
@@ -51,12 +54,33 @@ export class NotificationsController {
 
   @Post("test-push")
   @ApiOperation({
-    summary: "Queue a push to the authenticated user's devices (local only)",
+    summary: "Queue a push to the authenticated user's browsers (local only)",
   })
   @ApiOkResponse({ description: "Development push queued" })
   @ApiNotFoundResponse({ description: "Unavailable in production" })
   sendTestPush(@CurrentUser() user: AuthenticatedUser) {
     return this.developmentPush.queue(user.userId);
+  }
+
+  @Post("push-subscriptions")
+  registerWebPush(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() input: RegisterWebPushDto,
+  ) {
+    return this.notifications.registerWebPush(user, input);
+  }
+
+  @Get("push-subscriptions")
+  listWebPush(@CurrentUser() user: AuthenticatedUser) {
+    return this.notifications.listWebPush(user);
+  }
+
+  @Delete("push-subscriptions/:subscriptionId")
+  removeWebPush(
+    @Param("subscriptionId", ParseUUIDPipe) subscriptionId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.notifications.removeWebPush(subscriptionId, user);
   }
 
   @Get(":notificationId")

@@ -28,12 +28,12 @@ export class DevelopmentPushService {
       );
     }
 
-    const pushDeliveriesQueued = await this.prisma.userDevice.count({
+    const pushDeliveriesQueued = await this.prisma.webPushSubscription.count({
       where: { userId, active: true },
     });
     if (pushDeliveriesQueued === 0) {
       throw new BadRequestException(
-        "Register an active device before sending a test push",
+        "Enable browser notifications before sending a test push",
       );
     }
 

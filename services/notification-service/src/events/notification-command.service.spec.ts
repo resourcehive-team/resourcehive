@@ -1,5 +1,4 @@
 import { PrismaService } from "@resourcehive/database";
-import { NotificationGateway } from "../websocket/notification.gateway";
 import { NotificationCommandService } from "./notification-command.service";
 import { NotificationTemplateService } from "./notification-template.service";
 
@@ -22,13 +21,15 @@ describe("NotificationCommandService", () => {
   const claim = jest.fn().mockResolvedValue([{ id: "processed-id" }]);
   const findUser = jest.fn().mockResolvedValue(user);
   const createNotification = jest.fn().mockResolvedValue(notification);
-  const findDevices = jest.fn().mockResolvedValue([{ token: "fcm-token" }]);
+  const findSubscriptions = jest
+    .fn()
+    .mockResolvedValue([{ token: "fcm-token" }]);
   const createDeliveries = jest.fn().mockResolvedValue({ count: 1 });
   const transactionClient = {
     $queryRaw: claim,
     user: { findFirst: findUser },
     notification: { create: createNotification },
-    userDevice: { findMany: findDevices },
+    webPushSubscription: { findMany: findSubscriptions },
     notificationDelivery: { createMany: createDeliveries },
   };
   type TransactionOperation = (
@@ -41,12 +42,9 @@ describe("NotificationCommandService", () => {
   const prisma = {
     $transaction: runTransaction,
   } as unknown as PrismaService;
-  const emitCreated = jest.fn();
-  const gateway = { emitCreated } as unknown as NotificationGateway;
   const service = new NotificationCommandService(
     prisma,
     new NotificationTemplateService(),
-    gateway,
   );
 
   beforeEach(() => jest.clearAllMocks());
@@ -71,7 +69,6 @@ describe("NotificationCommandService", () => {
     });
 
     expect(createNotification).not.toHaveBeenCalled();
-    expect(emitCreated).not.toHaveBeenCalled();
     expect(createDeliveries).toHaveBeenCalledWith({
       data: [
         expect.objectContaining({
@@ -102,7 +99,7 @@ describe("NotificationCommandService", () => {
       occurredAt: "2026-08-31T12:00:00.000Z",
     });
 
-    expect(findDevices).toHaveBeenCalledWith({
+    expect(findSubscriptions).toHaveBeenCalledWith({
       where: { userId: user.id, active: true },
       select: { token: true },
     });
@@ -115,9 +112,5 @@ describe("NotificationCommandService", () => {
         }),
       ],
     });
-    expect(emitCreated).toHaveBeenCalledWith(
-      user.id,
-      expect.objectContaining({ id: notification.id }),
-    );
   });
 });
