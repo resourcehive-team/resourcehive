@@ -5,7 +5,6 @@ import { ConflictException, NotFoundException } from '@nestjs/common';
 
 describe('MembershipsService', () => {
   let service: MembershipsService;
-  let prisma: PrismaService;
 
   const mockPrismaService = {
     organizationMembership: {
@@ -25,7 +24,6 @@ describe('MembershipsService', () => {
     }).compile();
 
     service = module.get<MembershipsService>(MembershipsService);
-    prisma = module.get<PrismaService>(PrismaService);
   });
 
   afterEach(() => {
@@ -38,44 +36,80 @@ describe('MembershipsService', () => {
 
   describe('requestMembership', () => {
     it('should create a pending membership request', async () => {
-      mockPrismaService.organizationMembership.findUnique.mockResolvedValue(null);
-      const expectedResult = { userId: 'u1', organizationId: 'o1', status: 'PENDING' };
-      mockPrismaService.organizationMembership.create.mockResolvedValue(expectedResult);
+      mockPrismaService.organizationMembership.findUnique.mockResolvedValue(
+        null,
+      );
+      const expectedResult = {
+        userId: 'u1',
+        organizationId: 'o1',
+        status: 'PENDING',
+      };
+      mockPrismaService.organizationMembership.create.mockResolvedValue(
+        expectedResult,
+      );
 
       const result = await service.requestMembership('u1', 'o1');
-      
+
       expect(result).toEqual(expectedResult);
-      expect(mockPrismaService.organizationMembership.create).toHaveBeenCalledWith({
-        data: { userId: 'u1', organizationId: 'o1', status: 'PENDING', role: 'MEMBER' },
+      expect(
+        mockPrismaService.organizationMembership.create,
+      ).toHaveBeenCalledWith({
+        data: {
+          userId: 'u1',
+          organizationId: 'o1',
+          status: 'PENDING',
+          role: 'MEMBER',
+        },
       });
     });
 
     it('should throw ConflictException if membership already exists', async () => {
-      mockPrismaService.organizationMembership.findUnique.mockResolvedValue({ id: 'existing' });
+      mockPrismaService.organizationMembership.findUnique.mockResolvedValue({
+        id: 'existing',
+      });
 
-      await expect(service.requestMembership('u1', 'o1')).rejects.toThrow(ConflictException);
+      await expect(service.requestMembership('u1', 'o1')).rejects.toThrow(
+        ConflictException,
+      );
     });
   });
 
   describe('updateMembershipStatus', () => {
     it('should update membership status', async () => {
-      mockPrismaService.organizationMembership.findUnique.mockResolvedValue({ id: 'existing' });
+      mockPrismaService.organizationMembership.findUnique.mockResolvedValue({
+        id: 'existing',
+      });
       const expectedResult = { status: 'APPROVED', approvedBy: 'admin' };
-      mockPrismaService.organizationMembership.update.mockResolvedValue(expectedResult);
+      mockPrismaService.organizationMembership.update.mockResolvedValue(
+        expectedResult,
+      );
 
-      const result = await service.updateMembershipStatus('u1', 'o1', 'APPROVED', 'admin');
+      const result = await service.updateMembershipStatus(
+        'u1',
+        'o1',
+        'APPROVED',
+        'admin',
+      );
 
       expect(result).toEqual(expectedResult);
-      expect(mockPrismaService.organizationMembership.update).toHaveBeenCalledWith({
-        where: { userId_organizationId: { userId: 'u1', organizationId: 'o1' } },
+      expect(
+        mockPrismaService.organizationMembership.update,
+      ).toHaveBeenCalledWith({
+        where: {
+          userId_organizationId: { userId: 'u1', organizationId: 'o1' },
+        },
         data: { status: 'APPROVED', approvedBy: 'admin' },
       });
     });
 
     it('should throw NotFoundException if membership does not exist', async () => {
-      mockPrismaService.organizationMembership.findUnique.mockResolvedValue(null);
+      mockPrismaService.organizationMembership.findUnique.mockResolvedValue(
+        null,
+      );
 
-      await expect(service.updateMembershipStatus('u1', 'o1', 'APPROVED', 'admin')).rejects.toThrow(NotFoundException);
+      await expect(
+        service.updateMembershipStatus('u1', 'o1', 'APPROVED', 'admin'),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 });

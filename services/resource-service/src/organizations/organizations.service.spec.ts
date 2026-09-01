@@ -4,7 +4,6 @@ import { PrismaService } from '@resourcehive/database';
 
 describe('OrganizationsService', () => {
   let service: OrganizationsService;
-  let prisma: PrismaService;
 
   const mockPrismaService = {
     organization: {
@@ -32,7 +31,6 @@ describe('OrganizationsService', () => {
     }).compile();
 
     service = module.get<OrganizationsService>(OrganizationsService);
-    prisma = module.get<PrismaService>(PrismaService);
   });
 
   afterEach(() => {
@@ -67,15 +65,21 @@ describe('OrganizationsService', () => {
       });
     });
   });
-  
+
   // Minimal tests for other domains to ensure coverage without being exhaustive
   describe('addEmailDomain', () => {
     it('should add an email domain', async () => {
       const result = { id: 'domain1', domain: 'example.com' };
-      mockPrismaService.organizationEmailDomain.create.mockResolvedValue(result);
+      mockPrismaService.organizationEmailDomain.create.mockResolvedValue(
+        result,
+      );
 
-      expect(await service.addEmailDomain('org1', 'example.com', true)).toEqual(result);
-      expect(mockPrismaService.organizationEmailDomain.create).toHaveBeenCalledWith({
+      expect(await service.addEmailDomain('org1', 'example.com', true)).toEqual(
+        result,
+      );
+      expect(
+        mockPrismaService.organizationEmailDomain.create,
+      ).toHaveBeenCalledWith({
         data: { organizationId: 'org1', domain: 'example.com', autoJoin: true },
       });
     });

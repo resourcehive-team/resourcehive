@@ -5,7 +5,6 @@ import { ForbiddenException, NotFoundException } from '@nestjs/common';
 
 describe('ResourcesService', () => {
   let service: ResourcesService;
-  let prisma: PrismaService;
 
   const mockPrismaService = {
     resource: {
@@ -29,7 +28,6 @@ describe('ResourcesService', () => {
     }).compile();
 
     service = module.get<ResourcesService>(ResourcesService);
-    prisma = module.get<PrismaService>(PrismaService);
   });
 
   afterEach(() => {
@@ -41,7 +39,6 @@ describe('ResourcesService', () => {
   });
 
   describe('checkBookingAccess', () => {
-    
     it('should return bookable true for an ACTIVE resource', async () => {
       // Mock findOne to return an active resource
       jest.spyOn(service, 'findOne').mockResolvedValue({
@@ -49,7 +46,7 @@ describe('ResourcesService', () => {
         status: 'ACTIVE',
         name: 'Test Room',
         pointCost: 10,
-        ownerOrganizationId: 'org-1'
+        ownerOrganizationId: 'org-1',
       } as any);
 
       const result = await service.checkBookingAccess('org-1', 'res-1');
@@ -68,19 +65,24 @@ describe('ResourcesService', () => {
         status: 'INACTIVE',
       } as any);
 
-      await expect(service.checkBookingAccess('org-1', 'res-1'))
-        .rejects.toThrow(ForbiddenException);
+      await expect(
+        service.checkBookingAccess('org-1', 'res-1'),
+      ).rejects.toThrow(ForbiddenException);
     });
-    
   });
 
   describe('create', () => {
     it('should create a resource successfully', async () => {
-      mockPrismaService.organization.findUnique.mockResolvedValue({ id: 'org-1' });
+      mockPrismaService.organization.findUnique.mockResolvedValue({
+        id: 'org-1',
+      });
       const createdResource = { id: 'res-1', name: 'New Room' };
       mockPrismaService.resource.create.mockResolvedValue(createdResource);
 
-      const result = await service.create('org-1', 'user-1', { name: 'New Room', description: 'Desc' });
+      const result = await service.create('org-1', 'user-1', {
+        name: 'New Room',
+        description: 'Desc',
+      });
 
       expect(result).toEqual(createdResource);
       expect(mockPrismaService.resource.create).toHaveBeenCalled();
@@ -89,13 +91,19 @@ describe('ResourcesService', () => {
     it('should throw NotFoundException if organization not found', async () => {
       mockPrismaService.organization.findUnique.mockResolvedValue(null);
 
-      await expect(service.create('org-1', 'user-1', { name: 'Room' })).rejects.toThrow(NotFoundException);
+      await expect(
+        service.create('org-1', 'user-1', { name: 'Room' }),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
   describe('findOne', () => {
     it('should return a resource if the user is the owner', async () => {
-      const resource = { id: 'res-1', ownerOrganizationId: 'org-1', allowedOrganizations: [] };
+      const resource = {
+        id: 'res-1',
+        ownerOrganizationId: 'org-1',
+        allowedOrganizations: [],
+      };
       mockPrismaService.resource.findUnique.mockResolvedValue(resource);
 
       const result = await service.findOne('org-1', 'res-1');
@@ -106,14 +114,22 @@ describe('ResourcesService', () => {
     it('should throw NotFoundException if resource not found', async () => {
       mockPrismaService.resource.findUnique.mockResolvedValue(null);
 
-      await expect(service.findOne('org-1', 'res-1')).rejects.toThrow(NotFoundException);
+      await expect(service.findOne('org-1', 'res-1')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw ForbiddenException if user has no access', async () => {
-      const resource = { id: 'res-1', ownerOrganizationId: 'org-2', allowedOrganizations: [] };
+      const resource = {
+        id: 'res-1',
+        ownerOrganizationId: 'org-2',
+        allowedOrganizations: [],
+      };
       mockPrismaService.resource.findUnique.mockResolvedValue(resource);
 
-      await expect(service.findOne('org-1', 'res-1')).rejects.toThrow(ForbiddenException);
+      await expect(service.findOne('org-1', 'res-1')).rejects.toThrow(
+        ForbiddenException,
+      );
     });
   });
 
@@ -125,16 +141,30 @@ describe('ResourcesService', () => {
 
       const result = await service.findAll('org-1', 1, 10);
 
-      expect(result).toEqual({ data, total: 1, page: 1, limit: 10, totalPages: 1 });
+      expect(result).toEqual({
+        data,
+        total: 1,
+        page: 1,
+        limit: 10,
+        totalPages: 1,
+      });
     });
   });
 
   describe('update', () => {
     it('should update a resource', async () => {
-      mockPrismaService.resource.findUnique.mockResolvedValue({ id: 'res-1', ownerOrganizationId: 'org-1' });
-      mockPrismaService.resource.update.mockResolvedValue({ id: 'res-1', name: 'Updated' });
+      mockPrismaService.resource.findUnique.mockResolvedValue({
+        id: 'res-1',
+        ownerOrganizationId: 'org-1',
+      });
+      mockPrismaService.resource.update.mockResolvedValue({
+        id: 'res-1',
+        name: 'Updated',
+      });
 
-      const result = await service.update('org-1', 'res-1', { name: 'Updated' });
+      const result = await service.update('org-1', 'res-1', {
+        name: 'Updated',
+      });
 
       expect(result.name).toBe('Updated');
     });
@@ -142,8 +172,14 @@ describe('ResourcesService', () => {
 
   describe('remove', () => {
     it('should archive (INACTIVE) a resource', async () => {
-      mockPrismaService.resource.findUnique.mockResolvedValue({ id: 'res-1', ownerOrganizationId: 'org-1' });
-      mockPrismaService.resource.update.mockResolvedValue({ id: 'res-1', status: 'INACTIVE' });
+      mockPrismaService.resource.findUnique.mockResolvedValue({
+        id: 'res-1',
+        ownerOrganizationId: 'org-1',
+      });
+      mockPrismaService.resource.update.mockResolvedValue({
+        id: 'res-1',
+        status: 'INACTIVE',
+      });
 
       const result = await service.remove('org-1', 'res-1');
 
