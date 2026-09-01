@@ -33,7 +33,7 @@ model User {
   passwordResetTokens     PasswordResetToken[]
   refreshTokens           RefreshToken[]
   notifications           Notification[]
-  notificationDevices     UserDevice[]
+  webPushSubscriptions    WebPushSubscription[]
   notificationDeliveries  NotificationDelivery[]
 
   @@map("users")
@@ -311,19 +311,18 @@ model NotificationDelivery {
   @@map("notification_deliveries")
 }
 
-model UserDevice {
+model WebPushSubscription {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId    String   @map("user_id") @db.Uuid
-  token     String   @unique(map: "user_devices_token_unique")
-  platform  String
+  token     String   @unique(map: "web_push_subscriptions_token_unique")
   active    Boolean  @default(true)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   user User @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
-  @@index([userId, active], map: "user_devices_user_active_idx")
-  @@map("user_devices")
+  @@index([userId, active], map: "web_push_subscriptions_user_active_idx")
+  @@map("web_push_subscriptions")
 }
 
 model ProcessedEvent {

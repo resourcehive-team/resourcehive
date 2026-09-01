@@ -2,7 +2,7 @@ DO $$
 BEGIN
     IF to_regclass('notifications') IS NULL
         OR to_regclass('notification_deliveries') IS NULL
-        OR to_regclass('user_devices') IS NULL
+        OR to_regclass('web_push_subscriptions') IS NULL
         OR to_regclass('processed_events') IS NULL THEN
         RAISE EXCEPTION 'Expected simplified notification tables are missing';
     END IF;
@@ -25,10 +25,14 @@ BEGIN
     IF NOT EXISTS (
         SELECT 1
         FROM information_schema.columns
-        WHERE table_name = 'user_devices'
+        WHERE table_name = 'web_push_subscriptions'
           AND column_name = 'token'
     ) THEN
-        RAISE EXCEPTION 'user_devices.token is required';
+        RAISE EXCEPTION 'web_push_subscriptions.token is required';
+    END IF;
+
+    IF to_regclass('user_devices') IS NOT NULL THEN
+        RAISE EXCEPTION 'mobile user_devices table must be removed';
     END IF;
 END;
 $$;
