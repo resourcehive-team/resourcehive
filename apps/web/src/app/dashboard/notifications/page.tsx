@@ -25,6 +25,7 @@ export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [permission, setPermission] =
     useState<NotificationPermission>("default");
+  const [pushRegistered, setPushRegistered] = useState(false);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
   const [message, setMessage] = useState<string>();
@@ -59,9 +60,11 @@ export default function NotificationsPage() {
     try {
       await enableWebPush();
       setPermission(Notification.permission);
+      setPushRegistered(true);
       setMessage("Browser notifications are enabled.");
     } catch (error) {
       setPermission(Notification.permission);
+      setPushRegistered(false);
       setMessage(
         error instanceof Error
           ? error.message
@@ -76,6 +79,7 @@ export default function NotificationsPage() {
     setWorking(true);
     try {
       await sendDevelopmentPush();
+      setPushRegistered(true);
       await load();
       setMessage("Test notification queued.");
     } catch (error) {
@@ -101,12 +105,14 @@ export default function NotificationsPage() {
             <div className="flex flex-wrap gap-2">
               <Button
                 onClick={enableNotifications}
-                disabled={working || permission === "granted"}
+                disabled={working || pushRegistered}
               >
                 <BellIcon data-icon="inline-start" />
-                {permission === "granted"
+                {pushRegistered
                   ? "Browser alerts enabled"
-                  : "Enable browser alerts"}
+                  : permission === "granted"
+                    ? "Register browser alerts"
+                    : "Enable browser alerts"}
               </Button>
               {process.env.NODE_ENV === "development" ? (
                 <Button variant="outline" onClick={sendTest} disabled={working}>
