@@ -4,6 +4,7 @@ import {
   BookingTransactionClient,
   CreateConfirmedBookingInput,
 } from "./booking.types";
+import { BookingStatus } from "./bookingStatus";
 
 @Injectable()
 export class BookingRepository {
@@ -15,7 +16,7 @@ export class BookingRepository {
       data: {
         resourceSlotId: input.resourceSlotId,
         userId: input.userId,
-        status: "CONFIRMED",
+        status: BookingStatus.CONFIRMED,
       },
       include: {
         resourceSlot: {

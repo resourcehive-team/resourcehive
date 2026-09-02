@@ -4,7 +4,11 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { PrismaService } from "@resourcehive/database";
-import { BookingCompletionService } from "../../src/bookings/booking-completion.service";
+import { BookingAuthorizationService } from "../../src/authorization/booking-authorization.service";
+import { BookingRepository } from "../../src/bookings/booking.repository";
+import { BookingService } from "../../src/bookings/booking.service";
+import { PointLedgerService } from "../../src/points/point-ledger.service";
+import { SlotRepository } from "../../src/slots/slot.repository";
 
 const booking = {
   id: "d5000000-0000-4000-8000-000000000001",
@@ -39,7 +43,7 @@ interface BookingUpdateInput {
   where: { id: string };
 }
 
-describe("BookingCompletionService", () => {
+describe("BookingService completion", () => {
   let bookingUpdate: BookingUpdateInput | undefined;
   let bookingUpdateResult: unknown;
   const updateBooking = jest.fn(
@@ -57,8 +61,12 @@ describe("BookingCompletionService", () => {
       findFirst: jest.fn(),
     },
   };
-  const service = new BookingCompletionService(
+  const service = new BookingService(
     prisma as unknown as PrismaService,
+    {} as BookingAuthorizationService,
+    {} as SlotRepository,
+    {} as PointLedgerService,
+    {} as BookingRepository,
   );
 
   beforeEach(() => {
@@ -79,9 +87,9 @@ describe("BookingCompletionService", () => {
     };
     bookingUpdateResult = completedBooking;
 
-    await expect(service.complete(booking.id, "administrator-1")).resolves.toBe(
-      completedBooking,
-    );
+    await expect(
+      service.completeBooking(booking.id, "administrator-1"),
+    ).resolves.toBe(completedBooking);
 
     expect(prisma.organizationMembership.findFirst).toHaveBeenCalledWith({
       where: {
@@ -104,7 +112,7 @@ describe("BookingCompletionService", () => {
     prisma.organizationMembership.findFirst.mockResolvedValue(null);
 
     await expect(
-      service.complete(booking.id, "member-1"),
+      service.completeBooking(booking.id, "member-1"),
     ).rejects.toBeInstanceOf(ForbiddenException);
     expect(updateBooking).not.toHaveBeenCalled();
   });
@@ -117,7 +125,7 @@ describe("BookingCompletionService", () => {
     });
 
     await expect(
-      service.complete(booking.id, "administrator-1"),
+      service.completeBooking(booking.id, "administrator-1"),
     ).rejects.toBeInstanceOf(ConflictException);
     expect(updateBooking).not.toHaveBeenCalled();
   });
@@ -126,7 +134,7 @@ describe("BookingCompletionService", () => {
     prisma.booking.findUnique.mockResolvedValue(null);
 
     await expect(
-      service.complete(booking.id, "administrator-1"),
+      service.completeBooking(booking.id, "administrator-1"),
     ).rejects.toBeInstanceOf(NotFoundException);
     expect(prisma.organizationMembership.findFirst).not.toHaveBeenCalled();
   });

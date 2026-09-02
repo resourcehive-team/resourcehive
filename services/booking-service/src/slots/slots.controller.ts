@@ -21,8 +21,7 @@ import {
   CurrentUser,
   JwtAuthGuard,
 } from "@resourcehive/service-auth";
-import { CreateSlotDto } from "./dto/create-slot.dto";
-import { ListSlotsDto } from "./dto/list-slots.dto";
+import { CreateSlotDto, ListSlotsDto } from "./slot.dto";
 import { SlotsService } from "./slots.service";
 
 @ApiTags("slots")

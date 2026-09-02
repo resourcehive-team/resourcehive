@@ -1,9 +1,14 @@
 import { ForbiddenException } from "@nestjs/common";
-import { Test, TestingModule } from "@nestjs/testing";
-import { BookingReadService } from "../../src/bookings/booking-read.service";
 import { PrismaService } from "@resourcehive/database";
-import { GetUserBookingsDto } from "../../src/bookings/dto/get-user-bookings.dto";
-import { GetOrgBookingsDto } from "../../src/bookings/dto/get-org-bookings.dto";
+import { BookingAuthorizationService } from "../../src/authorization/booking-authorization.service";
+import { BookingRepository } from "../../src/bookings/booking.repository";
+import { BookingService } from "../../src/bookings/booking.service";
+import {
+  GetOrgBookingsDto,
+  GetUserBookingsDto,
+} from "../../src/bookings/bookings.dto";
+import { PointLedgerService } from "../../src/points/point-ledger.service";
+import { SlotRepository } from "../../src/slots/slot.repository";
 
 interface MockPrisma {
   booking: {
@@ -23,17 +28,16 @@ const mockPrisma: MockPrisma = {
   },
 };
 
-describe("BookingReadService", () => {
-  let service: BookingReadService;
+describe("BookingService reads", () => {
+  const service = new BookingService(
+    mockPrisma as unknown as PrismaService,
+    {} as BookingAuthorizationService,
+    {} as SlotRepository,
+    {} as PointLedgerService,
+    {} as BookingRepository,
+  );
 
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        BookingReadService,
-        { provide: PrismaService, useValue: mockPrisma },
-      ],
-    }).compile();
-    service = module.get<BookingReadService>(BookingReadService);
+  beforeEach(() => {
     jest.clearAllMocks();
   });
 
@@ -43,7 +47,7 @@ describe("BookingReadService", () => {
     const query: GetUserBookingsDto = {
       skip: 0,
       take: 10,
-      status: "CONFIRMED",
+      status: "CONFIRMED" as never,
     };
     const result = await service.getUserBookings("user-123", query);
     expect(mockPrisma.booking.findMany).toHaveBeenCalledWith({
@@ -104,7 +108,15 @@ describe("BookingReadService", () => {
           select: {
             startsAt: true,
             endsAt: true,
-            resource: { select: { id: true, name: true, pointCost: true } },
+            status: true,
+            resource: {
+              select: {
+                id: true,
+                name: true,
+                pointCost: true,
+                ownerOrganizationId: true,
+              },
+            },
           },
         },
       },

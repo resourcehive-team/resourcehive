@@ -4,8 +4,11 @@ import {
   ForbiddenException,
 } from "@nestjs/common";
 import { PrismaService } from "@resourcehive/database";
-import { BookingCancellationService } from "../../src/bookings/booking-cancellation.service";
+import { BookingAuthorizationService } from "../../src/authorization/booking-authorization.service";
+import { BookingRepository } from "../../src/bookings/booking.repository";
+import { BookingService } from "../../src/bookings/booking.service";
 import { PointLedgerService } from "../../src/points/point-ledger.service";
+import { SlotRepository } from "../../src/slots/slot.repository";
 
 const booking = {
   id: "d5000000-0000-4000-8000-000000000001",
@@ -43,7 +46,7 @@ interface ResourceSlotUpdateInput {
   where: { id: string };
 }
 
-describe("BookingCancellationService", () => {
+describe("BookingService cancellation", () => {
   const appendBookingRefund = jest.fn();
   let lastResourceSlotUpdate: ResourceSlotUpdateInput | undefined;
   const updateResourceSlot = jest.fn(
@@ -76,7 +79,13 @@ describe("BookingCancellationService", () => {
   const points = {
     appendBookingRefund,
   } as unknown as PointLedgerService;
-  const service = new BookingCancellationService(prisma, points);
+  const service = new BookingService(
+    prisma,
+    {} as BookingAuthorizationService,
+    {} as SlotRepository,
+    points,
+    {} as BookingRepository,
+  );
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -100,7 +109,7 @@ describe("BookingCancellationService", () => {
   });
 
   it("refunds half rounded up and republishes the slot for a user cancellation", async () => {
-    const result = await service.cancel(booking.id, booking.userId, {
+    const result = await service.cancelBooking(booking.id, booking.userId, {
       reason: "Plans changed",
     });
 
@@ -125,7 +134,7 @@ describe("BookingCancellationService", () => {
   });
 
   it("refunds all points and withdraws the slot for an admin cancellation", async () => {
-    const result = await service.cancel(booking.id, "administrator-1", {
+    const result = await service.cancelBooking(booking.id, "administrator-1", {
       makeSlotAvailable: false,
       reason: "Resource unavailable",
     });
@@ -158,7 +167,7 @@ describe("BookingCancellationService", () => {
 
   it("requires an administrator to choose the slot outcome", async () => {
     await expect(
-      service.cancel(booking.id, "administrator-1", {}),
+      service.cancelBooking(booking.id, "administrator-1", {}),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(transaction.booking.updateMany).not.toHaveBeenCalled();
   });
@@ -167,7 +176,7 @@ describe("BookingCancellationService", () => {
     transaction.organizationMembership.findFirst.mockResolvedValue(null);
 
     await expect(
-      service.cancel(booking.id, "administrator-1", {
+      service.cancelBooking(booking.id, "administrator-1", {
         makeSlotAvailable: true,
       }),
     ).rejects.toBeInstanceOf(ForbiddenException);
@@ -184,7 +193,7 @@ describe("BookingCancellationService", () => {
     });
 
     await expect(
-      service.cancel(booking.id, booking.userId, {}),
+      service.cancelBooking(booking.id, booking.userId, {}),
     ).rejects.toBeInstanceOf(ConflictException);
     expect(transaction.booking.updateMany).not.toHaveBeenCalled();
   });
