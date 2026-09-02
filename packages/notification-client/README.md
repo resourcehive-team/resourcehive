@@ -14,6 +14,10 @@ await notifications.send({
 });
 ```
 
+Booking Service uses `publishBookingEvent(...)` after confirmed, cancelled, and
+completed state changes. Notification Service maps those events to booking-
+specific in-app and browser-push messages for the booking user.
+
 Identity Service alone may call `sendVerificationEmail`. Provider credentials,
 rendering, persistence, retries, Resend, and Firebase remain owned by
 Notification Service.

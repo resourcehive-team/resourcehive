@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { PrismaService } from "@resourcehive/database";
+import { NotificationClientService } from "@resourcehive/notification-client";
 import { BookingAuthorizationService } from "../../src/authorization/booking-authorization.service";
 import { BookingRepository } from "../../src/bookings/booking.repository";
 import { BookingService } from "../../src/bookings/booking.service";
@@ -61,12 +62,17 @@ describe("BookingService completion", () => {
       findFirst: jest.fn(),
     },
   };
+  const publishBookingEvent = jest.fn();
+  const notifications = {
+    publishBookingEvent,
+  } as unknown as NotificationClientService;
   const service = new BookingService(
     prisma as unknown as PrismaService,
     {} as BookingAuthorizationService,
     {} as SlotRepository,
     {} as PointLedgerService,
     {} as BookingRepository,
+    notifications,
   );
 
   beforeEach(() => {
@@ -77,6 +83,7 @@ describe("BookingService completion", () => {
     prisma.organizationMembership.findFirst.mockResolvedValue({
       id: "membership-1",
     });
+    publishBookingEvent.mockResolvedValue({});
   });
 
   it("marks a confirmed organization booking as completed", async () => {
@@ -106,6 +113,13 @@ describe("BookingService completion", () => {
     expect(update.where).toEqual({ id: booking.id });
     expect(update.data.status).toBe("COMPLETED");
     expect(update.data.completedAt).toBeInstanceOf(Date);
+    expect(publishBookingEvent).toHaveBeenCalledWith({
+      eventType: "booking.completed",
+      bookingId: booking.id,
+      userId: booking.userId,
+      email: booking.user.email,
+      resourceName: booking.resourceSlot.resource.name,
+    });
   });
 
   it("rejects a user who does not administer the resource organization", async () => {

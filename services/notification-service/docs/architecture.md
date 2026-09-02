@@ -38,5 +38,7 @@ redelivery.
   in-app and browser push messages.
 - Booking Service publishes a general in-app and push command to each approved
   administrator of the resource-owning organization after booking creation.
+- Booking Service publishes confirmed, cancelled, and completed lifecycle
+  events for the booking user; all three create in-app and web-push messages.
 - Kafka payload bodies and token-bearing URLs must never be logged.
 - In-app notifications are read through REST; browser alerts are delivered by FCM.

@@ -1,5 +1,6 @@
 import { ForbiddenException } from "@nestjs/common";
 import { PrismaService } from "@resourcehive/database";
+import { NotificationClientService } from "@resourcehive/notification-client";
 import { BookingAuthorizationService } from "../../src/authorization/booking-authorization.service";
 import { BookingRepository } from "../../src/bookings/booking.repository";
 import { BookingService } from "../../src/bookings/booking.service";
@@ -35,6 +36,7 @@ describe("BookingService reads", () => {
     {} as SlotRepository,
     {} as PointLedgerService,
     {} as BookingRepository,
+    {} as NotificationClientService,
   );
 
   beforeEach(() => {

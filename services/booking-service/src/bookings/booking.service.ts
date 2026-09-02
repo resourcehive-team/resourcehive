@@ -1,6 +1,9 @@
 import { HttpException, Injectable, Logger } from "@nestjs/common";
 import { Prisma, PrismaService } from "@resourcehive/database";
-import { NotificationClientService } from "@resourcehive/notification-client";
+import {
+  NotificationClientService,
+  PublishBookingEventInput,
+} from "@resourcehive/notification-client";
 import { AuthenticatedUser } from "@resourcehive/service-auth";
 import { BookingAuthorizationService } from "../authorization/booking-authorization.service";
 import { PointLedgerService } from "../points/point-ledger.service";
@@ -102,7 +105,16 @@ export class BookingService {
               timeout: 30000,
             },
           );
-          await this.notifyAdministrators(booking, user.email);
+          await Promise.all([
+            this.notifyAdministrators(booking, user.email),
+            this.publishStudentBookingEvent({
+              eventType: "booking.confirmed",
+              bookingId: booking.id,
+              userId: booking.userId,
+              email: user.email,
+              resourceName: booking.resourceName,
+            }),
+          ]);
           return booking;
         } catch (error) {
           if (this.isUniqueConstraintConflict(error)) {
@@ -199,98 +211,109 @@ export class BookingService {
     input: CancelBookingDto,
   ): Promise<CancelledBookingRecord> {
     try {
-      return await this.prisma.$transaction(async (transaction) => {
-        const booking = await transaction.booking.findUnique({
-          where: { id: bookingId },
-          include: organizationBookingInclude,
-        });
+      const cancelledBooking = await this.prisma.$transaction(
+        async (transaction) => {
+          const booking = await transaction.booking.findUnique({
+            where: { id: bookingId },
+            include: organizationBookingInclude,
+          });
 
-        if (!booking) throw new BookingNotFoundError();
-        const bookingStatus = booking.status as BookingStatus;
-        if (bookingStatus !== BookingStatus.CONFIRMED) {
-          throw new BookingCannotBeCancelledError();
-        }
-
-        const isUserCancellation =
-          booking.userId === actorUserId &&
-          input.makeSlotAvailable === undefined;
-        const now = new Date();
-
-        if (isUserCancellation) {
-          if (booking.resourceSlot.startsAt <= now) {
-            throw new BookingCancellationStartedError();
+          if (!booking) throw new BookingNotFoundError();
+          const bookingStatus = booking.status as BookingStatus;
+          if (bookingStatus !== BookingStatus.CONFIRMED) {
+            throw new BookingCannotBeCancelledError();
           }
-        } else {
-          await this.assertOrganizationAdministrator(
-            actorUserId,
-            booking.resourceSlot.resource.ownerOrganizationId,
-            transaction,
-          );
-          if (input.makeSlotAvailable === undefined) {
-            throw new BookingCancellationInputError();
+
+          const isUserCancellation =
+            booking.userId === actorUserId &&
+            input.makeSlotAvailable === undefined;
+          const now = new Date();
+
+          if (isUserCancellation) {
+            if (booking.resourceSlot.startsAt <= now) {
+              throw new BookingCancellationStartedError();
+            }
+          } else {
+            await this.assertOrganizationAdministrator(
+              actorUserId,
+              booking.resourceSlot.resource.ownerOrganizationId,
+              transaction,
+            );
+            if (input.makeSlotAvailable === undefined) {
+              throw new BookingCancellationInputError();
+            }
           }
-        }
 
-        const deduction = await transaction.pointTransaction.findFirst({
-          where: {
-            bookingId,
-            userId: booking.userId,
-            transactionType: "BOOKING",
-          },
-          select: { amount: true },
-        });
-        const deductedPoints = Math.abs(deduction?.amount ?? 0);
-        const refundPoints = isUserCancellation
-          ? Math.ceil(deductedPoints / 2)
-          : deductedPoints;
-        const slotStatus =
-          isUserCancellation || input.makeSlotAvailable
-            ? "PUBLISHED"
-            : "WITHDRAWN";
-
-        const updateResult = await transaction.booking.updateMany({
-          where: { id: bookingId, status: BookingStatus.CONFIRMED },
-          data: {
-            status: BookingStatus.CANCELLED,
-            cancelledAt: now,
-            cancelledByUserId: actorUserId,
-            cancellationReason: input.reason?.trim() || null,
-          },
-        });
-        if (updateResult.count !== 1) {
-          throw new BookingCancellationConflictError();
-        }
-
-        await transaction.resourceSlot.update({
-          where: { id: booking.resourceSlotId },
-          data: {
-            status: slotStatus,
-            withdrawnAt: slotStatus === "WITHDRAWN" ? now : null,
-          },
-        });
-
-        if (refundPoints > 0) {
-          await this.points.appendBookingRefund(
-            {
-              userId: booking.userId,
+          const deduction = await transaction.pointTransaction.findFirst({
+            where: {
               bookingId,
-              amount: refundPoints,
-              description: isUserCancellation
-                ? `50% refund for cancelled booking for ${booking.resourceSlot.resource.name}`
-                : `Full refund for administrator-cancelled booking for ${booking.resourceSlot.resource.name}`,
+              userId: booking.userId,
+              transactionType: "BOOKING",
             },
-            transaction,
-          );
-        }
+            select: { amount: true },
+          });
+          const deductedPoints = Math.abs(deduction?.amount ?? 0);
+          const refundPoints = isUserCancellation
+            ? Math.ceil(deductedPoints / 2)
+            : deductedPoints;
+          const slotStatus =
+            isUserCancellation || input.makeSlotAvailable
+              ? "PUBLISHED"
+              : "WITHDRAWN";
 
-        const cancelledBooking = await transaction.booking.findUnique({
-          where: { id: bookingId },
-          include: organizationBookingInclude,
-        });
-        if (!cancelledBooking) throw new BookingNotFoundError();
+          const updateResult = await transaction.booking.updateMany({
+            where: { id: bookingId, status: BookingStatus.CONFIRMED },
+            data: {
+              status: BookingStatus.CANCELLED,
+              cancelledAt: now,
+              cancelledByUserId: actorUserId,
+              cancellationReason: input.reason?.trim() || null,
+            },
+          });
+          if (updateResult.count !== 1) {
+            throw new BookingCancellationConflictError();
+          }
 
-        return { ...cancelledBooking, refundPoints, slotStatus };
+          await transaction.resourceSlot.update({
+            where: { id: booking.resourceSlotId },
+            data: {
+              status: slotStatus,
+              withdrawnAt: slotStatus === "WITHDRAWN" ? now : null,
+            },
+          });
+
+          if (refundPoints > 0) {
+            await this.points.appendBookingRefund(
+              {
+                userId: booking.userId,
+                bookingId,
+                amount: refundPoints,
+                description: isUserCancellation
+                  ? `50% refund for cancelled booking for ${booking.resourceSlot.resource.name}`
+                  : `Full refund for administrator-cancelled booking for ${booking.resourceSlot.resource.name}`,
+              },
+              transaction,
+            );
+          }
+
+          const cancelledBooking = await transaction.booking.findUnique({
+            where: { id: bookingId },
+            include: organizationBookingInclude,
+          });
+          if (!cancelledBooking) throw new BookingNotFoundError();
+
+          return { ...cancelledBooking, refundPoints, slotStatus };
+        },
+      );
+      await this.publishStudentBookingEvent({
+        eventType: "booking.cancelled",
+        bookingId: cancelledBooking.id,
+        userId: cancelledBooking.userId,
+        email: cancelledBooking.user.email,
+        resourceName: cancelledBooking.resourceSlot.resource.name,
+        refundPoints: cancelledBooking.refundPoints,
       });
+      return cancelledBooking;
     } catch (error) {
       this.handleError(error, "cancel");
     }
@@ -318,11 +341,19 @@ export class BookingService {
         throw new BookingCannotBeCompletedError();
       }
 
-      return await this.prisma.booking.update({
+      const completedBooking = await this.prisma.booking.update({
         where: { id: bookingId },
         data: { status: BookingStatus.COMPLETED, completedAt: new Date() },
         include: organizationBookingInclude,
       });
+      await this.publishStudentBookingEvent({
+        eventType: "booking.completed",
+        bookingId: completedBooking.id,
+        userId: completedBooking.userId,
+        email: completedBooking.user.email,
+        resourceName: completedBooking.resourceSlot.resource.name,
+      });
+      return completedBooking;
     } catch (error) {
       this.handleError(error, "complete");
     }
@@ -484,6 +515,19 @@ export class BookingService {
     } catch (error) {
       this.logger.error(
         `Unable to publish administrator notifications for booking ${booking.id}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+    }
+  }
+
+  private async publishStudentBookingEvent(
+    event: PublishBookingEventInput,
+  ): Promise<void> {
+    try {
+      await this.notifications.publishBookingEvent(event);
+    } catch (error) {
+      this.logger.error(
+        `Unable to publish ${event.eventType} for booking ${event.bookingId}`,
         error instanceof Error ? error.stack : undefined,
       );
     }

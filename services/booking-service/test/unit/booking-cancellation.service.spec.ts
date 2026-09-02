@@ -4,6 +4,7 @@ import {
   ForbiddenException,
 } from "@nestjs/common";
 import { PrismaService } from "@resourcehive/database";
+import { NotificationClientService } from "@resourcehive/notification-client";
 import { BookingAuthorizationService } from "../../src/authorization/booking-authorization.service";
 import { BookingRepository } from "../../src/bookings/booking.repository";
 import { BookingService } from "../../src/bookings/booking.service";
@@ -79,12 +80,17 @@ describe("BookingService cancellation", () => {
   const points = {
     appendBookingRefund,
   } as unknown as PointLedgerService;
+  const publishBookingEvent = jest.fn();
+  const notifications = {
+    publishBookingEvent,
+  } as unknown as NotificationClientService;
   const service = new BookingService(
     prisma,
     {} as BookingAuthorizationService,
     {} as SlotRepository,
     points,
     {} as BookingRepository,
+    notifications,
   );
 
   beforeEach(() => {
@@ -106,6 +112,7 @@ describe("BookingService cancellation", () => {
       .mockReset()
       .mockResolvedValue({ amount: -25 });
     appendBookingRefund.mockReset().mockResolvedValue({});
+    publishBookingEvent.mockReset().mockResolvedValue({});
   });
 
   it("refunds half rounded up and republishes the slot for a user cancellation", async () => {
@@ -131,6 +138,14 @@ describe("BookingService cancellation", () => {
       }),
       transaction,
     );
+    expect(publishBookingEvent).toHaveBeenCalledWith({
+      eventType: "booking.cancelled",
+      bookingId: booking.id,
+      userId: booking.userId,
+      email: booking.user.email,
+      resourceName: booking.resourceSlot.resource.name,
+      refundPoints: 13,
+    });
   });
 
   it("refunds all points and withdraws the slot for an admin cancellation", async () => {

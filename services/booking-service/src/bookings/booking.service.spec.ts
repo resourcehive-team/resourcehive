@@ -31,8 +31,10 @@ describe("BookingService", () => {
     createConfirmed: jest.fn(),
   } as unknown as BookingRepository;
   const sendNotification = jest.fn();
+  const publishBookingEvent = jest.fn();
   const notifications = {
     send: sendNotification,
+    publishBookingEvent,
   } as unknown as NotificationClientService;
   const service = new BookingService(
     prisma,
@@ -86,6 +88,7 @@ describe("BookingService", () => {
       { userId: "administrator-id" },
     ]);
     sendNotification.mockResolvedValue({});
+    publishBookingEvent.mockResolvedValue({});
   });
 
   it("validates a bookable slot using server-derived values", async () => {
@@ -138,6 +141,13 @@ describe("BookingService", () => {
       title: "New booking",
       message: "user@example.edu booked Room.",
       correlationId: "booking-id",
+    });
+    expect(publishBookingEvent).toHaveBeenCalledWith({
+      eventType: "booking.confirmed",
+      bookingId: "booking-id",
+      userId: "user-id",
+      email: "user@example.edu",
+      resourceName: "Room",
     });
   });
 });

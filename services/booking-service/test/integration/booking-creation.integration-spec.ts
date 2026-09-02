@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { Prisma, PrismaService } from "@resourcehive/database";
+import { NotificationClientService } from "@resourcehive/notification-client";
 import { BookingAuthorizationService } from "../../src/authorization/booking-authorization.service";
 import { BookingRepository } from "../../src/bookings/booking.repository";
 import { BookingService } from "../../src/bookings/booking.service";
@@ -96,6 +97,10 @@ describeWithDatabase("Atomic booking creation integration", () => {
             slots,
             points,
             new BookingRepository(),
+            {
+              send: jest.fn().mockResolvedValue({}),
+              publishBookingEvent: jest.fn().mockResolvedValue({}),
+            } as unknown as NotificationClientService,
           );
           const result = await service.createBooking(slotId, {
             userId,
