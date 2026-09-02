@@ -1,5 +1,6 @@
-import { HttpException, Injectable } from "@nestjs/common";
+import { HttpException, Injectable, Logger } from "@nestjs/common";
 import { Prisma, PrismaService } from "@resourcehive/database";
+import { NotificationClientService } from "@resourcehive/notification-client";
 import { AuthenticatedUser } from "@resourcehive/service-auth";
 import { BookingAuthorizationService } from "../authorization/booking-authorization.service";
 import { PointLedgerService } from "../points/point-ledger.service";
@@ -70,12 +71,15 @@ const organizationBookingInclude = {
 
 @Injectable()
 export class BookingService {
+  private readonly logger = new Logger(BookingService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly authorization: BookingAuthorizationService,
     private readonly slots: SlotRepository,
     private readonly points: PointLedgerService,
     private readonly bookings: BookingRepository,
+    private readonly notifications: NotificationClientService,
   ) {}
 
   async createBooking(
@@ -89,7 +93,7 @@ export class BookingService {
         attempt += 1
       ) {
         try {
-          return await this.prisma.$transaction(
+          const booking = await this.prisma.$transaction(
             (transaction) =>
               this.createWithinTransaction(resourceSlotId, user, transaction),
             {
@@ -98,6 +102,8 @@ export class BookingService {
               timeout: 30000,
             },
           );
+          await this.notifyAdministrators(booking, user.email);
+          return booking;
         } catch (error) {
           if (this.isUniqueConstraintConflict(error)) {
             throw new BookingConcurrentConflictError();
@@ -437,6 +443,50 @@ export class BookingService {
       select: { id: true },
     });
     if (!membership) throw new BookingAdministratorRequiredError();
+  }
+
+  private async notifyAdministrators(
+    booking: CreatedBooking,
+    studentEmail: string,
+  ): Promise<void> {
+    try {
+      const resource = await this.prisma.resource.findUnique({
+        where: { id: booking.resourceId },
+        select: { ownerOrganizationId: true },
+      });
+      if (!resource) return;
+      const administrators = await this.prisma.organizationMembership.findMany({
+        where: {
+          organizationId: resource.ownerOrganizationId,
+          role: "ADMIN",
+          status: "APPROVED",
+        },
+        select: { userId: true },
+      });
+      const results = await Promise.allSettled(
+        administrators.map(({ userId }) =>
+          this.notifications.send({
+            recipientUserId: userId,
+            title: "New booking",
+            message: `${studentEmail} booked ${booking.resourceName}.`,
+            correlationId: booking.id,
+          }),
+        ),
+      );
+      const failures = results.filter(
+        (result) => result.status === "rejected",
+      ).length;
+      if (failures > 0) {
+        this.logger.error(
+          `Failed to publish ${failures} administrator notification(s) for booking ${booking.id}`,
+        );
+      }
+    } catch (error) {
+      this.logger.error(
+        `Unable to publish administrator notifications for booking ${booking.id}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+    }
   }
 
   private handleError(error: unknown, operation: string): never {

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ServiceAuthModule } from '@resourcehive/service-auth';
+import { NotificationClientModule } from '@resourcehive/notification-client';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from '@resourcehive/database';
@@ -14,6 +15,7 @@ import { ResourcesModule } from './resources/resources.module';
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
     ServiceAuthModule,
+    NotificationClientModule.register({ producer: 'resource-service' }),
     OrganizationsModule,
     MembershipsModule,
     ResourcesModule,

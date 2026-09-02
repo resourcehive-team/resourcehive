@@ -288,6 +288,9 @@ importers:
       '@resourcehive/database':
         specifier: workspace:*
         version: link:../../packages/database
+      '@resourcehive/notification-client':
+        specifier: workspace:*
+        version: link:../../packages/notification-client
       '@resourcehive/service-auth':
         specifier: workspace:*
         version: link:../../packages/service-auth
@@ -382,6 +385,9 @@ importers:
       '@resourcehive/database':
         specifier: workspace:*
         version: link:../../packages/database
+      '@resourcehive/notification-client':
+        specifier: workspace:*
+        version: link:../../packages/notification-client
       '@resourcehive/service-auth':
         specifier: workspace:*
         version: link:../../packages/service-auth
@@ -615,6 +621,9 @@ importers:
       '@resourcehive/database':
         specifier: workspace:*
         version: link:../../packages/database
+      '@resourcehive/notification-client':
+        specifier: workspace:*
+        version: link:../../packages/notification-client
       '@resourcehive/service-auth':
         specifier: workspace:*
         version: link:../../packages/service-auth

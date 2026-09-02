@@ -12,6 +12,7 @@ export class NotificationClientModule {
   static register(options: NotificationClientOptions): DynamicModule {
     return {
       module: NotificationClientModule,
+      global: true,
       providers: [
         {
           provide: NOTIFICATION_CLIENT_OPTIONS,

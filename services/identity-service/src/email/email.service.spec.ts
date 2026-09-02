@@ -1,4 +1,5 @@
 import { InternalServerErrorException } from '@nestjs/common';
+import { NotificationClientService } from '@resourcehive/notification-client';
 import nodemailer from 'nodemailer';
 import { EmailService } from './email.service';
 
@@ -10,7 +11,11 @@ jest.mock('nodemailer', () => ({
 }));
 
 describe('EmailService', () => {
-  const service = new EmailService();
+  const sendVerificationEmail = jest.fn();
+  const notifications = {
+    sendVerificationEmail,
+  } as unknown as NotificationClientService;
+  const service = new EmailService(notifications);
   const originalEnvironment = { ...process.env };
 
   afterEach(() => {
@@ -18,45 +23,44 @@ describe('EmailService', () => {
     jest.clearAllMocks();
   });
 
-  it('returns the verification link when using the console transport', async () => {
-    process.env.EMAIL_TRANSPORT = 'console';
+  it('publishes verification email and returns the link in development', async () => {
+    process.env.NODE_ENV = 'development';
     process.env.APP_URL = 'http://localhost:3000';
+    sendVerificationEmail.mockResolvedValue({});
 
     await expect(
-      service.sendVerificationEmail('alex@example.edu', 'verification-token'),
+      service.sendVerificationEmail(
+        '11111111-1111-4111-8111-111111111111',
+        'alex@example.edu',
+        'verification-token',
+      ),
     ).resolves.toEqual({
       developmentVerificationUrl:
         'http://localhost:3000/verify-email?token=verification-token',
     });
+    expect(sendVerificationEmail).toHaveBeenCalledWith({
+      recipientUserId: '11111111-1111-4111-8111-111111111111',
+      email: 'alex@example.edu',
+      verificationUrl:
+        'http://localhost:3000/verify-email?token=verification-token',
+      correlationId: '11111111-1111-4111-8111-111111111111',
+    });
     expect(nodemailer.createTransport).not.toHaveBeenCalled();
   });
 
-  it('sends the verification link through SMTP without returning it', async () => {
-    const sendMail = jest
-      .fn<
-        Promise<{ messageId: string }>,
-        [{ to: string; text: string; subject?: string; from?: string }]
-      >()
-      .mockResolvedValue({ messageId: 'message-id' });
-    (nodemailer.createTransport as jest.Mock).mockReturnValue({ sendMail });
-    process.env.EMAIL_TRANSPORT = 'smtp';
+  it('does not expose the verification link in production', async () => {
+    process.env.NODE_ENV = 'production';
     process.env.APP_URL = 'https://resourcehive.example';
-    process.env.SMTP_HOST = 'smtp.example';
-    process.env.SMTP_PORT = '587';
-    process.env.SMTP_USER = 'smtp-user';
-    process.env.SMTP_PASSWORD = 'smtp-password';
+    sendVerificationEmail.mockResolvedValue({});
 
     await expect(
-      service.sendVerificationEmail('alex@example.edu', 'verification-token'),
+      service.sendVerificationEmail(
+        '11111111-1111-4111-8111-111111111111',
+        'alex@example.edu',
+        'verification-token',
+      ),
     ).resolves.toEqual({});
-    const message = sendMail.mock.calls[0][0] as {
-      to: string;
-      text: string;
-    };
-    expect(message.to).toBe('alex@example.edu');
-    expect(message.text).toContain(
-      'https://resourcehive.example/verify-email?token=verification-token',
-    );
+    expect(nodemailer.createTransport).not.toHaveBeenCalled();
   });
 
   it('prints a trusted frontend password reset link for local development', async () => {
@@ -98,11 +102,11 @@ describe('EmailService', () => {
     );
   });
 
-  it('rejects an unsupported email transport', async () => {
+  it('rejects an unsupported transport for password emails', async () => {
     process.env.EMAIL_TRANSPORT = 'unknown';
 
     await expect(
-      service.sendVerificationEmail('alex@example.edu', 'verification-token'),
+      service.sendPasswordResetEmail('alex@example.edu', 'reset-token'),
     ).rejects.toBeInstanceOf(InternalServerErrorException);
   });
 });
