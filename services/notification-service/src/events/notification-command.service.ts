@@ -1,6 +1,9 @@
 import { Injectable, UnauthorizedException } from "@nestjs/common";
 import { Prisma, PrismaService } from "@resourcehive/database";
-import { NotificationCommandV1, parseNotificationCommand } from "../contracts";
+import {
+  NotificationCommandV1,
+  parseNotificationCommand,
+} from "@resourcehive/notification-client";
 import { NotificationTemplateService } from "./notification-template.service";
 
 const CONSUMER_NAME = "notification-command-consumer-v1";

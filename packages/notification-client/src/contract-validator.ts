@@ -6,7 +6,7 @@ import {
   NotificationProducer,
   NotificationTemplateKey,
   TemplateValue,
-} from "./notification-contracts";
+} from "./contracts";
 
 const channels = new Set<NotificationChannel>(["IN_APP", "EMAIL", "PUSH"]);
 const producers = new Set<NotificationProducer>([

@@ -1,4 +1,4 @@
-import { NotificationCommandV1 } from "../../contracts";
+import { NotificationCommandV1 } from "@resourcehive/notification-client";
 import { RenderedNotification } from "../notification-template.service";
 
 export function renderBooking(

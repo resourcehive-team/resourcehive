@@ -1,6 +1,9 @@
 import { Logger, UnauthorizedException } from "@nestjs/common";
 import { KafkaContext } from "@nestjs/microservices";
-import { NOTIFICATION_TOPICS, NotificationContractError } from "../contracts";
+import {
+  NOTIFICATION_TOPICS,
+  NotificationContractError,
+} from "@resourcehive/notification-client";
 import { BookingEventService } from "./booking-event.service";
 import { NotificationCommandService } from "./notification-command.service";
 import { NotificationEventController } from "./notification-event.controller";

@@ -1,5 +1,5 @@
 import { isISO8601, isUUID } from "class-validator";
-import { NotificationContractError } from "../contracts";
+import { NotificationContractError } from "@resourcehive/notification-client";
 
 export type BookingEventType =
   "booking.confirmed" | "booking.cancelled" | "booking.completed";
