@@ -83,4 +83,37 @@ describe("NotificationClientService", () => {
       }),
     ).rejects.toThrow("broker unavailable");
   });
+
+  it("publishes a booking event keyed by booking ID", async () => {
+    const bookingService = new NotificationClientService(
+      { ...options, clientId: "booking-service", producer: "booking-service" },
+      transport,
+    );
+    const event = await bookingService.publishBookingEvent({
+      eventId: "11111111-1111-4111-8111-111111111111",
+      eventType: "booking.cancelled",
+      bookingId: "22222222-2222-4222-8222-222222222222",
+      userId: "33333333-3333-4333-8333-333333333333",
+      resourceName: "Robotics Lab",
+      refundPoints: 10,
+    });
+
+    expect(event.payload.refundPoints).toBe(10);
+    expect(publish).toHaveBeenCalledWith(
+      NOTIFICATION_TOPICS.bookingEvents,
+      "22222222-2222-4222-8222-222222222222",
+      event,
+    );
+  });
+
+  it("prevents non-booking producers from publishing booking events", async () => {
+    await expect(
+      service.publishBookingEvent({
+        eventType: "booking.confirmed",
+        bookingId: "22222222-2222-4222-8222-222222222222",
+        userId: "33333333-3333-4333-8333-333333333333",
+        resourceName: "Robotics Lab",
+      }),
+    ).rejects.toThrow("Only Booking Service");
+  });
 });

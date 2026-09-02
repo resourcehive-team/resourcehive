@@ -1,6 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
 import {
+  BookingEventType,
+  BookingEventV1,
+  parseBookingEvent,
+} from "./booking-event";
+import {
   NOTIFICATION_TEMPLATES,
   NOTIFICATION_TOPICS,
   NotificationCommandV1,
@@ -26,6 +31,17 @@ export interface SendVerificationEmailInput {
   recipientUserId: string;
   email: string;
   verificationUrl: string;
+  correlationId?: string;
+}
+
+export interface PublishBookingEventInput {
+  eventId?: string;
+  eventType: BookingEventType;
+  bookingId: string;
+  userId: string;
+  email?: string;
+  resourceName: string;
+  refundPoints?: number;
   correlationId?: string;
 }
 
@@ -93,5 +109,37 @@ export class NotificationClientService {
       command,
     );
     return command;
+  }
+
+  async publishBookingEvent(
+    input: PublishBookingEventInput,
+  ): Promise<BookingEventV1> {
+    if (this.options.producer !== "booking-service") {
+      throw new Error("Only Booking Service may publish booking events");
+    }
+    const event = parseBookingEvent({
+      kind: "booking.event",
+      eventId: input.eventId ?? randomUUID(),
+      eventType: input.eventType,
+      eventVersion: 1,
+      producer: "booking-service",
+      correlationId: input.correlationId ?? input.bookingId,
+      occurredAt: new Date().toISOString(),
+      payload: {
+        bookingId: input.bookingId,
+        userId: input.userId,
+        ...(input.email ? { email: input.email } : {}),
+        resourceName: input.resourceName,
+        ...(input.refundPoints === undefined
+          ? {}
+          : { refundPoints: input.refundPoints }),
+      },
+    });
+    await this.transport.publish(
+      NOTIFICATION_TOPICS.bookingEvents,
+      input.bookingId,
+      event,
+    );
+    return event;
   }
 }

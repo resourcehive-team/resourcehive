@@ -1,9 +1,10 @@
 import { Injectable } from "@nestjs/common";
 import {
+  BookingEventV1,
   NOTIFICATION_TEMPLATES,
   NotificationCommandV1,
+  parseBookingEvent,
 } from "@resourcehive/notification-client";
-import { BookingEventV1, parseBookingEvent } from "./booking-event.contract";
 import { NotificationCommandService } from "./notification-command.service";
 
 @Injectable()

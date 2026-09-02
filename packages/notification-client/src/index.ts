@@ -1,3 +1,4 @@
+export * from "./booking-event";
 export * from "./contracts";
 export * from "./contract-validator";
 export * from "./notification-client.module";
