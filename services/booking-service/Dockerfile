@@ -6,6 +6,7 @@ COPY . .
 RUN pnpm install --frozen-lockfile
 RUN pnpm --filter @resourcehive/database run build
 RUN pnpm --filter @resourcehive/service-auth run build
+RUN pnpm --filter @resourcehive/notification-client run build
 RUN pnpm --filter booking-service run build
 
 FROM node:20-alpine AS runner

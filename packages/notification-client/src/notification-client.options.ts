@@ -6,6 +6,7 @@ export const NOTIFICATION_CLIENT_OPTIONS = Symbol(
 
 export interface NotificationClientOptions {
   producer: NotificationProducer;
+  clientId?: string;
 }
 
 export interface NotificationKafkaOptions extends NotificationClientOptions {
@@ -45,7 +46,7 @@ export function getNotificationKafkaOptions(
     ...options,
     enabled,
     brokers,
-    clientId: process.env.KAFKA_CLIENT_ID ?? options.producer,
+    clientId: options.clientId ?? `${options.producer}-notification-producer`,
     ssl,
     username,
     password,

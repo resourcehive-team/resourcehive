@@ -3,6 +3,8 @@
 The Notification Service owns notification persistence, approved templates,
 delivery retries, verification email, and browser push delivery.
 Domain services own the business decision that a notification is required.
+They use `@resourcehive/notification-client`; its simple TypeScript methods
+validate and publish commands to Kafka. There is no second internal HTTP API.
 
 ## Flow
 
@@ -34,5 +36,7 @@ redelivery.
 - Booking and other application events use in-app and web push channels.
 - Internal services can use `notification.message.v1` for bounded plain-text
   in-app and browser push messages.
+- Booking Service publishes a general in-app and push command to each approved
+  administrator of the resource-owning organization after booking creation.
 - Kafka payload bodies and token-bearing URLs must never be logged.
 - In-app notifications are read through REST; browser alerts are delivered by FCM.

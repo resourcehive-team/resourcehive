@@ -99,7 +99,12 @@ services:
       SMTP_SECURE: ${SMTP_SECURE:-false}
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      KAFKA_ENABLED: "true"
+      KAFKA_BROKERS: kafka:29092
       NODE_ENV: development
+    depends_on:
+      kafka-topics:
+        condition: service_completed_successfully
     command: >-
       sh -c "pnpm --filter @resourcehive/database exec prisma migrate deploy
       --schema ../../db/schema/schema.prisma &&
@@ -122,7 +127,12 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       PORT: 3004
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      KAFKA_ENABLED: "true"
+      KAFKA_BROKERS: kafka:29092
       NODE_ENV: development
+    depends_on:
+      kafka-topics:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3004/health"]
       interval: 15s
@@ -141,7 +151,12 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       PORT: 3002
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      KAFKA_ENABLED: "true"
+      KAFKA_BROKERS: kafka:29092
       NODE_ENV: development
+    depends_on:
+      kafka-topics:
+        condition: service_completed_successfully
 
   notification-service:
     build:

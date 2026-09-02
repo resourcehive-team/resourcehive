@@ -19,6 +19,7 @@ rendering, persistence, retries, Resend, and Firebase remain owned by
 Notification Service.
 
 The client uses `KAFKA_ENABLED`, `KAFKA_BROKERS`, `KAFKA_SSL`,
-`KAFKA_SASL_USERNAME`, `KAFKA_SASL_PASSWORD`, and `KAFKA_CLIENT_ID`. Calls fail
-clearly when publishing is disabled. Supply a stable `commandId` when retrying
-the same logical operation; Notification Service uses it for deduplication.
+`KAFKA_SASL_USERNAME`, and `KAFKA_SASL_PASSWORD`. It derives a distinct Kafka
+client ID from the registered producer. Calls fail clearly when publishing is
+disabled. Supply a stable `commandId` when retrying the same logical operation;
+Notification Service uses it for deduplication.

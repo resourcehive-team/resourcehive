@@ -13,7 +13,7 @@ describe("notification producer configuration", () => {
     const options = getNotificationKafkaOptions({
       producer: "booking-service",
     });
-    expect(options.clientId).toBe("booking-service");
+    expect(options.clientId).toBe("booking-service-notification-producer");
     expect(options.brokers).toEqual(["broker-1:9092", "broker-2:9092"]);
   });
 

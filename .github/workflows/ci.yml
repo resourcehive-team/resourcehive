@@ -115,6 +115,12 @@ jobs:
       - name: Build shared authentication package
         run: pnpm --filter @resourcehive/service-auth run build
 
+      - name: Check shared notification client
+        run: |
+          pnpm --filter @resourcehive/notification-client run lint
+          pnpm --filter @resourcehive/notification-client run test
+          pnpm --filter @resourcehive/notification-client run build
+
       - name: Lint frontend
         run: pnpm --filter frontend run lint
 
@@ -171,6 +177,7 @@ jobs:
         run: |
           pnpm --filter @resourcehive/database run build
           pnpm --filter @resourcehive/service-auth run build
+          pnpm --filter @resourcehive/notification-client run build
         env:
           DATABASE_URL: ${{ env.CI_DATABASE_URL }}
           DATABASE_URL_UNPOOLED: ${{ env.CI_DATABASE_URL }}
@@ -230,6 +237,7 @@ jobs:
         run: |
           pnpm run db:init
           pnpm --filter @resourcehive/service-auth run build
+          pnpm --filter @resourcehive/notification-client run build
 
       - name: Seed integration fixtures
         run: pnpm run db:seed:demo

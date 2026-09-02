@@ -15,9 +15,16 @@ Before setting `KAFKA_ENABLED=true`:
 3. Configure `KAFKA_BROKERS`, TLS, and matching SASL credentials.
 4. Apply the database migration, then deploy one instance as a smoke test.
 
-Producing services need produce access only to the topic they own. They should
-key commands by recipient user ID, key booking events by booking ID, and reuse
-the same command/event UUID when retrying a logical message.
+Producing services use `@resourcehive/notification-client`. Identity needs
+produce access to `resourcehive.identity.notification-commands.v1`; Booking
+and Resource need produce access to `resourcehive.notification.commands.v1`.
+Notification Service consumes those topics and produces only to the dead-letter
+topic. Commands are keyed by recipient user ID. Reuse the same command UUID
+when retrying one logical message.
+
+All services may connect to one Aiven Kafka service. The current deployment
+variables can share one SASL credential for simplicity; separate Aiven service
+users and least-privilege ACLs are recommended before production hardening.
 
 ## Resend
 
