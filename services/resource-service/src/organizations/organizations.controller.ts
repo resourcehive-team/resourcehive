@@ -13,7 +13,6 @@ import {
   ApiOperation,
   ApiBearerAuth,
   ApiOkResponse,
-  ApiNotFoundResponse,
   ApiForbiddenResponse,
   ApiCreatedResponse,
 } from '@nestjs/swagger';

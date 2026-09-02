@@ -47,7 +47,7 @@ describe('ResourcesService', () => {
         name: 'Test Room',
         pointCost: 10,
         ownerOrganizationId: 'org-1',
-      } as any);
+      } as never);
 
       const result = await service.checkBookingAccess('org-1', 'res-1');
 
@@ -63,7 +63,7 @@ describe('ResourcesService', () => {
       jest.spyOn(service, 'findOne').mockResolvedValue({
         id: 'res-1',
         status: 'INACTIVE',
-      } as any);
+      } as never);
 
       await expect(
         service.checkBookingAccess('org-1', 'res-1'),
