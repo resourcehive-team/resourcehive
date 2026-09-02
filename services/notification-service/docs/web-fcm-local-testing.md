@@ -67,11 +67,33 @@ which removes `user_devices` and creates `web_push_subscriptions`:
 pnpm.cmd run db:migrate
 ```
 
-Then restart Notification Service:
+For a host-run Notification Service, restart it with:
 
 ```powershell
 pnpm.cmd --filter notification-service run start:dev
 ```
+
+When the web app uses Caddy at `http://localhost:8000`, Caddy forwards
+notification requests to the Docker container. Start that container with the
+FCM override instead:
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.fcm.yml up -d --build --force-recreate notification-service
+```
+
+The override mounts the host file from `GOOGLE_APPLICATION_CREDENTIALS` at
+`/run/secrets/firebase-service-account.json` inside the container. The mount is
+read-only, and the credential remains outside the repository.
+
+Confirm that the rebuilt container contains the web-push routes:
+
+```powershell
+docker logs resourcehive-notification 2>&1 |
+  Select-String "test-push|push-subscriptions|successfully started"
+```
+
+Do not run a second host instance of Notification Service at the same time. It
+is not used by Caddy and can produce unrelated provider connection logs.
 
 ## 4. Test in the browser
 
