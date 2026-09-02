@@ -41,7 +41,6 @@ export class DevelopmentPushService {
     const result = await this.commands.process({
       kind: "notification.command",
       commandId,
-      idempotencyKey: `development/test-push/${userId}/${commandId}`,
       producer: "notification-service",
       recipient: { userId },
       channels: ["IN_APP", "PUSH"],

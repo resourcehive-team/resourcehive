@@ -20,7 +20,6 @@ export class BookingEventService {
     return {
       kind: "notification.command",
       commandId: event.eventId,
-      idempotencyKey: `${event.eventType}/${event.payload.bookingId}/${event.payload.userId}`,
       producer: "booking-service",
       recipient: { userId: event.payload.userId, email: event.payload.email },
       channels: ["IN_APP", "PUSH"],

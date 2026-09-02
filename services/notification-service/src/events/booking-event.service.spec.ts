@@ -1,3 +1,5 @@
+import { NotificationContractError } from "../contracts";
+import { parseBookingEvent } from "./booking-event.contract";
 import { BookingEventService } from "./booking-event.service";
 import { NotificationCommandService } from "./notification-command.service";
 
@@ -19,5 +21,15 @@ describe("BookingEventService", () => {
       },
     });
     expect(command.channels).toEqual(["IN_APP", "PUSH"]);
+  });
+
+  it("rejects malformed booking events as permanent contract errors", () => {
+    expect(() =>
+      parseBookingEvent({
+        kind: "booking.event",
+        producer: "booking-service",
+        eventVersion: 1,
+      }),
+    ).toThrow(NotificationContractError);
   });
 });

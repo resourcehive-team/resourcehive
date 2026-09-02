@@ -2,6 +2,7 @@ export const NOTIFICATION_TOPICS = {
   commands: "resourcehive.notification.commands.v1",
   identityCommands: "resourcehive.identity.notification-commands.v1",
   bookingEvents: "resourcehive.booking.events.v1",
+  deadLetters: "resourcehive.notification.dead-letter.v1",
 } as const;
 
 export const NOTIFICATION_TEMPLATES = {
@@ -9,6 +10,7 @@ export const NOTIFICATION_TEMPLATES = {
   bookingConfirmed: "booking.confirmed.v1",
   bookingCancelled: "booking.cancelled.v1",
   bookingCompleted: "booking.completed.v1",
+  message: "notification.message.v1",
   developmentTestPush: "development.test-push.v1",
 } as const;
 
@@ -33,7 +35,6 @@ export interface NotificationRecipient {
 export interface NotificationCommandV1 {
   kind: "notification.command";
   commandId: string;
-  idempotencyKey: string;
   producer: NotificationProducer;
   recipient: NotificationRecipient;
   channels: NotificationChannel[];

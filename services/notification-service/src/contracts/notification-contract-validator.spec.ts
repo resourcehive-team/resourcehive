@@ -6,7 +6,6 @@ import {
 const validCommand = {
   kind: "notification.command",
   commandId: "11111111-1111-4111-8111-111111111111",
-  idempotencyKey: "booking-confirmed/booking-id/user-id",
   producer: "booking-service",
   recipient: { userId: "22222222-2222-4222-8222-222222222222" },
   channels: ["IN_APP", "PUSH"],
@@ -36,7 +35,44 @@ describe("notification command contract", () => {
   it("requires an addressable recipient", () => {
     expect(() =>
       parseNotificationCommand({ ...validCommand, recipient: {} }),
-    ).toThrow("recipient requires userId or email");
+    ).toThrow("recipient requires a ResourceHive userId");
+  });
+
+  it("accepts a general in-app and push message from an internal service", () => {
+    const message = {
+      ...validCommand,
+      producer: "resource-service",
+      template: {
+        key: "notification.message.v1",
+        version: 1,
+        variables: { title: "Resource updated", message: "Lab hours changed." },
+      },
+    };
+
+    expect(parseNotificationCommand(message)).toEqual(message);
+  });
+
+  it("requires bounded title and message variables for general messages", () => {
+    expect(() =>
+      parseNotificationCommand({
+        ...validCommand,
+        producer: "resource-service",
+        template: {
+          key: "notification.message.v1",
+          version: 1,
+          variables: { title: "Resource updated" },
+        },
+      }),
+    ).toThrow("template.variables.message is invalid");
+  });
+
+  it("prevents services from using another service's templates", () => {
+    expect(() =>
+      parseNotificationCommand({
+        ...validCommand,
+        producer: "resource-service",
+      }),
+    ).toThrow("Booking templates may only be requested by Booking Service");
   });
 
   it("rejects email for non-verification notifications", () => {

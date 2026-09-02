@@ -53,7 +53,6 @@ describe("NotificationCommandService", () => {
     await service.process({
       kind: "notification.command",
       commandId: "11111111-1111-4111-8111-111111111111",
-      idempotencyKey: "verify/user/token",
       producer: "identity-service",
       recipient: { userId: user.id, email: user.email },
       channels: ["EMAIL"],
@@ -86,7 +85,6 @@ describe("NotificationCommandService", () => {
     await service.process({
       kind: "notification.command",
       commandId: "11111111-1111-4111-8111-111111111111",
-      idempotencyKey: "booking/confirmed/user",
       producer: "booking-service",
       recipient: { userId: user.id },
       channels: ["IN_APP", "PUSH"],
@@ -112,5 +110,29 @@ describe("NotificationCommandService", () => {
         }),
       ],
     });
+  });
+
+  it("does no work when Kafka redelivers a processed command", async () => {
+    claim.mockResolvedValueOnce([]);
+
+    const result = await service.process({
+      kind: "notification.command",
+      commandId: "11111111-1111-4111-8111-111111111111",
+      producer: "booking-service",
+      recipient: { userId: user.id },
+      channels: ["IN_APP", "PUSH"],
+      template: {
+        key: "booking.confirmed.v1",
+        version: 1,
+        variables: { resourceName: "Robotics Lab" },
+      },
+      correlationId: "33333333-3333-4333-8333-333333333333",
+      occurredAt: "2026-08-31T12:00:00.000Z",
+    });
+
+    expect(result).toEqual({ duplicate: true });
+    expect(findUser).not.toHaveBeenCalled();
+    expect(createNotification).not.toHaveBeenCalled();
+    expect(createDeliveries).not.toHaveBeenCalled();
   });
 });

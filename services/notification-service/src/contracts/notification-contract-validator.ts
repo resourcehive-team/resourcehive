@@ -35,7 +35,6 @@ export function parseNotificationCommand(
   const value = requireObject(input, "command");
   if (value.kind !== "notification.command") invalid("kind");
   requireUuid(value.commandId, "commandId");
-  requireText(value.idempotencyKey, "idempotencyKey", 200);
   if (!producers.has(value.producer as NotificationProducer)) {
     invalid("producer");
   }
@@ -52,10 +51,10 @@ export function parseNotificationCommand(
   ) {
     invalid("email");
   }
-  if (!recipient.userId && !recipient.email) {
+  if (!recipient.userId) {
     throw new NotificationContractError(
       "RECIPIENT_REQUIRED",
-      "recipient requires userId or email",
+      "recipient requires a ResourceHive userId",
     );
   }
 
@@ -64,6 +63,9 @@ export function parseNotificationCommand(
   }
   for (const channel of value.channels) {
     if (!channels.has(channel as NotificationChannel)) invalid("channels");
+  }
+  if (new Set(value.channels).size !== value.channels.length) {
+    invalid("channels");
   }
 
   const template = requireObject(value.template, "template");
@@ -89,6 +91,24 @@ export function parseNotificationCommand(
     throw new NotificationContractError(
       "TEMPLATE_FORBIDDEN",
       "Identity templates may only be requested by Identity Service",
+    );
+  }
+  if (
+    String(template.key).startsWith("booking.") &&
+    value.producer !== "booking-service"
+  ) {
+    throw new NotificationContractError(
+      "TEMPLATE_FORBIDDEN",
+      "Booking templates may only be requested by Booking Service",
+    );
+  }
+  if (
+    template.key === NOTIFICATION_TEMPLATES.developmentTestPush &&
+    value.producer !== "notification-service"
+  ) {
+    throw new NotificationContractError(
+      "TEMPLATE_FORBIDDEN",
+      "Development test pushes may only be requested by Notification Service",
     );
   }
   const usesEmail = value.channels.includes("EMAIL");
@@ -121,8 +141,29 @@ export function parseNotificationCommand(
   for (const variable of Object.values(variables)) {
     if (!isTemplateValue(variable)) invalid("template.variables");
   }
+  validateTemplateVariables(template.key as NotificationTemplateKey, variables);
 
   return value as unknown as NotificationCommandV1;
+}
+
+function validateTemplateVariables(
+  key: NotificationTemplateKey,
+  variables: Record<string, unknown>,
+): void {
+  if (key === NOTIFICATION_TEMPLATES.identityVerifyEmail) {
+    requireText(
+      variables.verificationUrl,
+      "template.variables.verificationUrl",
+      2_000,
+    );
+  }
+  if (String(key).startsWith("booking.")) {
+    requireText(variables.resourceName, "template.variables.resourceName", 200);
+  }
+  if (key === NOTIFICATION_TEMPLATES.message) {
+    requireText(variables.title, "template.variables.title", 120);
+    requireText(variables.message, "template.variables.message", 500);
+  }
 }
 
 function requireObject(value: unknown, field: string): Record<string, unknown> {

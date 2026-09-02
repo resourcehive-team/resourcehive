@@ -28,6 +28,17 @@ export class NotificationTemplateService {
         emailText: "",
       };
     }
+    if (command.template.key === NOTIFICATION_TEMPLATES.message) {
+      const title = this.text(command.template.variables, "title")!;
+      const message = this.text(command.template.variables, "message")!;
+      return {
+        type: "NOTIFICATION_MESSAGE",
+        title,
+        message,
+        emailSubject: "",
+        emailText: "",
+      };
+    }
     if (command.template.key.startsWith("identity.")) {
       return renderIdentityEmail(command);
     }

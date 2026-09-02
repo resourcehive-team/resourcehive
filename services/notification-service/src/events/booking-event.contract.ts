@@ -1,4 +1,5 @@
 import { isISO8601, isUUID } from "class-validator";
+import { NotificationContractError } from "../contracts";
 
 export type BookingEventType =
   "booking.confirmed" | "booking.cancelled" | "booking.completed";
@@ -26,7 +27,7 @@ export function parseBookingEvent(input: unknown): BookingEventV1 {
     event.producer !== "booking-service" ||
     event.eventVersion !== 1
   )
-    throw new Error("Invalid booking event envelope");
+    reject("Invalid booking event envelope");
   if (
     !event.eventId ||
     !isUUID(event.eventId) ||
@@ -35,20 +36,24 @@ export function parseBookingEvent(input: unknown): BookingEventV1 {
     !event.occurredAt ||
     !isISO8601(event.occurredAt)
   )
-    throw new Error("Invalid booking event identity");
+    reject("Invalid booking event identity");
   if (
     !event.eventType ||
     !["booking.confirmed", "booking.cancelled", "booking.completed"].includes(
       event.eventType,
     )
   )
-    throw new Error("Unsupported booking event type");
+    reject("Unsupported booking event type");
   if (
     !event.payload ||
     !isUUID(event.payload.bookingId) ||
     !isUUID(event.payload.userId) ||
     !event.payload.resourceName?.trim()
   )
-    throw new Error("Invalid booking event payload");
+    reject("Invalid booking event payload");
   return event as BookingEventV1;
+}
+
+function reject(message: string): never {
+  throw new NotificationContractError("INVALID_BOOKING_EVENT", message);
 }
