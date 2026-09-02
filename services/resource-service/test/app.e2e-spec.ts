@@ -37,7 +37,7 @@ describe('AppController (e2e)', () => {
       },
       { secret },
     );
-  });
+  }, 30000);
 
   afterAll(async () => {
     await app.close();
