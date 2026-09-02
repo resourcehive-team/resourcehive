@@ -26,7 +26,6 @@ export class MembershipsController {
   @ApiCreatedResponse({
     description: 'Membership request submitted successfully.',
   })
-  @ApiNotFoundResponse({ description: 'Organization not found.' })
   requestMembership(
     @Param('organizationId') orgId: string,
     @CurrentUser() user: AuthenticatedUser,

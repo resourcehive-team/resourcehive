@@ -104,7 +104,7 @@ export class ResourcesController {
     description: 'The resources have been listed successfully.',
   })
   @ApiForbiddenResponse({
-    description: 'Forbidden. Requires Admin privileges.',
+    description: 'Forbidden. You do not have access to this organization.',
   })
   findAll(
     @Param('organizationId') organizationId: string,

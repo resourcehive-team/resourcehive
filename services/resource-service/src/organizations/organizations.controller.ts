@@ -39,7 +39,6 @@ export class OrganizationsController {
   @Get(':id')
   @ApiOperation({ summary: 'Get organization details' })
   @ApiOkResponse({ description: 'Returns the organization details.' })
-  @ApiNotFoundResponse({ description: 'Organization not found.' })
   getOne(@Param('id') id: string) {
     return this.orgsService.findOne(id);
   }
@@ -47,7 +46,6 @@ export class OrganizationsController {
   @Get(':id/children')
   @ApiOperation({ summary: 'Get child organizations for a root tenant' })
   @ApiOkResponse({ description: 'Returns a list of child organizations.' })
-  @ApiNotFoundResponse({ description: 'Parent organization not found.' })
   getChildren(@Param('id') id: string) {
     return this.orgsService.findChildren(id);
   }
