@@ -44,7 +44,8 @@ services:
         for topic in \
           resourcehive.notification.commands.v1 \
           resourcehive.identity.notification-commands.v1 \
-          resourcehive.booking.events.v1; do
+          resourcehive.booking.events.v1 \
+          resourcehive.notification.dead-letter.v1; do
           /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 \
             --create --if-not-exists --topic "$$topic" \
             --partitions 1 --replication-factor 1

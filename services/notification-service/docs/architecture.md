@@ -20,6 +20,11 @@ Kafka consumption is at-least-once. Processed-event uniqueness prevents a
 command from creating duplicate database work. Resend also receives the
 delivery UUID as its idempotency key.
 
+Offsets are committed after successful transactional processing. Invalid
+contracts and inactive recipients are written to the notification dead-letter
+topic before being committed; transient failures remain uncommitted for Kafka
+redelivery.
+
 ## Boundaries
 
 - Producers publish template keys and typed variables, never arbitrary HTML.
@@ -27,5 +32,7 @@ delivery UUID as its idempotency key.
 - Identity owns verification tokens and is the only email-command producer.
 - Email is restricted to `identity.verify-email.v1`.
 - Booking and other application events use in-app and web push channels.
+- Internal services can use `notification.message.v1` for bounded plain-text
+  in-app and browser push messages.
 - Kafka payload bodies and token-bearing URLs must never be logged.
 - In-app notifications are read through REST; browser alerts are delivered by FCM.

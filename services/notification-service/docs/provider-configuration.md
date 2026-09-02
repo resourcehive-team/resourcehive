@@ -8,10 +8,16 @@ transport and topic ACLs.
 
 Before setting `KAFKA_ENABLED=true`:
 
-1. Provision the three inbound topics listed in `event-contracts.md`.
-2. Grant the notification client only the required producer/consumer ACLs.
+1. Provision the three inbound topics and the dead-letter topic listed in
+   `event-contracts.md`.
+2. Grant the notification client consume access to the inbound topics and
+   produce access to the dead-letter topic.
 3. Configure `KAFKA_BROKERS`, TLS, and matching SASL credentials.
 4. Apply the database migration, then deploy one instance as a smoke test.
+
+Producing services need produce access only to the topic they own. They should
+key commands by recipient user ID, key booking events by booking ID, and reuse
+the same command/event UUID when retrying a logical message.
 
 ## Resend
 
