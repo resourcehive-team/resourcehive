@@ -1,0 +1,63 @@
+import { Injectable } from "@nestjs/common";
+import { applicationDefault, getApps, initializeApp } from "firebase-admin/app";
+import { getMessaging } from "firebase-admin/messaging";
+import { PrismaService } from "@resourcehive/database";
+import { ConsolePushProvider } from "./console-delivery.providers";
+import {
+  DeliveryMessage,
+  DeliveryProvider,
+  DeliveryProviderResult,
+} from "./delivery-provider";
+import { classifyFcmError, isInvalidFcmTarget } from "./fcm-error-classifier";
+
+@Injectable()
+export class FcmPushProvider implements DeliveryProvider {
+  readonly channel = "PUSH" as const;
+  constructor(
+    private readonly consoleProvider: ConsolePushProvider,
+    private readonly prisma: PrismaService,
+  ) {}
+
+  async send(message: DeliveryMessage): Promise<DeliveryProviderResult> {
+    if (process.env.FCM_ENABLED !== "true")
+      return this.consoleProvider.send(message);
+    if (getApps().length === 0) {
+      initializeApp({
+        credential: applicationDefault(),
+        projectId: process.env.FIREBASE_PROJECT_ID,
+      });
+    }
+    try {
+      const notificationId =
+        typeof message.data.notificationId === "string"
+          ? message.data.notificationId
+          : message.deliveryId;
+      const providerMessageId = await getMessaging().send({
+        token: message.destination,
+        notification: { title: message.subject, body: message.body },
+        data: { notificationId },
+        webpush: {
+          notification: { icon: "/resourcehive-mark.svg" },
+          fcmOptions: { link: this.notificationUrl() },
+        },
+      });
+      return { providerMessageId };
+    } catch (error) {
+      if (isInvalidFcmTarget(error)) {
+        await this.prisma.webPushSubscription.updateMany({
+          where: { token: message.destination },
+          data: { active: false },
+        });
+      }
+      throw classifyFcmError(error);
+    }
+  }
+
+  private notificationUrl(): string {
+    const origin =
+      process.env.WEB_APP_URL?.trim() ||
+      process.env.CORS_ORIGINS?.split(",")[0]?.trim() ||
+      "http://localhost:3000";
+    return `${origin.replace(/\/$/, "")}/dashboard/notifications`;
+  }
+}

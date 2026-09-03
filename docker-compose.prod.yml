@@ -95,6 +95,24 @@ services:
     environment:
       <<: *service-environment
       PORT: 3003
+      DELIVERY_POLL_INTERVAL_MS: ${DELIVERY_POLL_INTERVAL_MS:-5000}
+      KAFKA_ENABLED: ${KAFKA_ENABLED:-false}
+      KAFKA_BROKERS: ${KAFKA_BROKERS:-localhost:9092}
+      KAFKA_CLIENT_ID: ${KAFKA_CLIENT_ID:-notification-service}
+      KAFKA_CONSUMER_GROUP: ${KAFKA_CONSUMER_GROUP:-notification-service-v1}
+      KAFKA_SSL: ${KAFKA_SSL:-true}
+      KAFKA_SASL_USERNAME: ${KAFKA_SASL_USERNAME:-}
+      KAFKA_SASL_PASSWORD: ${KAFKA_SASL_PASSWORD:-}
+      RESEND_ENABLED: ${RESEND_ENABLED:-false}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-}
+      FCM_ENABLED: ${FCM_ENABLED:-false}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
+      WEB_APP_URL: ${WEB_APP_URL:-}
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/firebase-service-account.json
+    secrets:
+      - source: firebase_service_account
+        target: firebase-service-account.json
 
   migrate:
     image: ghcr.io/resourcehive-team/resourcehive-identity:${IMAGE_TAG:?Set IMAGE_TAG in .env.production}
@@ -117,3 +135,7 @@ services:
 volumes:
   caddy_data:
   caddy_config:
+
+secrets:
+  firebase_service_account:
+    file: ./secrets/firebase-service-account.json

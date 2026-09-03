@@ -10,9 +10,15 @@ describe("NotificationRepository", () => {
     updateMany: jest.fn(),
   };
   const user = { findFirst: jest.fn() };
+  const webPushSubscription = {
+    upsert: jest.fn(),
+    findMany: jest.fn(),
+    updateMany: jest.fn(),
+  };
   const repository = new NotificationRepository({
     notification,
     user,
+    webPushSubscription,
   } as unknown as PrismaService);
 
   beforeEach(() => jest.clearAllMocks());
@@ -78,6 +84,18 @@ describe("NotificationRepository", () => {
         id: "notification-id",
         userId: "recipient-id",
       },
+    });
+  });
+
+  it("registers one browser token for the authenticated user", async () => {
+    webPushSubscription.upsert.mockResolvedValue({ id: "subscription-id" });
+
+    await repository.registerWebPush("user-id", "fcm-token");
+
+    expect(webPushSubscription.upsert).toHaveBeenCalledWith({
+      where: { token: "fcm-token" },
+      create: { userId: "user-id", token: "fcm-token" },
+      update: { userId: "user-id", active: true },
     });
   });
 });

@@ -1,0 +1,12 @@
+services:
+  notification-service:
+    environment:
+      FCM_ENABLED: "true"
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:?Set FIREBASE_PROJECT_ID in .env}
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/firebase-service-account.json
+      WEB_APP_URL: ${WEB_APP_URL:-http://localhost:3000}
+    volumes:
+      - type: bind
+        source: ${GOOGLE_APPLICATION_CREDENTIALS:?Set GOOGLE_APPLICATION_CREDENTIALS in .env}
+        target: /run/secrets/firebase-service-account.json
+        read_only: true

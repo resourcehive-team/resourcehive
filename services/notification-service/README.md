@@ -1,17 +1,19 @@
 # Notification Service
 
-Person B owns this NestJS service for persistent, real-time, and fallback
-notifications.
+This NestJS service persists in-app notifications and delivers verification
+email and browser push notifications.
 
-The service currently provides persistent notification creation,
-recipient-scoped read APIs, and the authenticated WebSocket connection
-foundation. Business-event delivery and email fallback remain later
-milestones.
+Domain events arrive through Kafka, in-app notifications are exposed through
+recipient-scoped REST APIs, and queued delivery work is sent through Resend or
+Firebase Cloud Messaging.
 
-Approved contracts:
+Architecture and contracts:
 
+- [Architecture](docs/architecture.md)
 - [Notification API](docs/api-contract.md)
 - [Consumed booking events](docs/event-contracts.md)
+- [Delivery semantics](docs/delivery-semantics.md)
+- [Provider configuration](docs/provider-configuration.md)
 
 ## Local development
 
@@ -22,12 +24,12 @@ pnpm --filter @resourcehive/database run build
 pnpm --filter notification-service run start:dev
 ```
 
+Firebase web setup and the development-only push smoke test are documented in
+[`docs/web-fcm-local-testing.md`](docs/web-fcm-local-testing.md).
+
 - Internal port: `3003`
 - Readiness: `GET /health`
 - Swagger UI: `GET /docs`
-- Socket.IO namespace: `/notifications`
-- Socket.IO path: `/notifications/socket.io`
-- Socket authentication: `handshake.auth.token`
 
 Run persistence integration tests only against a migrated disposable database:
 
@@ -61,11 +63,5 @@ docker build -f services/notification-service/Dockerfile -t resourcehive-notific
 docker run --rm -p 3003:3003 -e DATABASE_URL=postgresql://... resourcehive-notification
 ```
 
-The public HTTP prefix is `/notifications/*`. Person C's gateway integration
-must proxy `/notifications/socket.io` to this service with HTTP/1.1 WebSocket
-upgrade handling and long-lived connections. Root Compose, Caddy, shared
-environment files, CI workflows, and port assignments remain Person C-owned.
-
-Redis is not required for the single-instance authentication foundation. An
-approved Socket.IO adapter or Redis coordination is required before relying on
-rooms across multiple Notification Service instances.
+The public HTTP prefix is `/notifications/*`. Browser push uses Firebase Cloud
+Messaging and does not require WebSocket proxying or Redis coordination.

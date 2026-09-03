@@ -1,5 +1,6 @@
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { WebPushListener } from "@/components/web-push-listener";
 
 export default function DashboardLayout({
   children,
@@ -15,6 +16,7 @@ export default function DashboardLayout({
         } as React.CSSProperties
       }
     >
+      <WebPushListener />
       <AppSidebar />
       <SidebarInset>{children}</SidebarInset>
     </SidebarProvider>
