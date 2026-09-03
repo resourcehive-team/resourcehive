@@ -284,6 +284,11 @@ jobs:
           DATABASE_URL: ${{ env.CI_DATABASE_URL }}
           DATABASE_URL_UNPOOLED: ${{ env.CI_DATABASE_URL }}
           JWT_SECRET: ${{ env.CI_JWT_SECRET }}
+          KAFKA_ENABLED: "false"
+          KAFKA_BROKERS: kafka.invalid:9093
+          KAFKA_SSL: "true"
+          KAFKA_SASL_USERNAME: ci-config-check
+          KAFKA_SASL_PASSWORD: ci-config-check
 
       - name: Validate Caddy configuration
         run: >-
