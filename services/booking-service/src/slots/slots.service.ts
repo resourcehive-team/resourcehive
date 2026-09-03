@@ -8,6 +8,7 @@ import {
 import { Prisma } from "@resourcehive/database";
 import { AuthenticatedUser } from "@resourcehive/service-auth";
 import { BookingAuthorizationService } from "../authorization/booking-authorization.service";
+import { BookingNotificationService } from "../notifications/booking-notification.service";
 import { CreateSlotDto, ListSlotsDto } from "./slot.dto";
 import { SlotResourceNotFoundError } from "./slot.errors";
 import { SlotRepository } from "./slot.repository";
@@ -18,6 +19,7 @@ export class SlotsService {
   constructor(
     private readonly repository: SlotRepository,
     private readonly authorization: BookingAuthorizationService,
+    private readonly notifications: BookingNotificationService,
   ) {}
 
   async create(dto: CreateSlotDto, user: AuthenticatedUser): Promise<SlotView> {
@@ -37,6 +39,14 @@ export class SlotsService {
       const slot = await this.repository.create({
         ...dto,
         rootOrganizationId: context.rootOrganizationId,
+      });
+      await this.notifications.slotCreated({
+        slotId: slot.id,
+        actorUserId: context.userId,
+        resourceName: slot.resource.name,
+        startsAt: slot.startsAt,
+        endsAt: slot.endsAt,
+        ownerOrganizationId: slot.resource.ownerOrganizationId,
       });
       return this.toView(slot);
     } catch (error) {

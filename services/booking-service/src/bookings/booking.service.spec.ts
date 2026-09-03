@@ -1,6 +1,6 @@
 import { Prisma, PrismaService } from "@resourcehive/database";
-import { NotificationClientService } from "@resourcehive/notification-client";
 import { BookingAuthorizationService } from "../authorization/booking-authorization.service";
+import { BookingNotificationService } from "../notifications/booking-notification.service";
 import { PointLedgerService } from "../points/point-ledger.service";
 import { SlotRepository } from "../slots/slot.repository";
 import { BookingRepository } from "./booking.repository";
@@ -30,12 +30,10 @@ describe("BookingService", () => {
   const bookings = {
     createConfirmed: jest.fn(),
   } as unknown as BookingRepository;
-  const sendNotification = jest.fn();
-  const publishBookingEvent = jest.fn();
+  const bookingConfirmed = jest.fn();
   const notifications = {
-    send: sendNotification,
-    publishBookingEvent,
-  } as unknown as NotificationClientService;
+    bookingConfirmed,
+  } as unknown as BookingNotificationService;
   const service = new BookingService(
     prisma,
     authorization,
@@ -87,8 +85,7 @@ describe("BookingService", () => {
     organizationMembership.findMany.mockResolvedValue([
       { userId: "administrator-id" },
     ]);
-    sendNotification.mockResolvedValue({});
-    publishBookingEvent.mockResolvedValue({});
+    bookingConfirmed.mockResolvedValue(undefined);
   });
 
   it("validates a bookable slot using server-derived values", async () => {
@@ -121,7 +118,12 @@ describe("BookingService", () => {
       resourceSlot: {
         startsAt,
         endsAt,
-        resource: { id: "resource-id", name: "Room", pointCost: 25 },
+        resource: {
+          id: "resource-id",
+          name: "Room",
+          pointCost: 25,
+          ownerOrganizationId: "organization-id",
+        },
       },
     });
 
@@ -136,18 +138,13 @@ describe("BookingService", () => {
       expect.objectContaining({ amount: -25, bookingId: "booking-id" }),
       transaction,
     );
-    expect(sendNotification).toHaveBeenCalledWith({
-      recipientUserId: "administrator-id",
-      title: "New booking",
-      message: "user@example.edu booked Room.",
-      correlationId: "booking-id",
-    });
-    expect(publishBookingEvent).toHaveBeenCalledWith({
-      eventType: "booking.confirmed",
+    expect(bookingConfirmed).toHaveBeenCalledWith({
       bookingId: "booking-id",
       userId: "user-id",
-      email: "user@example.edu",
+      studentEmail: "user@example.edu",
       resourceName: "Room",
+      startsAt,
+      ownerOrganizationId: "organization-id",
     });
   });
 });

@@ -4,10 +4,10 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { PrismaService } from "@resourcehive/database";
-import { NotificationClientService } from "@resourcehive/notification-client";
 import { BookingAuthorizationService } from "../../src/authorization/booking-authorization.service";
 import { BookingRepository } from "../../src/bookings/booking.repository";
 import { BookingService } from "../../src/bookings/booking.service";
+import { BookingNotificationService } from "../../src/notifications/booking-notification.service";
 import { PointLedgerService } from "../../src/points/point-ledger.service";
 import { SlotRepository } from "../../src/slots/slot.repository";
 
@@ -62,10 +62,10 @@ describe("BookingService completion", () => {
       findFirst: jest.fn(),
     },
   };
-  const publishBookingEvent = jest.fn();
+  const bookingCompleted = jest.fn();
   const notifications = {
-    publishBookingEvent,
-  } as unknown as NotificationClientService;
+    bookingCompleted,
+  } as unknown as BookingNotificationService;
   const service = new BookingService(
     prisma as unknown as PrismaService,
     {} as BookingAuthorizationService,
@@ -83,7 +83,7 @@ describe("BookingService completion", () => {
     prisma.organizationMembership.findFirst.mockResolvedValue({
       id: "membership-1",
     });
-    publishBookingEvent.mockResolvedValue({});
+    bookingCompleted.mockResolvedValue(undefined);
   });
 
   it("marks a confirmed organization booking as completed", async () => {
@@ -113,12 +113,14 @@ describe("BookingService completion", () => {
     expect(update.where).toEqual({ id: booking.id });
     expect(update.data.status).toBe("COMPLETED");
     expect(update.data.completedAt).toBeInstanceOf(Date);
-    expect(publishBookingEvent).toHaveBeenCalledWith({
-      eventType: "booking.completed",
+    expect(bookingCompleted).toHaveBeenCalledWith({
       bookingId: booking.id,
       userId: booking.userId,
-      email: booking.user.email,
+      studentEmail: booking.user.email,
       resourceName: booking.resourceSlot.resource.name,
+      startsAt: booking.resourceSlot.startsAt,
+      ownerOrganizationId: booking.resourceSlot.resource.ownerOrganizationId,
+      actorUserId: "administrator-1",
     });
   });
 

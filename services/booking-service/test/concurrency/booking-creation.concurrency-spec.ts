@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { HttpException } from "@nestjs/common";
 import { PrismaService } from "@resourcehive/database";
-import { NotificationClientService } from "@resourcehive/notification-client";
 import { BookingAuthorizationService } from "../../src/authorization/booking-authorization.service";
 import { BookingRepository } from "../../src/bookings/booking.repository";
 import { BookingService } from "../../src/bookings/booking.service";
+import { BookingNotificationService } from "../../src/notifications/booking-notification.service";
 import { PointLedgerRepository } from "../../src/points/point-ledger.repository";
 import { PointLedgerService } from "../../src/points/point-ledger.service";
 import { SlotRepository } from "../../src/slots/slot.repository";
@@ -21,9 +21,8 @@ describe("Concurrent booking creation", () => {
     points,
     new BookingRepository(),
     {
-      send: jest.fn().mockResolvedValue({}),
-      publishBookingEvent: jest.fn().mockResolvedValue({}),
-    } as unknown as NotificationClientService,
+      bookingConfirmed: jest.fn().mockResolvedValue(undefined),
+    } as unknown as BookingNotificationService,
   );
 
   beforeAll(async () => {

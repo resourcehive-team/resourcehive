@@ -1,6 +1,5 @@
 import { ForbiddenException } from "@nestjs/common";
 import { PrismaService } from "@resourcehive/database";
-import { NotificationClientService } from "@resourcehive/notification-client";
 import { BookingAuthorizationService } from "../../src/authorization/booking-authorization.service";
 import { BookingRepository } from "../../src/bookings/booking.repository";
 import { BookingService } from "../../src/bookings/booking.service";
@@ -9,6 +8,7 @@ import {
   GetUserBookingsDto,
 } from "../../src/bookings/bookings.dto";
 import { PointLedgerService } from "../../src/points/point-ledger.service";
+import { BookingNotificationService } from "../../src/notifications/booking-notification.service";
 import { SlotRepository } from "../../src/slots/slot.repository";
 
 interface MockPrisma {
@@ -36,7 +36,7 @@ describe("BookingService reads", () => {
     {} as SlotRepository,
     {} as PointLedgerService,
     {} as BookingRepository,
-    {} as NotificationClientService,
+    {} as BookingNotificationService,
   );
 
   beforeEach(() => {
@@ -61,7 +61,14 @@ describe("BookingService reads", () => {
           select: {
             startsAt: true,
             endsAt: true,
-            resource: { select: { id: true, name: true, pointCost: true } },
+            resource: {
+              select: {
+                id: true,
+                name: true,
+                pointCost: true,
+                ownerOrganizationId: true,
+              },
+            },
           },
         },
       },

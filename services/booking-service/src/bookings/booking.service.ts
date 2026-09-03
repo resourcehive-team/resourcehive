@@ -1,11 +1,8 @@
-import { HttpException, Injectable, Logger } from "@nestjs/common";
+import { HttpException, Injectable } from "@nestjs/common";
 import { Prisma, PrismaService } from "@resourcehive/database";
-import {
-  NotificationClientService,
-  PublishBookingEventInput,
-} from "@resourcehive/notification-client";
 import { AuthenticatedUser } from "@resourcehive/service-auth";
 import { BookingAuthorizationService } from "../authorization/booking-authorization.service";
+import { BookingNotificationService } from "../notifications/booking-notification.service";
 import { PointLedgerService } from "../points/point-ledger.service";
 import { SlotRepository } from "../slots/slot.repository";
 import {
@@ -74,15 +71,13 @@ const organizationBookingInclude = {
 
 @Injectable()
 export class BookingService {
-  private readonly logger = new Logger(BookingService.name);
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly authorization: BookingAuthorizationService,
     private readonly slots: SlotRepository,
     private readonly points: PointLedgerService,
     private readonly bookings: BookingRepository,
-    private readonly notifications: NotificationClientService,
+    private readonly notifications: BookingNotificationService,
   ) {}
 
   async createBooking(
@@ -105,16 +100,14 @@ export class BookingService {
               timeout: 30000,
             },
           );
-          await Promise.all([
-            this.notifyAdministrators(booking, user.email),
-            this.publishStudentBookingEvent({
-              eventType: "booking.confirmed",
-              bookingId: booking.id,
-              userId: booking.userId,
-              email: user.email,
-              resourceName: booking.resourceName,
-            }),
-          ]);
+          await this.notifications.bookingConfirmed({
+            bookingId: booking.id,
+            userId: booking.userId,
+            studentEmail: user.email,
+            resourceName: booking.resourceName,
+            startsAt: booking.startsAt,
+            ownerOrganizationId: booking.ownerOrganizationId,
+          });
           return booking;
         } catch (error) {
           if (this.isUniqueConstraintConflict(error)) {
@@ -302,16 +295,27 @@ export class BookingService {
           });
           if (!cancelledBooking) throw new BookingNotFoundError();
 
-          return { ...cancelledBooking, refundPoints, slotStatus };
+          return {
+            ...cancelledBooking,
+            refundPoints,
+            slotStatus,
+            cancelledByUser: isUserCancellation,
+          };
         },
       );
-      await this.publishStudentBookingEvent({
-        eventType: "booking.cancelled",
+      await this.notifications.bookingCancelled({
         bookingId: cancelledBooking.id,
         userId: cancelledBooking.userId,
-        email: cancelledBooking.user.email,
+        studentEmail: cancelledBooking.user.email,
         resourceName: cancelledBooking.resourceSlot.resource.name,
+        startsAt: cancelledBooking.resourceSlot.startsAt,
+        ownerOrganizationId:
+          cancelledBooking.resourceSlot.resource.ownerOrganizationId,
+        actorUserId,
+        cancelledByUser: cancelledBooking.cancelledByUser,
+        reason: cancelledBooking.cancellationReason ?? undefined,
         refundPoints: cancelledBooking.refundPoints,
+        slotStatus: cancelledBooking.slotStatus,
       });
       return cancelledBooking;
     } catch (error) {
@@ -346,12 +350,15 @@ export class BookingService {
         data: { status: BookingStatus.COMPLETED, completedAt: new Date() },
         include: organizationBookingInclude,
       });
-      await this.publishStudentBookingEvent({
-        eventType: "booking.completed",
+      await this.notifications.bookingCompleted({
         bookingId: completedBooking.id,
         userId: completedBooking.userId,
-        email: completedBooking.user.email,
+        studentEmail: completedBooking.user.email,
         resourceName: completedBooking.resourceSlot.resource.name,
+        startsAt: completedBooking.resourceSlot.startsAt,
+        ownerOrganizationId:
+          completedBooking.resourceSlot.resource.ownerOrganizationId,
+        actorUserId: administratorUserId,
       });
       return completedBooking;
     } catch (error) {
@@ -374,7 +381,14 @@ export class BookingService {
             select: {
               startsAt: true,
               endsAt: true,
-              resource: { select: { id: true, name: true, pointCost: true } },
+              resource: {
+                select: {
+                  id: true,
+                  name: true,
+                  pointCost: true,
+                  ownerOrganizationId: true,
+                },
+              },
             },
           },
         },
@@ -450,6 +464,7 @@ export class BookingService {
       resourceSlotId: booking.resourceSlotId,
       resourceId: booking.resourceSlot.resource.id,
       resourceName: booking.resourceSlot.resource.name,
+      ownerOrganizationId: booking.resourceSlot.resource.ownerOrganizationId,
       userId: booking.userId,
       status: booking.status,
       startsAt: booking.resourceSlot.startsAt,
@@ -474,63 +489,6 @@ export class BookingService {
       select: { id: true },
     });
     if (!membership) throw new BookingAdministratorRequiredError();
-  }
-
-  private async notifyAdministrators(
-    booking: CreatedBooking,
-    studentEmail: string,
-  ): Promise<void> {
-    try {
-      const resource = await this.prisma.resource.findUnique({
-        where: { id: booking.resourceId },
-        select: { ownerOrganizationId: true },
-      });
-      if (!resource) return;
-      const administrators = await this.prisma.organizationMembership.findMany({
-        where: {
-          organizationId: resource.ownerOrganizationId,
-          role: "ADMIN",
-          status: "APPROVED",
-        },
-        select: { userId: true },
-      });
-      const results = await Promise.allSettled(
-        administrators.map(({ userId }) =>
-          this.notifications.send({
-            recipientUserId: userId,
-            title: "New booking",
-            message: `${studentEmail} booked ${booking.resourceName}.`,
-            correlationId: booking.id,
-          }),
-        ),
-      );
-      const failures = results.filter(
-        (result) => result.status === "rejected",
-      ).length;
-      if (failures > 0) {
-        this.logger.error(
-          `Failed to publish ${failures} administrator notification(s) for booking ${booking.id}`,
-        );
-      }
-    } catch (error) {
-      this.logger.error(
-        `Unable to publish administrator notifications for booking ${booking.id}`,
-        error instanceof Error ? error.stack : undefined,
-      );
-    }
-  }
-
-  private async publishStudentBookingEvent(
-    event: PublishBookingEventInput,
-  ): Promise<void> {
-    try {
-      await this.notifications.publishBookingEvent(event);
-    } catch (error) {
-      this.logger.error(
-        `Unable to publish ${event.eventType} for booking ${event.bookingId}`,
-        error instanceof Error ? error.stack : undefined,
-      );
-    }
   }
 
   private handleError(error: unknown, operation: string): never {

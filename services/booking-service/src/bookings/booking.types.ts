@@ -38,6 +38,7 @@ export interface BookingRecord {
       id: string;
       name: string;
       pointCost: number;
+      ownerOrganizationId: string;
     };
   };
 }
@@ -56,6 +57,8 @@ export interface OrganizationBookingRecord extends BookingRecord {
 export interface CancelledBookingRecord extends OrganizationBookingRecord {
   refundPoints: number;
   slotStatus: string;
+  cancelledByUser: boolean;
+  cancellationReason: string | null;
 }
 
 export interface CreatedBooking {
@@ -63,6 +66,7 @@ export interface CreatedBooking {
   resourceSlotId: string;
   resourceId: string;
   resourceName: string;
+  ownerOrganizationId: string;
   userId: string;
   status: string;
   startsAt: Date;

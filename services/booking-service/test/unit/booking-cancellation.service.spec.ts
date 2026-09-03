@@ -4,10 +4,10 @@ import {
   ForbiddenException,
 } from "@nestjs/common";
 import { PrismaService } from "@resourcehive/database";
-import { NotificationClientService } from "@resourcehive/notification-client";
 import { BookingAuthorizationService } from "../../src/authorization/booking-authorization.service";
 import { BookingRepository } from "../../src/bookings/booking.repository";
 import { BookingService } from "../../src/bookings/booking.service";
+import { BookingNotificationService } from "../../src/notifications/booking-notification.service";
 import { PointLedgerService } from "../../src/points/point-ledger.service";
 import { SlotRepository } from "../../src/slots/slot.repository";
 
@@ -80,10 +80,10 @@ describe("BookingService cancellation", () => {
   const points = {
     appendBookingRefund,
   } as unknown as PointLedgerService;
-  const publishBookingEvent = jest.fn();
+  const bookingCancelled = jest.fn();
   const notifications = {
-    publishBookingEvent,
-  } as unknown as NotificationClientService;
+    bookingCancelled,
+  } as unknown as BookingNotificationService;
   const service = new BookingService(
     prisma,
     {} as BookingAuthorizationService,
@@ -112,10 +112,19 @@ describe("BookingService cancellation", () => {
       .mockReset()
       .mockResolvedValue({ amount: -25 });
     appendBookingRefund.mockReset().mockResolvedValue({});
-    publishBookingEvent.mockReset().mockResolvedValue({});
+    bookingCancelled.mockReset().mockResolvedValue(undefined);
   });
 
   it("refunds half rounded up and republishes the slot for a user cancellation", async () => {
+    transaction.booking.findUnique
+      .mockReset()
+      .mockResolvedValueOnce(booking)
+      .mockResolvedValueOnce({
+        ...booking,
+        status: "CANCELLED",
+        cancelledAt: new Date(),
+        cancellationReason: "Plans changed",
+      });
     const result = await service.cancelBooking(booking.id, booking.userId, {
       reason: "Plans changed",
     });
@@ -138,17 +147,31 @@ describe("BookingService cancellation", () => {
       }),
       transaction,
     );
-    expect(publishBookingEvent).toHaveBeenCalledWith({
-      eventType: "booking.cancelled",
+    expect(bookingCancelled).toHaveBeenCalledWith({
       bookingId: booking.id,
       userId: booking.userId,
-      email: booking.user.email,
+      studentEmail: booking.user.email,
       resourceName: booking.resourceSlot.resource.name,
+      startsAt: booking.resourceSlot.startsAt,
+      ownerOrganizationId: booking.resourceSlot.resource.ownerOrganizationId,
+      actorUserId: booking.userId,
+      cancelledByUser: true,
+      reason: "Plans changed",
       refundPoints: 13,
+      slotStatus: "PUBLISHED",
     });
   });
 
   it("refunds all points and withdraws the slot for an admin cancellation", async () => {
+    transaction.booking.findUnique
+      .mockReset()
+      .mockResolvedValueOnce(booking)
+      .mockResolvedValueOnce({
+        ...booking,
+        status: "CANCELLED",
+        cancelledAt: new Date(),
+        cancellationReason: "Resource unavailable",
+      });
     const result = await service.cancelBooking(booking.id, "administrator-1", {
       makeSlotAvailable: false,
       reason: "Resource unavailable",
@@ -177,6 +200,15 @@ describe("BookingService cancellation", () => {
     expect(appendBookingRefund).toHaveBeenCalledWith(
       expect.objectContaining({ amount: 25 }),
       transaction,
+    );
+    expect(bookingCancelled).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actorUserId: "administrator-1",
+        cancelledByUser: false,
+        reason: "Resource unavailable",
+        refundPoints: 25,
+        slotStatus: "WITHDRAWN",
+      }),
     );
   });
 
