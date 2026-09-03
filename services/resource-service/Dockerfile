@@ -1,40 +1,36 @@
-# Builder Stage
-FROM node:20-alpine AS builder
-WORKDIR /app
+# syntax=docker/dockerfile:1
 
-# Install pnpm and openssl (required for Prisma engine detection on Alpine)
+FROM node:20-alpine AS base
+WORKDIR /app
 RUN apk add --no-cache openssl
+
+FROM base AS builder
 RUN npm install -g pnpm@10.34.5
 
-# Copy all workspace files
-COPY . .
+# Install only this service and its workspace dependencies. Source changes do
+# not invalidate this layer.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY packages/database/package.json packages/database/package.json
+COPY packages/service-auth/package.json packages/service-auth/package.json
+COPY services/resource-service/package.json services/resource-service/package.json
+RUN --mount=type=cache,id=resourcehive-pnpm,target=/pnpm/store \
+    pnpm config set store-dir /pnpm/store && \
+    pnpm install --frozen-lockfile --filter resource-service...
 
-# Install all dependencies
-RUN pnpm install --frozen-lockfile
-
-# Generate the Prisma client and build the database package.
+COPY db db
+COPY packages/database packages/database
 RUN pnpm --filter @resourcehive/database run build
 
-# Build the shared authentication package used by protected routes.
+COPY packages/service-auth packages/service-auth
 RUN pnpm --filter @resourcehive/service-auth run build
 
-# Build the resource-service
+COPY services/resource-service services/resource-service
 RUN pnpm --filter resource-service run build
+RUN --mount=type=cache,id=resourcehive-pnpm,target=/pnpm/store \
+    pnpm --prefer-offline --filter resource-service --prod deploy /prod/service
 
-# Production Runner Stage
-FROM node:20-alpine AS runner
-WORKDIR /app
-
-# Install pnpm and openssl (required for Prisma runtime on Alpine)
-RUN apk add --no-cache openssl
-RUN npm install -g pnpm@10.34.5
-
-# Copy the entire built application from the builder stage
-# This ensures the generated Prisma client in node_modules/.prisma is preserved
-COPY --from=builder /app /app
-
-# Expose the port the NestJS app runs on
+FROM base AS runner
+ENV NODE_ENV=production
+COPY --from=builder /prod/service ./
 EXPOSE 3004
-
-# Start the application using the production build
-CMD ["pnpm", "--filter", "resource-service", "run", "start:prod"]
+CMD ["node", "dist/main.js"]

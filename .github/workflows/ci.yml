@@ -271,10 +271,13 @@ jobs:
       - name: Validate Docker Compose configurations
         run: |
           docker compose config --quiet
+          docker compose -f docker-compose.yml -f docker-compose.fcm.yml config --quiet
           docker compose --env-file .env.production.example -f docker-compose.prod.yml config --quiet
         env:
           DATABASE_URL: ${{ env.CI_DATABASE_URL }}
           DATABASE_URL_UNPOOLED: ${{ env.CI_DATABASE_URL }}
+          FIREBASE_PROJECT_ID: resourcehive-ci
+          GOOGLE_APPLICATION_CREDENTIALS: .env.example
           JWT_SECRET: ${{ env.CI_JWT_SECRET }}
 
       - name: Validate Caddy configuration
@@ -285,10 +288,49 @@ jobs:
           --volume "$PWD/services/api-gateway/Caddyfile:/etc/caddy/Caddyfile:ro"
           caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile
 
+  containers:
+    name: Build ${{ matrix.label }} image
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: Identity Service
+            dockerfile: services/identity-service/Dockerfile
+          - label: Resource Service
+            dockerfile: services/resource-service/Dockerfile
+          - label: Booking Service
+            dockerfile: services/booking-service/Dockerfile
+          - label: Notification Service
+            dockerfile: services/notification-service/Dockerfile
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: false
+
   ci-success:
     name: CI success
     if: always()
-    needs: [database, shared-and-frontend, services, integration, infrastructure]
+    needs:
+      [
+        database,
+        shared-and-frontend,
+        services,
+        integration,
+        infrastructure,
+        containers,
+      ]
     runs-on: ubuntu-latest
     timeout-minutes: 2
 
@@ -301,6 +343,7 @@ jobs:
           SERVICES_RESULT: ${{ needs.services.result }}
           INTEGRATION_RESULT: ${{ needs.integration.result }}
           INFRASTRUCTURE_RESULT: ${{ needs.infrastructure.result }}
+          CONTAINERS_RESULT: ${{ needs.containers.result }}
         run: |
           failed=0
 
@@ -309,7 +352,8 @@ jobs:
             "$FRONTEND_RESULT" \
             "$SERVICES_RESULT" \
             "$INTEGRATION_RESULT" \
-            "$INFRASTRUCTURE_RESULT"; do
+            "$INFRASTRUCTURE_RESULT" \
+            "$CONTAINERS_RESULT"; do
             if [[ "$result" != "success" ]]; then
               failed=1
             fi

@@ -16,14 +16,16 @@ place.
 ResourceHive is a pnpm monorepo with a Next.js frontend and four NestJS backend
 services.
 
-| Component | Technology | Production host |
-| --- | --- | --- |
-| Frontend | Next.js, React, Tailwind CSS | Vercel |
-| API gateway | Caddy | Linode |
-| Identity, Resource, Booking, Notification | NestJS microservices | Docker on Linode |
-| Database | PostgreSQL with Prisma | Neon |
-| Container registry | GHCR | GitHub |
-| CI/CD | GitHub Actions | GitHub |
+| Component                                 | Technology                   | Production host                               |
+| ----------------------------------------- | ---------------------------- | --------------------------------------------- |
+| Frontend                                  | Next.js, React, Tailwind CSS | Vercel                                        |
+| API gateway                               | Caddy                        | Linode                                        |
+| Identity, Resource, Booking, Notification | NestJS microservices         | Docker on Linode                              |
+| Event transport                           | Apache Kafka                 | Docker locally, external broker in production |
+| Browser notifications                     | Firebase Cloud Messaging     | Firebase                                      |
+| Database                                  | PostgreSQL with Prisma       | Neon                                          |
+| Container registry                        | GHCR                         | GitHub                                        |
+| CI/CD                                     | GitHub Actions               | GitHub                                        |
 
 Only Caddy exposes public backend ports. The four services communicate over a
 private Docker network.
@@ -111,18 +113,87 @@ docker compose logs -f identity-service
 To test real email locally, change `EMAIL_TRANSPORT` to `smtp` and configure
 the SMTP variables described in the production section.
 
+### Local browser notifications
+
+Browser notifications use two Firebase configurations from the same Firebase
+project:
+
+- a private service-account JSON file for Notification Service;
+- public Web App values and a public VAPID key for the frontend.
+
+In the [Firebase Console](https://console.firebase.google.com/):
+
+1. Create or select a development project.
+2. Open **Project settings > Service accounts**, select **Generate new private
+   key**, and download the JSON file.
+3. Store the JSON outside this repository, for example at
+   `C:/Users/YOUR_NAME/.secrets/resourcehive-firebase-adminsdk.json`.
+4. Add a Web App from **Project settings > General** and copy its
+   `firebaseConfig` values.
+5. Open **Project settings > Cloud Messaging > Web Push certificates**,
+   generate a key pair, and copy the public key.
+
+Never commit the service-account JSON or place its contents in an environment
+file.
+
+Add the private backend configuration to the root `.env`:
+
+```env
+FCM_ENABLED=true
+FIREBASE_PROJECT_ID=your-firebase-project-id
+GOOGLE_APPLICATION_CREDENTIALS=C:/Users/YOUR_NAME/.secrets/resourcehive-firebase-adminsdk.json
+WEB_APP_URL=http://localhost:3000
+```
+
+Add the public Web App values to `apps/web/.env.local`:
+
+```env
+NEXT_PUBLIC_FIREBASE_API_KEY=your-web-api-key
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=your-firebase-project-id
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your-sender-id
+NEXT_PUBLIC_FIREBASE_APP_ID=your-web-app-id
+NEXT_PUBLIC_FIREBASE_VAPID_KEY=your-public-vapid-key
+```
+
+The project IDs must match. Restart the frontend after changing these values.
+If you use Brave, enable **Use Google Services for Push Messaging** in
+`brave://settings/privacy`.
+
+Firebase is optional. If it is not needed, keep `FCM_ENABLED=false` and leave
+the Firebase values empty.
+
 ### Run the application
 
-Build and start the backend for the first time:
+Build and start the backend without Firebase:
 
 ```bash
 docker compose up --build -d
 ```
 
-For later starts:
+To enable Firebase browser notifications, include the FCM override instead:
 
 ```bash
-docker compose up -d
+docker compose -f docker-compose.yml -f docker-compose.fcm.yml up --build -d
+```
+
+For later starts, omit `--build` from the command you selected.
+
+The first build can take several minutes. The Dockerfiles cache dependency
+installation separately from the source code, so later builds reuse that work
+unless a package file or lockfile changed. The final service images contain
+only the compiled application and its production dependencies.
+
+Local Compose starts Kafka and creates the required topics automatically. The
+local broker does not need a username, password, or TLS configuration. Kafka
+is also not involved in the **Send test** browser-push action.
+
+When using Docker Compose, Identity Service applies committed database
+migrations automatically before it starts. For development without Docker,
+apply them manually after pulling changes:
+
+```bash
+pnpm run db:migrate
 ```
 
 Confirm that the containers are running:
@@ -172,14 +243,23 @@ docker compose logs -f
 Follow selected services:
 
 ```bash
-docker compose logs -f api-gateway resource-service
+docker compose logs -f api-gateway notification-service kafka
 ```
 
-Rebuild after backend source or dependency changes:
+Rebuild only the backend service you changed:
 
 ```bash
-docker compose up --build -d
+docker compose up --build --no-deps -d notification-service
 ```
+
+Include the FCM override when rebuilding Notification Service with Firebase:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.fcm.yml up --build --no-deps -d notification-service
+```
+
+Replace `notification-service` with another service name when needed. Run a
+full build only after shared dependency or Compose changes.
 
 Stop and remove the local containers:
 
@@ -295,6 +375,12 @@ DNS-only unless the active Cloudflare certificate covers the full hostname.
 
 ### 4. Create `.env.production`
 
+Create a separate production Firebase project when possible. Register its Web
+App, generate its Web Push certificate, and download its service-account JSON
+using the same Firebase Console steps from the local setup. The public values
+go to Vercel; the complete private JSON goes to the GitHub secret described
+below.
+
 Copy `.env.production.example` to the server:
 
 ```bash
@@ -339,6 +425,25 @@ SMTP_PORT=587
 SMTP_SECURE=false
 SMTP_USER=replace_with_smtp_username
 SMTP_PASSWORD=replace_with_smtp_password
+
+# Notification providers. Kafka and Resend can remain disabled until their
+# production services have been provisioned.
+DELIVERY_POLL_INTERVAL_MS=5000
+KAFKA_ENABLED=false
+KAFKA_BROKERS=kafka.example.com:9093
+KAFKA_CLIENT_ID=notification-service
+KAFKA_CONSUMER_GROUP=notification-service-v1-production
+KAFKA_SSL=true
+KAFKA_SASL_USERNAME=
+KAFKA_SASL_PASSWORD=
+
+RESEND_ENABLED=false
+RESEND_API_KEY=
+RESEND_FROM_EMAIL="ResourceHive <notifications@thisismalindu.com>"
+
+FCM_ENABLED=true
+FIREBASE_PROJECT_ID=your-production-firebase-project-id
+WEB_APP_URL=https://app.resourcehive.thisismalindu.com
 ```
 
 Generate a production JWT secret with:
@@ -352,6 +457,15 @@ For email, use credentials from any SMTP provider. Use port 587 with
 address in `EMAIL_FROM` must be accepted by the provider, which usually means
 verifying the sender address or domain.
 
+`DELIVERY_POLL_INTERVAL_MS=5000` is suitable for normal use. If Kafka is
+enabled, create the four topics listed in the
+[notification event contracts](services/notification-service/docs/event-contracts.md)
+and configure the broker address, TLS, and SASL credentials. If Resend is
+enabled, use a Resend API key and an address on a verified sending domain.
+
+Do not set `GOOGLE_APPLICATION_CREDENTIALS` in `.env.production`. The
+deployment workflow installs and mounts the Firebase service-account JSON.
+
 Never commit `.env.production`, SMTP credentials, database URLs, or private
 keys.
 
@@ -359,33 +473,41 @@ keys.
 
 Import this repository into Vercel and configure:
 
-| Setting | Value |
-| --- | --- |
-| Root Directory | `apps/web` |
-| Production Branch | `main` |
-| Domain | `app.resourcehive.thisismalindu.com` |
+| Setting           | Value                                |
+| ----------------- | ------------------------------------ |
+| Root Directory    | `apps/web`                           |
+| Production Branch | `main`                               |
+| Domain            | `app.resourcehive.thisismalindu.com` |
 
 Add these production environment variables:
 
 ```env
 NEXT_PUBLIC_API_URL=https://api.resourcehive.thisismalindu.com
 JWT_SECRET=the_same_secret_used_in_env_production
+NEXT_PUBLIC_FIREBASE_API_KEY=your-production-web-api-key
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your-production-project.firebaseapp.com
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=your-production-firebase-project-id
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your-production-sender-id
+NEXT_PUBLIC_FIREBASE_APP_ID=your-production-web-app-id
+NEXT_PUBLIC_FIREBASE_VAPID_KEY=your-production-public-vapid-key
 ```
 
 `NEXT_PUBLIC_API_URL` is public. `JWT_SECRET` is server-only and must not have a
-`NEXT_PUBLIC_` prefix.
+`NEXT_PUBLIC_` prefix. Firebase's `NEXT_PUBLIC_*` Web App values and VAPID key
+are public client configuration; the service-account JSON remains private.
 
 ### 6. Configure GitHub Actions
 
 Create a GitHub Environment named `production`. Restrict its deployment branch
 to `main` and add these environment secrets:
 
-| Secret | Value |
-| --- | --- |
-| `LINODE_HOST` | Linode IP address or SSH hostname |
-| `LINODE_USERNAME` | `deploy` |
-| `LINODE_SSH_PRIVATE_KEY` | Contents of the dedicated private key |
-| `LINODE_SSH_KNOWN_HOSTS` | Verified SSH host-key entry for the Linode |
+| Secret                          | Value                                             |
+| ------------------------------- | ------------------------------------------------- |
+| `LINODE_HOST`                   | Linode IP address or SSH hostname                 |
+| `LINODE_USERNAME`               | `deploy`                                          |
+| `LINODE_SSH_PRIVATE_KEY`        | Contents of the dedicated private key             |
+| `LINODE_SSH_KNOWN_HOSTS`        | Verified SSH host-key entry for the Linode        |
+| `FIREBASE_SERVICE_ACCOUNT_JSON` | Complete production Firebase service-account JSON |
 
 Create the known-hosts entry on a trusted machine:
 
@@ -401,7 +523,9 @@ ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub
 ```
 
 The workflow uses GitHub's short-lived token for GHCR, so no permanent registry
-token is needed on the server.
+token is needed on the server. The workflow validates
+`FIREBASE_SERVICE_ACCOUNT_JSON`, installs it on the Linode with restricted file
+permissions, and mounts it only into Notification Service.
 
 ### 7. Release to production
 

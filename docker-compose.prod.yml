@@ -122,15 +122,11 @@ services:
       DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env.production}
       DATABASE_URL_UNPOOLED: ${DATABASE_URL_UNPOOLED:?Set DATABASE_URL_UNPOOLED in .env.production}
     command:
-      - pnpm
-      - --filter
-      - "@resourcehive/database"
-      - exec
-      - prisma
+      - /migrator/node_modules/.bin/prisma
       - migrate
       - deploy
       - --schema
-      - ../../db/schema/schema.prisma
+      - /migrator/schema/schema.prisma
 
 volumes:
   caddy_data:
