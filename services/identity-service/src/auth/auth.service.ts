@@ -142,6 +142,7 @@ export class AuthService {
       return createdUser;
     });
     const emailResult = await this.emailService.sendVerificationEmail(
+      user.id,
       email,
       verificationToken,
     );
@@ -254,7 +255,7 @@ export class AuthService {
     });
 
     try {
-      await this.emailService.sendVerificationEmail(user.email, token);
+      await this.emailService.sendVerificationEmail(user.id, user.email, token);
     } catch (error) {
       this.logger.error(
         `Unable to resend verification email for user ${user.id}`,

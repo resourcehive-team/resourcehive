@@ -18,6 +18,9 @@ RUN pnpm --filter @resourcehive/database run build
 # Build the shared authentication package used by the identity service.
 RUN pnpm --filter @resourcehive/service-auth run build
 
+# Build the shared notification producer and contracts.
+RUN pnpm --filter @resourcehive/notification-client run build
+
 # Build the identity-service
 RUN pnpm --filter identity-service run build
 

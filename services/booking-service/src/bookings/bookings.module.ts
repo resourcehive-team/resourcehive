@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { ServiceAuthModule } from "@resourcehive/service-auth";
 import { BookingAuthorizationModule } from "../authorization/booking-authorization.module";
+import { BookingNotificationsModule } from "../notifications/booking-notifications.module";
 import { PointsModule } from "../points/points.module";
 import { SlotsModule } from "../slots/slots.module";
 import { BookingService } from "./booking.service";
@@ -11,6 +12,7 @@ import { BookingsController } from "./bookings.controller";
   imports: [
     ServiceAuthModule,
     BookingAuthorizationModule,
+    BookingNotificationsModule,
     SlotsModule,
     PointsModule,
   ],

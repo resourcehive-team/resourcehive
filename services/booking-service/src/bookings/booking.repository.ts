@@ -28,6 +28,7 @@ export class BookingRepository {
                 id: true,
                 name: true,
                 pointCost: true,
+                ownerOrganizationId: true,
               },
             },
           },

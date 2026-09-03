@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { BookingAuthorizationService } from "../authorization/booking-authorization.service";
+import { BookingNotificationService } from "../notifications/booking-notification.service";
 import { SlotRepository } from "./slot.repository";
 import { SlotsService } from "./slots.service";
 
@@ -18,7 +19,11 @@ describe("SlotsService", () => {
   const authorization = {
     resolve: jest.fn(),
   } as unknown as BookingAuthorizationService;
-  const service = new SlotsService(repository, authorization);
+  const slotCreated = jest.fn();
+  const notifications = {
+    slotCreated,
+  } as unknown as BookingNotificationService;
+  const service = new SlotsService(repository, authorization, notifications);
   const user = {
     userId: "user-id",
     email: "user@example.edu",
@@ -35,6 +40,7 @@ describe("SlotsService", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.spyOn(authorization, "resolve").mockResolvedValue(context);
+    slotCreated.mockResolvedValue(undefined);
   });
 
   it("rejects an invalid slot interval", async () => {
@@ -62,6 +68,41 @@ describe("SlotsService", () => {
         user,
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it("notifies other administrators after creating a slot", async () => {
+    const startsAt = new Date("2030-08-01T10:00:00.000Z");
+    const endsAt = new Date("2030-08-01T11:00:00.000Z");
+    jest.spyOn(repository, "canManageResource").mockResolvedValue(true);
+    jest.spyOn(repository, "create").mockResolvedValue({
+      id: "slot-id",
+      resourceId: "resource-id",
+      startsAt,
+      endsAt,
+      status: "PUBLISHED",
+      withdrawnAt: null,
+      createdAt: new Date(),
+      resource: {
+        id: "resource-id",
+        name: "Room",
+        status: "ACTIVE",
+        rootOrganizationId: "root-id",
+        ownerOrganizationId: "organization-id",
+        pointCost: 10,
+      },
+      bookings: [],
+    });
+
+    await service.create({ resourceId: "resource-id", startsAt, endsAt }, user);
+
+    expect(slotCreated).toHaveBeenCalledWith({
+      slotId: "slot-id",
+      actorUserId: "user-id",
+      resourceName: "Room",
+      startsAt,
+      endsAt,
+      ownerOrganizationId: "organization-id",
+    });
   });
 
   it("hides a slot when the user lacks resource access", async () => {

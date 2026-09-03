@@ -1,4 +1,4 @@
-import { NotificationCommandV1 } from "../contracts";
+import { NotificationCommandV1 } from "@resourcehive/notification-client";
 import { NotificationTemplateService } from "./notification-template.service";
 
 describe("NotificationTemplateService", () => {

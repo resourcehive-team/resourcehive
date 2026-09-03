@@ -4,6 +4,7 @@ import { PrismaService } from "@resourcehive/database";
 import { BookingAuthorizationService } from "../../src/authorization/booking-authorization.service";
 import { BookingRepository } from "../../src/bookings/booking.repository";
 import { BookingService } from "../../src/bookings/booking.service";
+import { BookingNotificationService } from "../../src/notifications/booking-notification.service";
 import { PointLedgerRepository } from "../../src/points/point-ledger.repository";
 import { PointLedgerService } from "../../src/points/point-ledger.service";
 import { SlotRepository } from "../../src/slots/slot.repository";
@@ -19,6 +20,9 @@ describe("Concurrent booking creation", () => {
     slots,
     points,
     new BookingRepository(),
+    {
+      bookingConfirmed: jest.fn().mockResolvedValue(undefined),
+    } as unknown as BookingNotificationService,
   );
 
   beforeAll(async () => {

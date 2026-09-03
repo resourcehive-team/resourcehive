@@ -4,7 +4,7 @@ import {
   NotificationCommandV1,
   NotificationTemplateKey,
   TemplateVariables,
-} from "../contracts";
+} from "@resourcehive/notification-client";
 import { renderIdentityEmail } from "./templates/identity-email.templates";
 import { renderBooking } from "./templates/booking.templates";
 

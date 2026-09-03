@@ -3,6 +3,7 @@ import {
   InternalServerErrorException,
   Logger,
 } from '@nestjs/common';
+import { NotificationClientService } from '@resourcehive/notification-client';
 import nodemailer from 'nodemailer';
 
 export interface VerificationEmailResult {
@@ -19,24 +20,24 @@ interface EmailMessage {
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
 
+  constructor(private readonly notifications: NotificationClientService) {}
+
   async sendVerificationEmail(
+    userId: string,
     email: string,
     token: string,
   ): Promise<VerificationEmailResult> {
     const verificationUrl = this.createAppUrl('/verify-email', token);
-
-    if ((process.env.EMAIL_TRANSPORT ?? 'console') === 'console') {
-      this.logger.log(`Verification email for ${email}: ${verificationUrl}`);
-      return { developmentVerificationUrl: verificationUrl };
-    }
-
-    await this.sendSmtpEmail({
-      to: email,
-      subject: 'Verify your ResourceHive email',
-      text: `Verify your email by opening this link: ${verificationUrl}`,
+    await this.notifications.sendVerificationEmail({
+      recipientUserId: userId,
+      email,
+      verificationUrl,
+      correlationId: userId,
     });
 
-    return {};
+    return process.env.NODE_ENV === 'production'
+      ? {}
+      : { developmentVerificationUrl: verificationUrl };
   }
 
   async sendPasswordResetEmail(email: string, token: string): Promise<void> {
