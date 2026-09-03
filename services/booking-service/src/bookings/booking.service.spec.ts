@@ -1,5 +1,6 @@
 import { Prisma, PrismaService } from "@resourcehive/database";
 import { BookingAuthorizationService } from "../authorization/booking-authorization.service";
+import { BookingNotificationService } from "../notifications/booking-notification.service";
 import { PointLedgerService } from "../points/point-ledger.service";
 import { SlotRepository } from "../slots/slot.repository";
 import { BookingRepository } from "./booking.repository";
@@ -8,8 +9,12 @@ import { BookingStatus } from "./bookingStatus";
 
 describe("BookingService", () => {
   const transaction = {} as Prisma.TransactionClient;
+  const resource = { findUnique: jest.fn() };
+  const organizationMembership = { findMany: jest.fn() };
   const prisma = {
     $transaction: jest.fn(),
+    resource,
+    organizationMembership,
   } as unknown as PrismaService;
   const authorization = {
     resolve: jest.fn(),
@@ -25,12 +30,17 @@ describe("BookingService", () => {
   const bookings = {
     createConfirmed: jest.fn(),
   } as unknown as BookingRepository;
+  const bookingConfirmed = jest.fn();
+  const notifications = {
+    bookingConfirmed,
+  } as unknown as BookingNotificationService;
   const service = new BookingService(
     prisma,
     authorization,
     slots,
     points,
     bookings,
+    notifications,
   );
   const user = {
     userId: "user-id",
@@ -69,6 +79,13 @@ describe("BookingService", () => {
     });
     jest.spyOn(slots, "canAccessResource").mockResolvedValue(true);
     jest.spyOn(points, "assertSufficientBalance").mockResolvedValue(100);
+    resource.findUnique.mockResolvedValue({
+      ownerOrganizationId: "organization-id",
+    });
+    organizationMembership.findMany.mockResolvedValue([
+      { userId: "administrator-id" },
+    ]);
+    bookingConfirmed.mockResolvedValue(undefined);
   });
 
   it("validates a bookable slot using server-derived values", async () => {
@@ -101,7 +118,12 @@ describe("BookingService", () => {
       resourceSlot: {
         startsAt,
         endsAt,
-        resource: { id: "resource-id", name: "Room", pointCost: 25 },
+        resource: {
+          id: "resource-id",
+          name: "Room",
+          pointCost: 25,
+          ownerOrganizationId: "organization-id",
+        },
       },
     });
 
@@ -116,5 +138,13 @@ describe("BookingService", () => {
       expect.objectContaining({ amount: -25, bookingId: "booking-id" }),
       transaction,
     );
+    expect(bookingConfirmed).toHaveBeenCalledWith({
+      bookingId: "booking-id",
+      userId: "user-id",
+      studentEmail: "user@example.edu",
+      resourceName: "Room",
+      startsAt,
+      ownerOrganizationId: "organization-id",
+    });
   });
 });

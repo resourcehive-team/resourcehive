@@ -7,6 +7,7 @@ import { PrismaService } from "@resourcehive/database";
 import { BookingAuthorizationService } from "../../src/authorization/booking-authorization.service";
 import { BookingRepository } from "../../src/bookings/booking.repository";
 import { BookingService } from "../../src/bookings/booking.service";
+import { BookingNotificationService } from "../../src/notifications/booking-notification.service";
 import { PointLedgerService } from "../../src/points/point-ledger.service";
 import { SlotRepository } from "../../src/slots/slot.repository";
 
@@ -61,12 +62,17 @@ describe("BookingService completion", () => {
       findFirst: jest.fn(),
     },
   };
+  const bookingCompleted = jest.fn();
+  const notifications = {
+    bookingCompleted,
+  } as unknown as BookingNotificationService;
   const service = new BookingService(
     prisma as unknown as PrismaService,
     {} as BookingAuthorizationService,
     {} as SlotRepository,
     {} as PointLedgerService,
     {} as BookingRepository,
+    notifications,
   );
 
   beforeEach(() => {
@@ -77,6 +83,7 @@ describe("BookingService completion", () => {
     prisma.organizationMembership.findFirst.mockResolvedValue({
       id: "membership-1",
     });
+    bookingCompleted.mockResolvedValue(undefined);
   });
 
   it("marks a confirmed organization booking as completed", async () => {
@@ -106,6 +113,15 @@ describe("BookingService completion", () => {
     expect(update.where).toEqual({ id: booking.id });
     expect(update.data.status).toBe("COMPLETED");
     expect(update.data.completedAt).toBeInstanceOf(Date);
+    expect(bookingCompleted).toHaveBeenCalledWith({
+      bookingId: booking.id,
+      userId: booking.userId,
+      studentEmail: booking.user.email,
+      resourceName: booking.resourceSlot.resource.name,
+      startsAt: booking.resourceSlot.startsAt,
+      ownerOrganizationId: booking.resourceSlot.resource.ownerOrganizationId,
+      actorUserId: "administrator-1",
+    });
   });
 
   it("rejects a user who does not administer the resource organization", async () => {

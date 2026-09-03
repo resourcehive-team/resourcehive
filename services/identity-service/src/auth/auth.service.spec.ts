@@ -145,6 +145,7 @@ describe('AuthService registration', () => {
       },
     });
     expect(sendVerificationEmail).toHaveBeenCalledWith(
+      'user-id',
       'alex@example.edu',
       expect.any(String),
     );

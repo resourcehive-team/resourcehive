@@ -62,6 +62,11 @@ services:
       SMTP_SECURE: ${SMTP_SECURE:-false}
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      KAFKA_ENABLED: ${KAFKA_ENABLED:-false}
+      KAFKA_BROKERS: ${KAFKA_BROKERS:-localhost:9092}
+      KAFKA_SSL: ${KAFKA_SSL:-true}
+      KAFKA_SASL_USERNAME: ${KAFKA_SASL_USERNAME:-}
+      KAFKA_SASL_PASSWORD: ${KAFKA_SASL_PASSWORD:-}
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/"]
       interval: 15s
@@ -75,6 +80,11 @@ services:
     environment:
       <<: *service-environment
       PORT: 3004
+      KAFKA_ENABLED: ${KAFKA_ENABLED:-false}
+      KAFKA_BROKERS: ${KAFKA_BROKERS:-localhost:9092}
+      KAFKA_SSL: ${KAFKA_SSL:-true}
+      KAFKA_SASL_USERNAME: ${KAFKA_SASL_USERNAME:-}
+      KAFKA_SASL_PASSWORD: ${KAFKA_SASL_PASSWORD:-}
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3004/health"]
       interval: 15s
@@ -88,6 +98,11 @@ services:
     environment:
       <<: *service-environment
       PORT: 3002
+      KAFKA_ENABLED: ${KAFKA_ENABLED:-false}
+      KAFKA_BROKERS: ${KAFKA_BROKERS:-localhost:9092}
+      KAFKA_SSL: ${KAFKA_SSL:-true}
+      KAFKA_SASL_USERNAME: ${KAFKA_SASL_USERNAME:-}
+      KAFKA_SASL_PASSWORD: ${KAFKA_SASL_PASSWORD:-}
 
   notification-service:
     image: ghcr.io/resourcehive-team/resourcehive-notification:${IMAGE_TAG:?Set IMAGE_TAG in .env.production}

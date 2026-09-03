@@ -8,6 +8,7 @@ import {
   GetUserBookingsDto,
 } from "../../src/bookings/bookings.dto";
 import { PointLedgerService } from "../../src/points/point-ledger.service";
+import { BookingNotificationService } from "../../src/notifications/booking-notification.service";
 import { SlotRepository } from "../../src/slots/slot.repository";
 
 interface MockPrisma {
@@ -35,6 +36,7 @@ describe("BookingService reads", () => {
     {} as SlotRepository,
     {} as PointLedgerService,
     {} as BookingRepository,
+    {} as BookingNotificationService,
   );
 
   beforeEach(() => {
@@ -59,7 +61,14 @@ describe("BookingService reads", () => {
           select: {
             startsAt: true,
             endsAt: true,
-            resource: { select: { id: true, name: true, pointCost: true } },
+            resource: {
+              select: {
+                id: true,
+                name: true,
+                pointCost: true,
+                ownerOrganizationId: true,
+              },
+            },
           },
         },
       },

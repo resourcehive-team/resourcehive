@@ -5,7 +5,7 @@ import {
 } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 import { PrismaService } from "@resourcehive/database";
-import { NOTIFICATION_TEMPLATES } from "../contracts";
+import { NOTIFICATION_TEMPLATES } from "@resourcehive/notification-client";
 import { NotificationCommandService } from "../events/notification-command.service";
 
 @Injectable()

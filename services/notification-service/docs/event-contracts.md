@@ -11,6 +11,8 @@ Topics:
 
 Every envelope has a UUID event or command ID, version, producer, correlation
 ID, occurrence time, and a typed payload. Consumers reject unknown versions.
+Application services should create these envelopes through
+`@resourcehive/notification-client` instead of duplicating this JSON manually.
 
 Approved initial templates:
 

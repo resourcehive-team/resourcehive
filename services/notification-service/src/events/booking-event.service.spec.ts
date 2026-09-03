@@ -1,5 +1,7 @@
-import { NotificationContractError } from "../contracts";
-import { parseBookingEvent } from "./booking-event.contract";
+import {
+  NotificationContractError,
+  parseBookingEvent,
+} from "@resourcehive/notification-client";
 import { BookingEventService } from "./booking-event.service";
 import { NotificationCommandService } from "./notification-command.service";
 

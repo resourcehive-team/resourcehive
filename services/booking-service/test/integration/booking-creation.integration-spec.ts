@@ -3,6 +3,7 @@ import { Prisma, PrismaService } from "@resourcehive/database";
 import { BookingAuthorizationService } from "../../src/authorization/booking-authorization.service";
 import { BookingRepository } from "../../src/bookings/booking.repository";
 import { BookingService } from "../../src/bookings/booking.service";
+import { BookingNotificationService } from "../../src/notifications/booking-notification.service";
 import { PointLedgerRepository } from "../../src/points/point-ledger.repository";
 import { PointLedgerService } from "../../src/points/point-ledger.service";
 import { SlotRepository } from "../../src/slots/slot.repository";
@@ -96,6 +97,9 @@ describeWithDatabase("Atomic booking creation integration", () => {
             slots,
             points,
             new BookingRepository(),
+            {
+              bookingConfirmed: jest.fn().mockResolvedValue(undefined),
+            } as unknown as BookingNotificationService,
           );
           const result = await service.createBooking(slotId, {
             userId,
