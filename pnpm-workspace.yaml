@@ -3,9 +3,14 @@ packages:
   - "services/*"
   - "packages/*"
 
+injectWorkspacePackages: true
+
+syncInjectedDepsAfterScripts:
+  - build
+
 allowBuilds:
-  '@prisma/client': true
-  '@prisma/engines': true
+  "@prisma/client": true
+  "@prisma/engines": true
   bcrypt: true
   prisma: true
   sharp: true

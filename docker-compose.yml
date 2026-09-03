@@ -56,9 +56,9 @@ services:
       KAFKA_SASL_PASSWORD: ${KAFKA_SASL_PASSWORD:?Set KAFKA_SASL_PASSWORD in .env}
       NODE_ENV: development
     command: >-
-      sh -c "pnpm --filter @resourcehive/database exec prisma migrate deploy
-      --schema ../../db/schema/schema.prisma &&
-      exec pnpm --filter identity-service run start:prod"
+      sh -c "/migrator/node_modules/.bin/prisma migrate deploy
+      --schema /migrator/schema/schema.prisma &&
+      exec node dist/main.js"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/"]
       interval: 15s

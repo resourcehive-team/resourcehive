@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "description": "ResourceHive notification persistence and delivery service",
   "private": true,
+  "files": [
+    "dist"
+  ],
   "license": "UNLICENSED",
   "scripts": {
     "build": "nest build",

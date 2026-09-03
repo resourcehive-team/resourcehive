@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "description": "ResourceHive booking, availability, and points service",
   "private": true,
+  "files": [
+    "dist"
+  ],
   "license": "UNLICENSED",
   "scripts": {
     "build": "nest build",
