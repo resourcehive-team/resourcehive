@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { PrismaService } from '@resourcehive/database';
+import { NotificationClientService } from '@resourcehive/notification-client';
 import { createHash } from 'node:crypto';
 import request from 'supertest';
 import { App } from 'supertest/types';
@@ -65,7 +66,12 @@ describe('Authentication Flow (e2e)', () => {
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(NotificationClientService)
+      .useValue({
+        sendVerificationEmail: jest.fn().mockResolvedValue({}),
+      })
+      .compile();
 
     app = moduleFixture.createNestApplication();
     app.useGlobalPipes(
