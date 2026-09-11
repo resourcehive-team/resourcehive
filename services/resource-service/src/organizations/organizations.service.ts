@@ -64,9 +64,17 @@ export class OrganizationsService {
       data: { organizationId, email, addedBy: addedByUserId },
     });
   }
+
   async removeFromAllowlist(organizationId: string, allowlistId: string) {
     return this.prisma.organizationEmailAllowlist.delete({
       where: { id: allowlistId, organizationId },
+    });
+  }
+
+  async update(id:string, data:any){
+    return this.prisma.organization.update({
+      where:{id},
+      data,
     });
   }
 }
