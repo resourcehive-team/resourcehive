@@ -7,6 +7,7 @@ import {
   Patch,
   Delete,
   Body,
+  BadRequestException,
 } from '@nestjs/common';
 import { MembershipsService } from './memberships.service';
 import {
@@ -128,6 +129,9 @@ export class MembershipsController {
     @Param('userId') targetUserId: string,
     @Body('role') role: string,
   ) {
+    if (role !== 'ADMIN' && role !== 'MEMBER') {
+      throw new BadRequestException('Role must be ADMIN or MEMBER');
+    }
     return this.membershipsService.updateMembershipRole(
       targetUserId,
       orgId,

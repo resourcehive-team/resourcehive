@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNumber, IsOptional, IsString } from 'class-validator';
+import { IsInt, IsOptional, IsString, IsIn } from 'class-validator';
 
 export class UpdateOrganizationDto {
   @ApiPropertyOptional({ description: 'The name of the organization' })
@@ -11,11 +11,12 @@ export class UpdateOrganizationDto {
     description: 'The status of the organization (e.g. ACTIVE, SUSPENDED)',
   })
   @IsString()
+  @IsIn(['ACTIVE', 'SUSPENDED'])
   @IsOptional()
   status?: string;
 
   @ApiPropertyOptional({ description: 'Bonus points awarded upon joining' })
-  @IsNumber()
+  @IsInt()
   @IsOptional()
   joinBonusPoints?: number;
 }

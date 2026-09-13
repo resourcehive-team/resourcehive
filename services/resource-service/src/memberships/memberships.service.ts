@@ -84,6 +84,12 @@ export class MembershipsService {
   }
 
   async removeMembership(userId: string, organizationId: string) {
+    const membership = await this.prisma.organizationMembership.findUnique({
+      where: { userId_organizationId: { userId, organizationId } },
+    });
+    if (!membership) {
+      throw new NotFoundException('Membership not found');
+    }
     return this.prisma.organizationMembership.delete({
       where: {
         userId_organizationId: {
@@ -99,6 +105,12 @@ export class MembershipsService {
     organizationId: string,
     role: string,
   ) {
+    const membership = await this.prisma.organizationMembership.findUnique({
+      where: { userId_organizationId: { userId, organizationId } },
+    });
+    if (!membership) {
+      throw new NotFoundException('Membership not found');
+    }
     return this.prisma.organizationMembership.update({
       where: {
         userId_organizationId: {

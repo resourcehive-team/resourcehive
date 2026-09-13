@@ -116,6 +116,9 @@ describe('MembershipsService', () => {
 
   describe('removeMembership', () => {
     it('should delete membership', async () => {
+      mockPrismaService.organizationMembership.findUnique.mockResolvedValue({
+        id: 'membershipId',
+      });
       const expectedResult = { id: 'membershipId' };
       mockPrismaService.organizationMembership.delete.mockResolvedValue(
         expectedResult,
@@ -139,6 +142,9 @@ describe('MembershipsService', () => {
 
   describe('updateMembershipRole', () => {
     it('should update membership role', async () => {
+      mockPrismaService.organizationMembership.findUnique.mockResolvedValue({
+        id: 'membershipId',
+      });
       const expectedResult = { id: 'membershipId', role: 'ADMIN' };
       mockPrismaService.organizationMembership.update.mockResolvedValue(
         expectedResult,

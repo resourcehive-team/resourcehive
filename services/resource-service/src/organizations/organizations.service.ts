@@ -73,9 +73,14 @@ export class OrganizationsService {
   }
 
   async update(id: string, data: UpdateOrganizationDto) {
+    const updateData: any = {};
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.status !== undefined) updateData.status = data.status;
+    if (data.joinBonusPoints !== undefined) updateData.joinBonusPoints = data.joinBonusPoints;
+
     return this.prisma.organization.update({
       where: { id },
-      data,
+      data: updateData,
     });
   }
 }
