@@ -154,6 +154,119 @@ describe('MembershipsController (e2e)', () => {
     });
   });
 
+  describe('Membership Administration', () => {
+    it('updates a membership role (200 OK)', async () => {
+      const targetUserId = '00000000-0000-4000-8000-000000000889';
+      const prisma = app.get(PrismaService);
+      await prisma.user.upsert({
+        where: { id: targetUserId },
+        update: {},
+        create: {
+          id: targetUserId,
+          email: 'target-role-test@example.edu',
+          passwordHash: 'dummyhash',
+          firstName: 'Target',
+          lastName: 'User',
+        },
+      });
+
+      await prisma.organizationMembership.upsert({
+        where: {
+          userId_organizationId: {
+            userId: targetUserId,
+            organizationId: demoOrganizationId,
+          },
+        },
+        update: { role: 'MEMBER' },
+        create: {
+          userId: targetUserId,
+          organizationId: demoOrganizationId,
+          role: 'MEMBER',
+          status: 'APPROVED',
+        },
+      });
+
+      await request(app.getHttpServer())
+        .patch(
+          `/memberships/organization/${demoOrganizationId}/users/${targetUserId}/role`,
+        )
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .send({ role: 'ADMIN' })
+        .expect(200);
+
+      const updated = await prisma.organizationMembership.findUnique({
+        where: {
+          userId_organizationId: {
+            userId: targetUserId,
+            organizationId: demoOrganizationId,
+          },
+        },
+      });
+      expect(updated?.role).toBe('ADMIN');
+
+      await prisma.organizationMembership.delete({
+        where: {
+          userId_organizationId: {
+            userId: targetUserId,
+            organizationId: demoOrganizationId,
+          },
+        },
+      });
+      await prisma.user.delete({ where: { id: targetUserId } });
+    });
+
+    it('removes a membership (200 OK)', async () => {
+      const targetUserId = '00000000-0000-4000-8000-000000000890';
+      const prisma = app.get(PrismaService);
+      await prisma.user.upsert({
+        where: { id: targetUserId },
+        update: {},
+        create: {
+          id: targetUserId,
+          email: 'target-remove-test@example.edu',
+          passwordHash: 'dummyhash',
+          firstName: 'Target',
+          lastName: 'User',
+        },
+      });
+
+      await prisma.organizationMembership.upsert({
+        where: {
+          userId_organizationId: {
+            userId: targetUserId,
+            organizationId: demoOrganizationId,
+          },
+        },
+        update: {},
+        create: {
+          userId: targetUserId,
+          organizationId: demoOrganizationId,
+          role: 'MEMBER',
+          status: 'APPROVED',
+        },
+      });
+
+      await request(app.getHttpServer())
+        .delete(
+          `/memberships/organization/${demoOrganizationId}/users/${targetUserId}`,
+        )
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .expect(200);
+
+      const removed = await prisma.organizationMembership.findUnique({
+        where: {
+          userId_organizationId: {
+            userId: targetUserId,
+            organizationId: demoOrganizationId,
+          },
+        },
+      });
+      expect(removed).toBeNull();
+
+      await prisma.user.delete({ where: { id: targetUserId } });
+    });
+  });
+
   it('allows access via deep ancestor administrator inheritance', async () => {
     const freshPrisma = new PrismaClient();
     await freshPrisma.$connect();

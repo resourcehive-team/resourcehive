@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '@resourcehive/database';
+import { Prisma, PrismaService } from '@resourcehive/database';
+import { UpdateOrganizationDto } from './dto/update-organization.dto';
 
 @Injectable()
 export class OrganizationsService {
@@ -64,9 +65,23 @@ export class OrganizationsService {
       data: { organizationId, email, addedBy: addedByUserId },
     });
   }
+
   async removeFromAllowlist(organizationId: string, allowlistId: string) {
     return this.prisma.organizationEmailAllowlist.delete({
       where: { id: allowlistId, organizationId },
+    });
+  }
+
+  async update(id: string, data: UpdateOrganizationDto) {
+    const updateData: Prisma.OrganizationUpdateInput = {};
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.status !== undefined) updateData.status = data.status;
+    if (data.joinBonusPoints !== undefined)
+      updateData.joinBonusPoints = data.joinBonusPoints;
+
+    return this.prisma.organization.update({
+      where: { id },
+      data: updateData,
     });
   }
 }

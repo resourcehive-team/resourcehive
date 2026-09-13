@@ -82,4 +82,69 @@ export class MembershipsService {
       user: membership.user,
     }));
   }
+
+  async removeMembership(userId: string, organizationId: string) {
+    const membership = await this.prisma.organizationMembership.findUnique({
+      where: { userId_organizationId: { userId, organizationId } },
+    });
+    if (!membership) {
+      throw new NotFoundException('Membership not found');
+    }
+
+    if (membership.role === 'ADMIN' && membership.status === 'APPROVED') {
+      const adminCount = await this.prisma.organizationMembership.count({
+        where: { organizationId, role: 'ADMIN', status: 'APPROVED' },
+      });
+      if (adminCount <= 1) {
+        throw new ConflictException('Cannot remove the last administrator');
+      }
+    }
+
+    return this.prisma.organizationMembership.delete({
+      where: {
+        userId_organizationId: {
+          userId,
+          organizationId,
+        },
+      },
+    });
+  }
+
+  async updateMembershipRole(
+    userId: string,
+    organizationId: string,
+    role: string,
+  ) {
+    const membership = await this.prisma.organizationMembership.findUnique({
+      where: { userId_organizationId: { userId, organizationId } },
+    });
+    if (!membership) {
+      throw new NotFoundException('Membership not found');
+    }
+
+    if (
+      membership.role === 'ADMIN' &&
+      membership.status === 'APPROVED' &&
+      role !== 'ADMIN'
+    ) {
+      const adminCount = await this.prisma.organizationMembership.count({
+        where: { organizationId, role: 'ADMIN', status: 'APPROVED' },
+      });
+      if (adminCount <= 1) {
+        throw new ConflictException('Cannot demote the last administrator');
+      }
+    }
+
+    return this.prisma.organizationMembership.update({
+      where: {
+        userId_organizationId: {
+          userId,
+          organizationId,
+        },
+      },
+      data: {
+        role,
+      },
+    });
+  }
 }

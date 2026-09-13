@@ -12,6 +12,7 @@ describe('MembershipsService', () => {
       findMany: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
+      delete: jest.fn(),
     },
   };
 
@@ -110,6 +111,61 @@ describe('MembershipsService', () => {
       await expect(
         service.updateMembershipStatus('u1', 'o1', 'APPROVED', 'admin'),
       ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('removeMembership', () => {
+    it('should delete membership', async () => {
+      mockPrismaService.organizationMembership.findUnique.mockResolvedValue({
+        id: 'membershipId',
+      });
+      const expectedResult = { id: 'membershipId' };
+      mockPrismaService.organizationMembership.delete.mockResolvedValue(
+        expectedResult,
+      );
+
+      const result = await service.removeMembership('u1', 'o1');
+
+      expect(result).toEqual(expectedResult);
+      expect(
+        mockPrismaService.organizationMembership.delete,
+      ).toHaveBeenCalledWith({
+        where: {
+          userId_organizationId: {
+            userId: 'u1',
+            organizationId: 'o1',
+          },
+        },
+      });
+    });
+  });
+
+  describe('updateMembershipRole', () => {
+    it('should update membership role', async () => {
+      mockPrismaService.organizationMembership.findUnique.mockResolvedValue({
+        id: 'membershipId',
+      });
+      const expectedResult = { id: 'membershipId', role: 'ADMIN' };
+      mockPrismaService.organizationMembership.update.mockResolvedValue(
+        expectedResult,
+      );
+
+      const result = await service.updateMembershipRole('u1', 'o1', 'ADMIN');
+
+      expect(result).toEqual(expectedResult);
+      expect(
+        mockPrismaService.organizationMembership.update,
+      ).toHaveBeenCalledWith({
+        where: {
+          userId_organizationId: {
+            userId: 'u1',
+            organizationId: 'o1',
+          },
+        },
+        data: {
+          role: 'ADMIN',
+        },
+      });
     });
   });
 });
