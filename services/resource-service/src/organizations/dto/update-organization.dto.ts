@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsInt, IsOptional, IsString, IsIn } from 'class-validator';
+import { IsInt, IsOptional, IsString, IsIn, Min } from 'class-validator';
 
 export class UpdateOrganizationDto {
   @ApiPropertyOptional({ description: 'The name of the organization' })
@@ -17,6 +17,7 @@ export class UpdateOrganizationDto {
 
   @ApiPropertyOptional({ description: 'Bonus points awarded upon joining' })
   @IsInt()
+  @Min(0)
   @IsOptional()
   joinBonusPoints?: number;
 }

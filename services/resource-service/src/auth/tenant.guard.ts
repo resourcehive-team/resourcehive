@@ -110,6 +110,11 @@ export class TenantGuard implements CanActivate {
 
     // If no inherited admin was found, but they have a direct non-admin membership, use that
     if (bestMembership) {
+      if (targetOrg.status !== 'ACTIVE') {
+        throw new ForbiddenException(
+          'This organization is suspended and cannot be accessed.',
+        );
+      }
       request.membership = bestMembership;
       return true;
     }

@@ -90,6 +90,16 @@ export class MembershipsService {
     if (!membership) {
       throw new NotFoundException('Membership not found');
     }
+
+    if (membership.role === 'ADMIN' && membership.status === 'APPROVED') {
+      const adminCount = await this.prisma.organizationMembership.count({
+        where: { organizationId, role: 'ADMIN', status: 'APPROVED' },
+      });
+      if (adminCount <= 1) {
+        throw new ConflictException('Cannot remove the last administrator');
+      }
+    }
+
     return this.prisma.organizationMembership.delete({
       where: {
         userId_organizationId: {
@@ -111,6 +121,20 @@ export class MembershipsService {
     if (!membership) {
       throw new NotFoundException('Membership not found');
     }
+
+    if (
+      membership.role === 'ADMIN' &&
+      membership.status === 'APPROVED' &&
+      role !== 'ADMIN'
+    ) {
+      const adminCount = await this.prisma.organizationMembership.count({
+        where: { organizationId, role: 'ADMIN', status: 'APPROVED' },
+      });
+      if (adminCount <= 1) {
+        throw new ConflictException('Cannot demote the last administrator');
+      }
+    }
+
     return this.prisma.organizationMembership.update({
       where: {
         userId_organizationId: {
