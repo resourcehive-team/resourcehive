@@ -134,14 +134,14 @@ export class OrganizationsController {
   }
 
   @UseGuards(TenantGuard, AdminGuard)
-  @Patch(':id')
+  @Patch(':organizationId')
   @ApiOperation({ summary: 'Update organization details or status' })
   @ApiOkResponse({ description: 'Organization updated successfully.' })
   @ApiForbiddenResponse({
     description: 'Forbidden. Requires Admin privileges.',
   })
   update(
-    @Param('id') id: string,
+    @Param('organizationId') id: string,
     @Body() updateOrganizationDto: UpdateOrganizationDto,
   ) {
     return this.orgsService.update(id, updateOrganizationDto);

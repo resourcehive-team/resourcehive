@@ -216,4 +216,20 @@ describe('OrganizationsController (e2e)', () => {
         .expect(403);
     });
   });
+
+  describe('Organization Moderation', () => {
+    it('should update organization details (200 OK)', async () => {
+      await request(app.getHttpServer())
+        .patch(`/organizations/${rootOrgId}`)
+        .set('Authorization', `Bearer ${adminJwtToken}`)
+        .send({ status: 'SUSPENDED', name: 'Updated Root Org' })
+        .expect(200);
+      
+      const updatedOrg = await prisma.organization.findUnique({
+        where: { id: rootOrgId }
+      });
+      expect(updatedOrg?.status).toBe('SUSPENDED');
+      expect(updatedOrg?.name).toBe('Updated Root Org');
+    });
+  });
 });

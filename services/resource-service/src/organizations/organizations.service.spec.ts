@@ -9,6 +9,7 @@ describe('OrganizationsService', () => {
     organization: {
       findMany: jest.fn(),
       findUnique: jest.fn(),
+      update: jest.fn(),
     },
     organizationEmailDomain: {
       findMany: jest.fn(),
@@ -81,6 +82,20 @@ describe('OrganizationsService', () => {
         mockPrismaService.organizationEmailDomain.create,
       ).toHaveBeenCalledWith({
         data: { organizationId: 'org1', domain: 'example.com', autoJoin: true },
+      });
+    });
+  });
+
+  describe('update', () => {
+    it('should update organization details', async () => {
+      const dto = { status: 'SUSPENDED', name: 'New Name' };
+      const result = { id: 'org1', ...dto };
+      mockPrismaService.organization.update.mockResolvedValue(result);
+
+      expect(await service.update('org1', dto)).toEqual(result);
+      expect(mockPrismaService.organization.update).toHaveBeenCalledWith({
+        where: { id: 'org1' },
+        data: dto,
       });
     });
   });
