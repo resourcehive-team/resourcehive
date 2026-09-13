@@ -187,17 +187,31 @@ describe('MembershipsController (e2e)', () => {
       });
 
       await request(app.getHttpServer())
-        .patch(`/memberships/organization/${demoOrganizationId}/users/${targetUserId}/role`)
+        .patch(
+          `/memberships/organization/${demoOrganizationId}/users/${targetUserId}/role`,
+        )
         .set('Authorization', `Bearer ${jwtToken}`)
         .send({ role: 'ADMIN' })
         .expect(200);
 
       const updated = await prisma.organizationMembership.findUnique({
-        where: { userId_organizationId: { userId: targetUserId, organizationId: demoOrganizationId } },
+        where: {
+          userId_organizationId: {
+            userId: targetUserId,
+            organizationId: demoOrganizationId,
+          },
+        },
       });
       expect(updated?.role).toBe('ADMIN');
 
-      await prisma.organizationMembership.delete({ where: { userId_organizationId: { userId: targetUserId, organizationId: demoOrganizationId } } });
+      await prisma.organizationMembership.delete({
+        where: {
+          userId_organizationId: {
+            userId: targetUserId,
+            organizationId: demoOrganizationId,
+          },
+        },
+      });
       await prisma.user.delete({ where: { id: targetUserId } });
     });
 
@@ -233,12 +247,19 @@ describe('MembershipsController (e2e)', () => {
       });
 
       await request(app.getHttpServer())
-        .delete(`/memberships/organization/${demoOrganizationId}/users/${targetUserId}`)
+        .delete(
+          `/memberships/organization/${demoOrganizationId}/users/${targetUserId}`,
+        )
         .set('Authorization', `Bearer ${jwtToken}`)
         .expect(200);
 
       const removed = await prisma.organizationMembership.findUnique({
-        where: { userId_organizationId: { userId: targetUserId, organizationId: demoOrganizationId } },
+        where: {
+          userId_organizationId: {
+            userId: targetUserId,
+            organizationId: demoOrganizationId,
+          },
+        },
       });
       expect(removed).toBeNull();
 

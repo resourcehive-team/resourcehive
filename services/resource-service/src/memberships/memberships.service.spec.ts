@@ -117,12 +117,16 @@ describe('MembershipsService', () => {
   describe('removeMembership', () => {
     it('should delete membership', async () => {
       const expectedResult = { id: 'membershipId' };
-      mockPrismaService.organizationMembership.delete.mockResolvedValue(expectedResult);
+      mockPrismaService.organizationMembership.delete.mockResolvedValue(
+        expectedResult,
+      );
 
       const result = await service.removeMembership('u1', 'o1');
 
       expect(result).toEqual(expectedResult);
-      expect(mockPrismaService.organizationMembership.delete).toHaveBeenCalledWith({
+      expect(
+        mockPrismaService.organizationMembership.delete,
+      ).toHaveBeenCalledWith({
         where: {
           userId_organizationId: {
             userId: 'u1',
@@ -136,12 +140,16 @@ describe('MembershipsService', () => {
   describe('updateMembershipRole', () => {
     it('should update membership role', async () => {
       const expectedResult = { id: 'membershipId', role: 'ADMIN' };
-      mockPrismaService.organizationMembership.update.mockResolvedValue(expectedResult);
+      mockPrismaService.organizationMembership.update.mockResolvedValue(
+        expectedResult,
+      );
 
       const result = await service.updateMembershipRole('u1', 'o1', 'ADMIN');
 
       expect(result).toEqual(expectedResult);
-      expect(mockPrismaService.organizationMembership.update).toHaveBeenCalledWith({
+      expect(
+        mockPrismaService.organizationMembership.update,
+      ).toHaveBeenCalledWith({
         where: {
           userId_organizationId: {
             userId: 'u1',

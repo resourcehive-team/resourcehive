@@ -224,9 +224,9 @@ describe('OrganizationsController (e2e)', () => {
         .set('Authorization', `Bearer ${adminJwtToken}`)
         .send({ status: 'SUSPENDED', name: 'Updated Root Org' })
         .expect(200);
-      
+
       const updatedOrg = await prisma.organization.findUnique({
-        where: { id: rootOrgId }
+        where: { id: rootOrgId },
       });
       expect(updatedOrg?.status).toBe('SUSPENDED');
       expect(updatedOrg?.name).toBe('Updated Root Org');
