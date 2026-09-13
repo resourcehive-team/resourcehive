@@ -82,4 +82,33 @@ export class MembershipsService {
       user: membership.user,
     }));
   }
+
+  async removeMembership(userId: string, organizationId: string) {
+    return this.prisma.organizationMembership.delete({
+      where: {
+        userId_organizationId: {
+          userId,
+          organizationId,
+        },
+      },
+    });
+  }
+
+  async updateMembershipRole(
+    userId: string,
+    organizationId: string,
+    role: string,
+  ) {
+    return this.prisma.organizationMembership.update({
+      where: {
+        userId_organizationId: {
+          userId,
+          organizationId,
+        },
+      },
+      data: {
+        role,
+      },
+    });
+  }
 }

@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Param, UseGuards, Patch } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Param,
+  UseGuards,
+  Patch,
+  Delete,
+  Body,
+} from '@nestjs/common';
 import { MembershipsService } from './memberships.service';
 import {
   ApiTags,
@@ -91,5 +100,38 @@ export class MembershipsController {
   })
   getOrganizationMembers(@Param('organizationId') orgId: string) {
     return this.membershipsService.getOrganizationMembers(orgId);
+  }
+
+  @UseGuards(TenantGuard, AdminGuard)
+  @Delete('organization/:organizationId/users/:userId')
+  @ApiOperation({ summary: 'Remove a user from the organization' })
+  @ApiOkResponse({ description: 'User removed successfully.' })
+  @ApiForbiddenResponse({
+    description: 'Forbidden. Requires Admin privileges.',
+  })
+  removeMembership(
+    @Param('organizationId') orgId: string,
+    @Param('userId') targetUserId: string,
+  ) {
+    return this.membershipsService.removeMembership(targetUserId, orgId);
+  }
+
+  @UseGuards(TenantGuard, AdminGuard)
+  @Patch('organization/:organizationId/users/:userId/role')
+  @ApiOperation({ summary: 'Update a user role' })
+  @ApiOkResponse({ description: 'User role updated successfully.' })
+  @ApiForbiddenResponse({
+    description: 'Forbidden. Requires Admin privileges.',
+  })
+  updateMembershipRole(
+    @Param('organizationId') orgId: string,
+    @Param('userId') targetUserId: string,
+    @Body('role') role: string,
+  ) {
+    return this.membershipsService.updateMembershipRole(
+      targetUserId,
+      orgId,
+      role,
+    );
   }
 }

@@ -64,7 +64,6 @@ export class OrganizationsController {
     return this.orgsService.getEmailDomains(orgId);
   }
 
-
   @UseGuards(TenantGuard, AdminGuard)
   @Post(':organizationId/email-domains')
   @ApiOperation({ summary: 'Add an email domain' })
@@ -80,7 +79,6 @@ export class OrganizationsController {
     return this.orgsService.addEmailDomain(orgId, domain, autoJoin);
   }
 
-
   @UseGuards(TenantGuard, AdminGuard)
   @Delete(':organizationId/email-domains/:domainId')
   @ApiOperation({ summary: 'Remove an email domain' })
@@ -94,7 +92,6 @@ export class OrganizationsController {
   ) {
     return this.orgsService.removeEmailDomain(orgId, domainId);
   }
-  
 
   @UseGuards(TenantGuard, AdminGuard)
   @Get(':organizationId/allowlist')
@@ -106,7 +103,6 @@ export class OrganizationsController {
   getAllowlist(@Param('organizationId') orgId: string) {
     return this.orgsService.getAllowlist(orgId);
   }
-
 
   @UseGuards(TenantGuard, AdminGuard)
   @Post(':organizationId/allowlist')
@@ -123,7 +119,6 @@ export class OrganizationsController {
     return this.orgsService.addToAllowlist(orgId, email, user.userId);
   }
 
-
   @UseGuards(TenantGuard, AdminGuard)
   @Delete(':organizationId/allowlist/:allowlistId')
   @ApiOperation({ summary: 'Remove email from allowlist' })
@@ -138,15 +133,17 @@ export class OrganizationsController {
     return this.orgsService.removeFromAllowlist(orgId, allowlistId);
   }
 
-  @UseGuards(TenantGuard,AdminGuard)
+  @UseGuards(TenantGuard, AdminGuard)
   @Patch(':id')
   @ApiOperation({ summary: 'Update organization details or status' })
   @ApiOkResponse({ description: 'Organization updated successfully.' })
-  @ApiForbiddenResponse({ description: 'Forbidden. Requires Admin privileges.' })
+  @ApiForbiddenResponse({
+    description: 'Forbidden. Requires Admin privileges.',
+  })
   update(
-    @Param('id') id:string,
-    @Body() updateOrganizationDto:UpdateOrganizationDto,
-  ){
-    return this.orgsService.update(id,updateOrganizationDto);
+    @Param('id') id: string,
+    @Body() updateOrganizationDto: UpdateOrganizationDto,
+  ) {
+    return this.orgsService.update(id, updateOrganizationDto);
   }
 }
