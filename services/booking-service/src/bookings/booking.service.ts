@@ -190,6 +190,7 @@ export class BookingService {
         resourceId: slot.resourceId,
         resourceSlotId: slot.id,
         pointCost: slot.resource.pointCost,
+        cancellationNoticeMinutes: slot.resource.cancellationNoticeMinutes,
         startsAt: slot.startsAt,
         endsAt: slot.endsAt,
       };
@@ -443,7 +444,11 @@ export class BookingService {
       transaction,
     );
     const booking = await this.bookings.createConfirmed(
-      { resourceSlotId: context.resourceSlotId, userId: context.userId },
+      {
+        resourceSlotId: context.resourceSlotId,
+        userId: context.userId,
+        cancellationNoticeMinutes: context.cancellationNoticeMinutes,
+      },
       transaction,
     );
 
