@@ -18,6 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ApiAuthenticationError } from "@/lib/api-client";
 import { getMyBookings } from "@/lib/booking-service/booking-api";
 import { getMyDisputes } from "@/lib/booking-service/dispute-api";
+import { formatDisputeReason } from "@/lib/booking-service/dispute-format";
 import type { Dispute, UserBooking } from "@/lib/booking-service/types";
 import { formatOrganizationDate } from "@/lib/resource-service/organization-format";
 
@@ -155,7 +156,7 @@ export function MyDisputes() {
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="font-medium">
-                      {reasonLabel(dispute.reason)}
+                      {formatDisputeReason(dispute.reason)}
                     </p>
                     <DisputeStatusBadge status={dispute.status} />
                   </div>
@@ -179,19 +180,6 @@ export function MyDisputes() {
       )}
     </div>
   );
-}
-
-function reasonLabel(reason: Dispute["reason"]): string {
-  switch (reason) {
-    case "NOT_RETURNED":
-      return "Resource was not returned";
-    case "DAMAGED":
-      return "Resource was damaged";
-    case "MISPLACED":
-      return "Resource was misplaced";
-    default:
-      return "Other issue";
-  }
 }
 
 function MyDisputesSkeleton() {
