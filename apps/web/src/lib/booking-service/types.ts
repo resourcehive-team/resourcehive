@@ -68,6 +68,39 @@ export type DisputeStatus =
 
 export type DisputeResourceAction = "NONE" | "MARK_UNAVAILABLE" | "RESTORE";
 
+export interface ResourceDemand {
+  resourceId: string;
+  name: string;
+  bookingCount: number;
+}
+
+export interface OrganizationUsage {
+  organizationId: string;
+  organizationName: string;
+  bookingCount: number;
+}
+
+export interface PeakSlot {
+  dayOfWeek: number;
+  hour: number;
+  bookingCount: number;
+}
+
+export interface PersonalResourceUsage extends ResourceDemand {
+  totalHours: number;
+}
+
+export interface OrganizationAnalytics {
+  inventoryDemand: ResourceDemand[];
+  userSegmentation: OrganizationUsage[];
+  peakTimes: PeakSlot[];
+}
+
+export interface PersonalAnalytics {
+  usage: PersonalResourceUsage[];
+  peakTimes: PeakSlot[];
+}
+
 export interface Dispute {
   id: string;
   bookingId: string;
