@@ -13,6 +13,7 @@ export type BookingTransactionClient = Pick<
 export interface CreateConfirmedBookingInput {
   resourceSlotId: string;
   userId: string;
+  cancellationNoticeMinutes: number;
 }
 
 export interface ValidatedBookingContext {
@@ -21,6 +22,7 @@ export interface ValidatedBookingContext {
   resourceId: string;
   resourceSlotId: string;
   pointCost: number;
+  cancellationNoticeMinutes: number;
   startsAt: Date;
   endsAt: Date;
 }
@@ -31,6 +33,7 @@ export interface BookingRecord {
   userId: string;
   status: string;
   createdAt: Date;
+  cancellationNoticeMinutes: number;
   resourceSlot: {
     startsAt: Date;
     endsAt: Date;

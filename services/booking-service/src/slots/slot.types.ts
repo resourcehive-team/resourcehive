@@ -34,6 +34,7 @@ export interface SlotRecord {
     rootOrganizationId: string;
     ownerOrganizationId: string;
     pointCost: number;
+    cancellationNoticeMinutes: number;
   };
   bookings: { id: string }[];
 }
