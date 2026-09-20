@@ -234,10 +234,11 @@ describe('OrganizationsController (e2e)', () => {
 
   describe('Semester Points Allocation', () => {
     it('should allocate points to members and return count', async () => {
+      const uniqueSemester = `Semester-1/2026-${Date.now()}`;
       const response = await request(app.getHttpServer())
         .post(`/organizations/${rootOrgId}/semester-points`)
         .set('Authorization', `Bearer ${adminJwtToken}`)
-        .send({ amount: 500, semesterName: 'Semester-1/2026' })
+        .send({ amount: 500, semesterName: uniqueSemester })
         .expect(201);
 
       expect(response.body).toHaveProperty('count');
@@ -248,11 +249,12 @@ describe('OrganizationsController (e2e)', () => {
         where: {
           sourceOrganizationId: rootOrgId,
           transactionType: 'SEMESTER_ALLOCATION',
+          description: uniqueSemester,
         },
       });
       expect(transactions.length).toBeGreaterThan(0);
       expect(transactions[0].amount).toBe(500);
-      expect(transactions[0].description).toBe('Semester-1/2026');
+      expect(transactions[0].description).toBe(uniqueSemester);
     });
 
     it('should reject if not admin', async () => {

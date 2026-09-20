@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ConflictException } from '@nestjs/common';
 import { Prisma, PrismaService } from '@resourcehive/database';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
 
@@ -96,6 +96,18 @@ export class OrganizationsService {
 
     if (memberships.length === 0) {
       return { count: 0 };
+    }
+
+    const existingAllocation = await this.prisma.pointTransaction.findFirst({
+      where: {
+        sourceOrganizationId: organizationId,
+        transactionType: 'SEMESTER_ALLOCATION',
+        description: semesterName,
+      },
+    });
+
+    if (existingAllocation) {
+      throw new ConflictException(`Semester points for '${semesterName}' have already been allocated.`);
     }
 
     const data = memberships.map((membership) => ({
