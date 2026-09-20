@@ -35,4 +35,14 @@ export class CreateResourceDto {
   @IsUUID('4', { each: true })
   @IsOptional()
   allowedOrganizationIds?: string[];
+
+  @ApiPropertyOptional({
+    example: 60,
+    description:
+      'Minutes of notice required before a slot start for a member to cancel a booking',
+  })
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  cancellationNoticeMinutes?: number;
 }
