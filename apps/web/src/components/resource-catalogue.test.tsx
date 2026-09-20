@@ -70,6 +70,7 @@ const firstPage: PaginatedResources = {
       createdByUserId: "admin-1",
       status: "ACTIVE",
       pointCost: 25,
+      cancellationNoticeMinutes: 0,
       createdAt: "2026-07-10T00:00:00.000Z",
       allowedOrganizations: [],
     },

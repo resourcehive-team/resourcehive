@@ -12,6 +12,7 @@ export interface CreateResourceInput {
   name: string;
   description?: string;
   pointCost?: number;
+  cancellationNoticeMinutes?: number;
   allowedOrganizationIds?: string[];
 }
 
@@ -31,6 +32,7 @@ export function createResource(
   const name = input.name.trim();
   const description = input.description?.trim();
   const pointCost = input.pointCost ?? 0;
+  const cancellationNoticeMinutes = input.cancellationNoticeMinutes ?? 0;
 
   if (!name) {
     throw new Error("Resource name is required.");
@@ -38,6 +40,13 @@ export function createResource(
 
   if (!Number.isInteger(pointCost) || pointCost < 0) {
     throw new Error("Point cost must be a non-negative integer.");
+  }
+
+  if (
+    !Number.isInteger(cancellationNoticeMinutes) ||
+    cancellationNoticeMinutes < 0
+  ) {
+    throw new Error("Cancellation notice must be a non-negative integer.");
   }
 
   const allowedOrganizationIds = [
@@ -61,6 +70,7 @@ export function createResource(
       name,
       ...(description ? { description } : {}),
       pointCost,
+      cancellationNoticeMinutes,
       allowedOrganizationIds,
     },
   });

@@ -60,6 +60,7 @@ export interface Resource {
   createdByUserId: string;
   status: string;
   pointCost: number;
+  cancellationNoticeMinutes: number;
   createdAt: string;
   allowedOrganizations: AllowedOrganization[];
 }

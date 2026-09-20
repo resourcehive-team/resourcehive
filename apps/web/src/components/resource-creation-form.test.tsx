@@ -109,6 +109,7 @@ const createdResource: Resource = {
   createdByUserId: "admin-user",
   status: "ACTIVE",
   pointCost: 25,
+  cancellationNoticeMinutes: 0,
   createdAt: "2026-08-04T00:00:00.000Z",
   allowedOrganizations: [],
 };
@@ -150,6 +151,10 @@ describe("ResourceCreationForm", () => {
     fireEvent.change(screen.getByRole("spinbutton", { name: /Point cost/ }), {
       target: { value: "25" },
     });
+    fireEvent.change(
+      screen.getByRole("spinbutton", { name: /Cancellation notice/ }),
+      { target: { value: "60" } },
+    );
     fireEvent.click(
       screen.getByRole("checkbox", {
         name: "Department of Computer Science",
@@ -164,6 +169,7 @@ describe("ResourceCreationForm", () => {
         name: "Robotics Lab",
         description: "Shared robotics equipment.",
         pointCost: 25,
+        cancellationNoticeMinutes: 60,
         allowedOrganizationIds: [
           engineeringOrganization.id,
           computingOrganization.id,

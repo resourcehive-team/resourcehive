@@ -74,6 +74,8 @@ export function ResourceCreationForm() {
   const [name, setName] = React.useState("");
   const [description, setDescription] = React.useState("");
   const [pointCost, setPointCost] = React.useState("0");
+  const [cancellationNoticeMinutes, setCancellationNoticeMinutes] =
+    React.useState("0");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [formError, setFormError] = React.useState("");
   const [createdResource, setCreatedResource] = React.useState<Resource | null>(
@@ -142,6 +144,9 @@ export function ResourceCreationForm() {
 
     const normalizedName = name.trim();
     const numericPointCost = Number(pointCost);
+    const numericCancellationNoticeMinutes = Number(
+      cancellationNoticeMinutes,
+    );
 
     if (!normalizedName) {
       setFormError("Resource name is required.");
@@ -153,6 +158,16 @@ export function ResourceCreationForm() {
       return;
     }
 
+    if (
+      !Number.isInteger(numericCancellationNoticeMinutes) ||
+      numericCancellationNoticeMinutes < 0
+    ) {
+      setFormError(
+        "Cancellation notice must be a non-negative whole number of minutes.",
+      );
+      return;
+    }
+
     setIsSubmitting(true);
     setFormError("");
 
@@ -161,6 +176,7 @@ export function ResourceCreationForm() {
         name: normalizedName,
         description,
         pointCost: numericPointCost,
+        cancellationNoticeMinutes: numericCancellationNoticeMinutes,
         allowedOrganizationIds,
       });
       setCreatedResource(resource);
@@ -181,6 +197,7 @@ export function ResourceCreationForm() {
     setName("");
     setDescription("");
     setPointCost("0");
+    setCancellationNoticeMinutes("0");
     setAllowedOrganizationIds(
       ownerOrganizationId ? [ownerOrganizationId] : [],
     );
@@ -317,6 +334,28 @@ export function ResourceCreationForm() {
               />
               <FieldDescription>
                 The points deducted when a member books this resource.
+              </FieldDescription>
+            </Field>
+
+            <Field>
+              <FieldLabel htmlFor="resource-cancellation-notice">
+                Cancellation notice (minutes)
+              </FieldLabel>
+              <Input
+                id="resource-cancellation-notice"
+                type="number"
+                inputMode="numeric"
+                min={0}
+                step={1}
+                value={cancellationNoticeMinutes}
+                onChange={(event) =>
+                  setCancellationNoticeMinutes(event.target.value)
+                }
+              />
+              <FieldDescription>
+                How many minutes before a slot starts a member must cancel to
+                receive a refund. Use 0 to allow cancellation up until the
+                slot starts.
               </FieldDescription>
             </Field>
 
