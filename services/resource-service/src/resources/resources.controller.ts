@@ -14,6 +14,7 @@ import {
 import { ResourcesService } from './resources.service';
 import { CreateResourceDto } from './dto/create-resource.dto';
 import { UpdateResourceDto } from './dto/update-resource.dto';
+import { CreateRatingDto } from './dto/create-rating.dto';
 import {
   ApiTags,
   ApiOperation,
@@ -93,6 +94,36 @@ export class ResourcesController {
     @Param('resourceId') resourceId: string,
   ) {
     return this.resourcesService.remove(organizationId, resourceId);
+  }
+
+  @UseGuards(TenantGuard)
+  @Post('organization/:organizationId/:id/ratings')
+  @ApiOperation({ summary: 'Submit a rating for a resource' })
+  @ApiCreatedResponse({ description: 'Rating submitted successfully.' })
+  submitRating(
+    @Param('organizationId') organizationId: string,
+    @Param('id') id: string,
+    @Body() dto: CreateRatingDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.resourcesService.upsertRating(
+      organizationId,
+      id,
+      user.userId,
+      dto.rating,
+      dto.comment,
+    );
+  }
+
+  @UseGuards(TenantGuard)
+  @Get('organization/:organizationId/:id/ratings')
+  @ApiOperation({ summary: 'Get ratings for a resource' })
+  @ApiOkResponse({ description: 'Returns ratings and average.' })
+  getRatings(
+    @Param('organizationId') organizationId: string,
+    @Param('id') id: string,
+  ) {
+    return this.resourcesService.getRatings(organizationId, id);
   }
 
   @UseGuards(TenantGuard)
