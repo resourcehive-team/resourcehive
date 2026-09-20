@@ -245,4 +245,18 @@ describe("BookingService cancellation", () => {
     ).rejects.toBeInstanceOf(ConflictException);
     expect(transaction.booking.updateMany).not.toHaveBeenCalled();
   });
+
+  it("does not let a user cancel inside the resource's notice period", async () => {
+    const soonSlotStart = new Date(Date.now() + 30 * 60_000);
+    transaction.booking.findUnique.mockReset().mockResolvedValue({
+      ...booking,
+      cancellationNoticeMinutes: 60,
+      resourceSlot: { ...booking.resourceSlot, startsAt: soonSlotStart },
+    });
+
+    await expect(
+      service.cancelBooking(booking.id, booking.userId, {}),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(transaction.booking.updateMany).not.toHaveBeenCalled();
+  });
 });
