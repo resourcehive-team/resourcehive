@@ -118,7 +118,7 @@ describe('OrganizationsService', () => {
 
       expect(result).toEqual({ count: 2 });
       expect(mockPrismaService.organizationMembership.findMany).toHaveBeenCalledWith({
-        where: { organizationId: 'org1', status: 'ACTIVE' },
+        where: { organizationId: 'org1', status: 'APPROVED' },
       });
       expect(mockPrismaService.pointTransaction.createMany).toHaveBeenCalledWith({
         data: [

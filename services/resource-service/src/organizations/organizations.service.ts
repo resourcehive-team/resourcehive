@@ -87,7 +87,7 @@ export class OrganizationsService {
 
   async allocateSemesterPoints(organizationId: string, amount: number, semesterName: string) {
     const memberships = await this.prisma.organizationMembership.findMany({
-      where: { organizationId, status: 'ACTIVE' },
+      where: { organizationId, status: 'APPROVED' },
     });
 
     if (memberships.length === 0) {

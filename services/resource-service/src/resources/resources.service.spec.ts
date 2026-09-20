@@ -14,6 +14,10 @@ describe('ResourcesService', () => {
       findMany: jest.fn(),
       count: jest.fn(),
     },
+    resourceRating: {
+      upsert: jest.fn(),
+      findMany: jest.fn(),
+    },
     organization: {
       findUnique: jest.fn(),
     },
@@ -184,6 +188,66 @@ describe('ResourcesService', () => {
       const result = await service.remove('org-1', 'res-1');
 
       expect(result.status).toBe('INACTIVE');
+    });
+  });
+
+  describe('upsertRating', () => {
+    it('should upsert a rating if user has access to the resource', async () => {
+      // Mock findOne for access check
+      jest.spyOn(service, 'findOne').mockResolvedValue({
+        id: 'res-1',
+        ownerOrganizationId: 'org-1',
+        allowedOrganizations: [],
+      } as any);
+
+      const mockUpsertResult = { id: 'rating-1', rating: 5, comment: 'Great' };
+      mockPrismaService.resourceRating.upsert.mockResolvedValue(mockUpsertResult);
+
+      const result = await service.upsertRating('org-1', 'res-1', 'user-1', 5, 'Great');
+
+      expect(result).toEqual(mockUpsertResult);
+      expect(mockPrismaService.resourceRating.upsert).toHaveBeenCalledWith({
+        where: { resourceId_userId: { resourceId: 'res-1', userId: 'user-1' } },
+        update: { rating: 5, comment: 'Great' },
+        create: { resourceId: 'res-1', userId: 'user-1', rating: 5, comment: 'Great' },
+      });
+    });
+
+    it('should throw if user does not have access', async () => {
+      jest.spyOn(service, 'findOne').mockRejectedValue(new ForbiddenException());
+
+      await expect(
+        service.upsertRating('org-1', 'res-1', 'user-1', 5, 'Great'),
+      ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('getRatings', () => {
+    it('should return ratings and average', async () => {
+      jest.spyOn(service, 'findOne').mockResolvedValue({
+        id: 'res-1',
+        ownerOrganizationId: 'org-1',
+        allowedOrganizations: [],
+      } as any);
+
+      const mockRatings = [{ rating: 4 }, { rating: 5 }];
+      mockPrismaService.resourceRating.findMany.mockResolvedValue(mockRatings);
+
+      const result = await service.getRatings('org-1', 'res-1');
+
+      expect(result.total).toBe(2);
+      expect(result.average).toBe(4.5);
+      expect(result.ratings).toEqual(mockRatings);
+    });
+
+    it('should return 0 average if no ratings exist', async () => {
+      jest.spyOn(service, 'findOne').mockResolvedValue({} as any);
+      mockPrismaService.resourceRating.findMany.mockResolvedValue([]);
+
+      const result = await service.getRatings('org-1', 'res-1');
+
+      expect(result.total).toBe(0);
+      expect(result.average).toBe(0);
     });
   });
 });

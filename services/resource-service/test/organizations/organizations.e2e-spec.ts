@@ -175,7 +175,6 @@ describe('OrganizationsController (e2e)', () => {
     await prisma.organization
       .delete({ where: { id: otherTenantOrgId } })
       .catch(() => {});
-    await prisma.user.deleteMany({ where: { id: deepAdminUserId } });
     await app.close();
   });
 
@@ -230,6 +229,35 @@ describe('OrganizationsController (e2e)', () => {
       });
       expect(updatedOrg?.status).toBe('SUSPENDED');
       expect(updatedOrg?.name).toBe('Updated Root Org');
+    });
+  });
+
+  describe('Semester Points Allocation', () => {
+    it('should allocate points to members and return count', async () => {
+      const response = await request(app.getHttpServer())
+        .post(`/organizations/${rootOrgId}/semester-points`)
+        .set('Authorization', `Bearer ${adminJwtToken}`)
+        .send({ amount: 500, semesterName: 'Semester-1/2026' })
+        .expect(201);
+
+      expect(response.body).toHaveProperty('count');
+      expect(typeof response.body.count).toBe('number');
+      
+      const transactions = await prisma.pointTransaction.findMany({
+        where: { sourceOrganizationId: rootOrgId, transactionType: 'SEMESTER_ALLOCATION' },
+      });
+      expect(transactions.length).toBeGreaterThan(0);
+      expect(transactions[0].amount).toBe(500);
+      expect(transactions[0].description).toBe('Semester-1/2026');
+    });
+
+    it('should reject if not admin', async () => {
+      // jwtToken is a normal member
+      await request(app.getHttpServer())
+        .post(`/organizations/${rootOrgId}/semester-points`)
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .send({ amount: 500, semesterName: 'Semester-1/2026' })
+        .expect(403);
     });
   });
 });
