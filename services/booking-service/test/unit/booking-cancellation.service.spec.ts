@@ -21,6 +21,7 @@ const booking = {
   cancelledByUserId: null,
   cancellationReason: null,
   completedAt: null,
+  cancellationNoticeMinutes: 0,
   user: {
     firstName: "Alice",
     lastName: "Perera",
