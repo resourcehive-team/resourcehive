@@ -89,6 +89,7 @@ describe("SlotsService", () => {
         rootOrganizationId: "root-id",
         ownerOrganizationId: "organization-id",
         pointCost: 10,
+        cancellationNoticeMinutes: 0,
       },
       bookings: [],
     });
@@ -135,6 +136,7 @@ describe("SlotsService", () => {
           rootOrganizationId: "root-id",
           ownerOrganizationId: "organization-id",
           pointCost: 10,
+          cancellationNoticeMinutes: 0,
         },
         bookings: [],
       },
