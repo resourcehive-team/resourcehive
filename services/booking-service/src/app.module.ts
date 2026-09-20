@@ -3,6 +3,7 @@ import { PrismaModule } from "@resourcehive/database";
 import { ServiceAuthModule } from "@resourcehive/service-auth";
 import { BookingAuthorizationModule } from "./authorization/booking-authorization.module";
 import { BookingsModule } from "./bookings/bookings.module";
+import { DisputesModule } from "./disputes/disputes.module";
 import { HealthModule } from "./health/health.module";
 import { PointsModule } from "./points/points.module";
 import { SlotsModule } from "./slots/slots.module";
@@ -16,6 +17,7 @@ import { SlotsModule } from "./slots/slots.module";
     HealthModule,
     SlotsModule,
     PointsModule,
+    DisputesModule,
   ],
 })
 export class AppModule {}
