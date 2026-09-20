@@ -112,15 +112,25 @@ describe('OrganizationsService', () => {
         { userId: 'user1' },
         { userId: 'user2' },
       ]);
-      mockPrismaService.pointTransaction.createMany.mockResolvedValue({ count: 2 });
+      mockPrismaService.pointTransaction.createMany.mockResolvedValue({
+        count: 2,
+      });
 
-      const result = await service.allocateSemesterPoints('org1', 500, 'Semester-1/2026');
+      const result = await service.allocateSemesterPoints(
+        'org1',
+        500,
+        'Semester-1/2026',
+      );
 
       expect(result).toEqual({ count: 2 });
-      expect(mockPrismaService.organizationMembership.findMany).toHaveBeenCalledWith({
+      expect(
+        mockPrismaService.organizationMembership.findMany,
+      ).toHaveBeenCalledWith({
         where: { organizationId: 'org1', status: 'APPROVED' },
       });
-      expect(mockPrismaService.pointTransaction.createMany).toHaveBeenCalledWith({
+      expect(
+        mockPrismaService.pointTransaction.createMany,
+      ).toHaveBeenCalledWith({
         data: [
           {
             userId: 'user1',
@@ -143,10 +153,16 @@ describe('OrganizationsService', () => {
     it('should return count 0 if no active members', async () => {
       mockPrismaService.organizationMembership.findMany.mockResolvedValue([]);
 
-      const result = await service.allocateSemesterPoints('org1', 500, 'Semester-1/2026');
+      const result = await service.allocateSemesterPoints(
+        'org1',
+        500,
+        'Semester-1/2026',
+      );
 
       expect(result).toEqual({ count: 0 });
-      expect(mockPrismaService.pointTransaction.createMany).not.toHaveBeenCalled();
+      expect(
+        mockPrismaService.pointTransaction.createMany,
+      ).not.toHaveBeenCalled();
     });
   });
 });

@@ -241,10 +241,14 @@ describe('OrganizationsController (e2e)', () => {
         .expect(201);
 
       expect(response.body).toHaveProperty('count');
-      expect(typeof response.body.count).toBe('number');
-      
+      const body = response.body as { count: number };
+      expect(typeof body.count).toBe('number');
+
       const transactions = await prisma.pointTransaction.findMany({
-        where: { sourceOrganizationId: rootOrgId, transactionType: 'SEMESTER_ALLOCATION' },
+        where: {
+          sourceOrganizationId: rootOrgId,
+          transactionType: 'SEMESTER_ALLOCATION',
+        },
       });
       expect(transactions.length).toBeGreaterThan(0);
       expect(transactions[0].amount).toBe(500);

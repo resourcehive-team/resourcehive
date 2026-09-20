@@ -201,20 +201,35 @@ describe('ResourcesService', () => {
       } as any);
 
       const mockUpsertResult = { id: 'rating-1', rating: 5, comment: 'Great' };
-      mockPrismaService.resourceRating.upsert.mockResolvedValue(mockUpsertResult);
+      mockPrismaService.resourceRating.upsert.mockResolvedValue(
+        mockUpsertResult,
+      );
 
-      const result = await service.upsertRating('org-1', 'res-1', 'user-1', 5, 'Great');
+      const result = await service.upsertRating(
+        'org-1',
+        'res-1',
+        'user-1',
+        5,
+        'Great',
+      );
 
       expect(result).toEqual(mockUpsertResult);
       expect(mockPrismaService.resourceRating.upsert).toHaveBeenCalledWith({
         where: { resourceId_userId: { resourceId: 'res-1', userId: 'user-1' } },
         update: { rating: 5, comment: 'Great' },
-        create: { resourceId: 'res-1', userId: 'user-1', rating: 5, comment: 'Great' },
+        create: {
+          resourceId: 'res-1',
+          userId: 'user-1',
+          rating: 5,
+          comment: 'Great',
+        },
       });
     });
 
     it('should throw if user does not have access', async () => {
-      jest.spyOn(service, 'findOne').mockRejectedValue(new ForbiddenException());
+      jest
+        .spyOn(service, 'findOne')
+        .mockRejectedValue(new ForbiddenException());
 
       await expect(
         service.upsertRating('org-1', 'res-1', 'user-1', 5, 'Great'),

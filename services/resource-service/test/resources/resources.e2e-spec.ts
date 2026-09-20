@@ -323,13 +323,17 @@ describe('ResourcesController (e2e)', () => {
     it('should submit a rating successfully', async () => {
       // First reactivate the resource for this test so it is accessible
       await request(app.getHttpServer())
-        .patch(`/resources/organization/${demoOrganizationId}/${createdResourceId}`)
+        .patch(
+          `/resources/organization/${demoOrganizationId}/${createdResourceId}`,
+        )
         .set('Authorization', `Bearer ${adminJwtToken}`)
         .send({ status: 'ACTIVE' })
         .expect(200);
 
       await request(app.getHttpServer())
-        .post(`/resources/organization/${demoOrganizationId}/${createdResourceId}/ratings`)
+        .post(
+          `/resources/organization/${demoOrganizationId}/${createdResourceId}/ratings`,
+        )
         .set('Authorization', `Bearer ${jwtToken}`)
         .send({ rating: 4, comment: 'Good resource' })
         .expect(201);
@@ -337,15 +341,26 @@ describe('ResourcesController (e2e)', () => {
 
     it('should get ratings and calculate average', async () => {
       const res = await request(app.getHttpServer())
-        .get(`/resources/organization/${demoOrganizationId}/${createdResourceId}/ratings`)
+        .get(
+          `/resources/organization/${demoOrganizationId}/${createdResourceId}/ratings`,
+        )
         .set('Authorization', `Bearer ${adminJwtToken}`)
         .expect(200);
 
-      expect(res.body.total).toBe(1);
-      expect(res.body.average).toBe(4);
-      expect(res.body.ratings[0].comment).toBe('Good resource');
-      expect(res.body.ratings[0].rating).toBe(4);
-      expect(res.body.ratings[0].user.firstName).toBe('Member');
+      const body = res.body as {
+        total: number;
+        average: number;
+        ratings: {
+          comment: string;
+          rating: number;
+          user: { firstName: string };
+        }[];
+      };
+      expect(body.total).toBe(1);
+      expect(body.average).toBe(4);
+      expect(body.ratings[0].comment).toBe('Good resource');
+      expect(body.ratings[0].rating).toBe(4);
+      expect(body.ratings[0].user.firstName).toBe('Member');
     });
   });
 });

@@ -159,6 +159,10 @@ export class OrganizationsController {
     @Param('organizationId') id: string,
     @Body() dto: AllocateSemesterPointsDto,
   ) {
-    return this.orgsService.allocateSemesterPoints(id, dto.amount, dto.semesterName);
+    return this.orgsService.allocateSemesterPoints(
+      id,
+      dto.amount,
+      dto.semesterName,
+    );
   }
 }

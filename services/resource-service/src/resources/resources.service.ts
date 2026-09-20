@@ -201,7 +201,11 @@ export class ResourcesService {
     const ratings = await this.prisma.resourceRating.findMany({
       where: { resourceId },
       orderBy: { createdAt: 'desc' },
-      include: { user: { select: { id: true, email: true, firstName: true, lastName: true } } },
+      include: {
+        user: {
+          select: { id: true, email: true, firstName: true, lastName: true },
+        },
+      },
     });
 
     const average =
