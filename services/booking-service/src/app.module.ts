@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { PrismaModule } from "@resourcehive/database";
 import { ServiceAuthModule } from "@resourcehive/service-auth";
+import { AnalyticsModule } from "./analytics/analytics.module";
 import { BookingAuthorizationModule } from "./authorization/booking-authorization.module";
 import { BookingsModule } from "./bookings/bookings.module";
 import { DisputesModule } from "./disputes/disputes.module";
@@ -18,6 +19,7 @@ import { SlotsModule } from "./slots/slots.module";
     SlotsModule,
     PointsModule,
     DisputesModule,
+    AnalyticsModule,
   ],
 })
 export class AppModule {}
