@@ -8,7 +8,7 @@
 	@identity path /auth /auth/*
 	@resourceSlots path_regexp resourceSlots ^/resources/[^/]+/slots/?$
 	@resource path /organizations /organizations/* /memberships /memberships/* /resources /resources/*
-	@booking path /slots /slots/* /bookings /bookings/* /points /points/*
+	@booking path /slots /slots/* /bookings /bookings/* /points /points/* /disputes /disputes/* /analytics /analytics/*
 	@notifications path /notifications /notifications/*
 
 	@resourceDocs path /resource/api/docs /resource/api/docs/*
