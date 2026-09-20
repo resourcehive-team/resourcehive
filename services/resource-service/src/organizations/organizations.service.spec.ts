@@ -21,6 +21,12 @@ describe('OrganizationsService', () => {
       create: jest.fn(),
       delete: jest.fn(),
     },
+    organizationMembership: {
+      findMany: jest.fn(),
+    },
+    pointTransaction: {
+      createMany: jest.fn(),
+    },
   };
 
   beforeEach(async () => {
@@ -97,6 +103,50 @@ describe('OrganizationsService', () => {
         where: { id: 'org1' },
         data: dto,
       });
+    });
+  });
+
+  describe('allocateSemesterPoints', () => {
+    it('should allocate points to all active members', async () => {
+      mockPrismaService.organizationMembership.findMany.mockResolvedValue([
+        { userId: 'user1' },
+        { userId: 'user2' },
+      ]);
+      mockPrismaService.pointTransaction.createMany.mockResolvedValue({ count: 2 });
+
+      const result = await service.allocateSemesterPoints('org1', 500, 'Semester-1/2026');
+
+      expect(result).toEqual({ count: 2 });
+      expect(mockPrismaService.organizationMembership.findMany).toHaveBeenCalledWith({
+        where: { organizationId: 'org1', status: 'ACTIVE' },
+      });
+      expect(mockPrismaService.pointTransaction.createMany).toHaveBeenCalledWith({
+        data: [
+          {
+            userId: 'user1',
+            amount: 500,
+            transactionType: 'SEMESTER_ALLOCATION',
+            sourceOrganizationId: 'org1',
+            description: 'Semester-1/2026',
+          },
+          {
+            userId: 'user2',
+            amount: 500,
+            transactionType: 'SEMESTER_ALLOCATION',
+            sourceOrganizationId: 'org1',
+            description: 'Semester-1/2026',
+          },
+        ],
+      });
+    });
+
+    it('should return count 0 if no active members', async () => {
+      mockPrismaService.organizationMembership.findMany.mockResolvedValue([]);
+
+      const result = await service.allocateSemesterPoints('org1', 500, 'Semester-1/2026');
+
+      expect(result).toEqual({ count: 0 });
+      expect(mockPrismaService.pointTransaction.createMany).not.toHaveBeenCalled();
     });
   });
 });
