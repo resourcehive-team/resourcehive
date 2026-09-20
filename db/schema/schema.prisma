@@ -116,15 +116,16 @@ model OrganizationMembership {
 }
 
 model Resource {
-  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name                String
-  description         String?
-  ownerOrganizationId String   @map("owner_organization_id") @db.Uuid
-  rootOrganizationId  String   @map("root_organization_id") @db.Uuid
-  createdByUserId     String   @map("created_by_user_id") @db.Uuid
-  status              String   @default("ACTIVE")
-  pointCost           Int      @default(0) @map("point_cost")
-  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz
+  id                        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                      String
+  description               String?
+  ownerOrganizationId       String   @map("owner_organization_id") @db.Uuid
+  rootOrganizationId        String   @map("root_organization_id") @db.Uuid
+  createdByUserId           String   @map("created_by_user_id") @db.Uuid
+  status                    String   @default("ACTIVE")
+  pointCost                 Int      @default(0) @map("point_cost")
+  cancellationNoticeMinutes Int      @default(0) @map("cancellation_notice_minutes")
+  createdAt                 DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   ownerOrganization    Organization                  @relation("ResourceOwner", fields: [ownerOrganizationId, rootOrganizationId], references: [id, rootOrganizationId], onDelete: NoAction, onUpdate: NoAction)
   createdByUser        User                          @relation("ResourceCreatedBy", fields: [createdByUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -170,15 +171,17 @@ model ResourceSlot {
 
 /// One non-cancelled booking per slot is enforced by bookings_active_slot_unique.
 model Booking {
-  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  resourceSlotId     String    @map("resource_slot_id") @db.Uuid
-  userId             String    @map("user_id") @db.Uuid
-  status             String    @default("CONFIRMED")
-  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  cancelledAt        DateTime? @map("cancelled_at") @db.Timestamptz
-  cancelledByUserId  String?   @map("cancelled_by_user_id") @db.Uuid
-  cancellationReason String?   @map("cancellation_reason")
-  completedAt        DateTime? @map("completed_at") @db.Timestamptz
+  id                        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  resourceSlotId            String    @map("resource_slot_id") @db.Uuid
+  userId                    String    @map("user_id") @db.Uuid
+  status                    String    @default("CONFIRMED")
+  createdAt                 DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  cancelledAt               DateTime? @map("cancelled_at") @db.Timestamptz
+  cancelledByUserId         String?   @map("cancelled_by_user_id") @db.Uuid
+  cancellationReason        String?   @map("cancellation_reason")
+  completedAt               DateTime? @map("completed_at") @db.Timestamptz
+  /// Snapshot of the resource's notice period at booking time (SRS 3.1.15 #13).
+  cancellationNoticeMinutes Int       @default(0) @map("cancellation_notice_minutes")
 
   resourceSlot      ResourceSlot       @relation(fields: [resourceSlotId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   user              User               @relation("BookingUser", fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
