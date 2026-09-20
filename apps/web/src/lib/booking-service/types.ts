@@ -57,3 +57,29 @@ export interface CancelledBooking extends OrganizationBooking {
   refundPoints: number;
   slotStatus: string;
 }
+
+export type DisputeReason = "NOT_RETURNED" | "DAMAGED" | "MISPLACED" | "OTHER";
+
+export type DisputeStatus =
+  | "OPEN"
+  | "UNDER_REVIEW"
+  | "RESOLVED"
+  | "REJECTED";
+
+export type DisputeResourceAction = "NONE" | "MARK_UNAVAILABLE" | "RESTORE";
+
+export interface Dispute {
+  id: string;
+  bookingId: string;
+  rootOrganizationId: string;
+  submittedByUserId: string;
+  reason: DisputeReason;
+  description: string;
+  evidence: string[] | null;
+  status: DisputeStatus;
+  resolutionNotes: string | null;
+  reviewedByUserId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  resolvedAt: string | null;
+}
