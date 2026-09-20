@@ -224,7 +224,11 @@ export class BookingService {
           const now = new Date();
 
           if (isUserCancellation) {
-            if (booking.resourceSlot.startsAt <= now) {
+            const deadline = new Date(
+              booking.resourceSlot.startsAt.getTime() -
+                booking.cancellationNoticeMinutes * 60_000,
+            );
+            if (now >= deadline) {
               throw new BookingCancellationStartedError();
             }
           } else {
