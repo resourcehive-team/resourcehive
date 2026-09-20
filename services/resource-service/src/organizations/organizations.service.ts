@@ -84,4 +84,28 @@ export class OrganizationsService {
       data: updateData,
     });
   }
+
+  async allocateSemesterPoints(organizationId: string, amount: number, semesterName: string) {
+    const memberships = await this.prisma.organizationMembership.findMany({
+      where: { organizationId, status: 'ACTIVE' },
+    });
+
+    if (memberships.length === 0) {
+      return { count: 0 };
+    }
+
+    const data = memberships.map((membership) => ({
+      userId: membership.userId,
+      amount,
+      transactionType: 'SEMESTER_ALLOCATION',
+      sourceOrganizationId: organizationId,
+      description: semesterName,
+    }));
+
+    const result = await this.prisma.pointTransaction.createMany({
+      data,
+    });
+
+    return { count: result.count };
+  }
 }
