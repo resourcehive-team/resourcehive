@@ -198,7 +198,7 @@ describe('ResourcesService', () => {
         id: 'res-1',
         ownerOrganizationId: 'org-1',
         allowedOrganizations: [],
-      } as any);
+      } as unknown as Awaited<ReturnType<ResourcesService['findOne']>>);
 
       const mockUpsertResult = { id: 'rating-1', rating: 5, comment: 'Great' };
       mockPrismaService.resourceRating.upsert.mockResolvedValue(
@@ -243,7 +243,7 @@ describe('ResourcesService', () => {
         id: 'res-1',
         ownerOrganizationId: 'org-1',
         allowedOrganizations: [],
-      } as any);
+      } as unknown as Awaited<ReturnType<ResourcesService['findOne']>>);
 
       const mockRatings = [{ rating: 4 }, { rating: 5 }];
       mockPrismaService.resourceRating.findMany.mockResolvedValue(mockRatings);
@@ -256,7 +256,11 @@ describe('ResourcesService', () => {
     });
 
     it('should return 0 average if no ratings exist', async () => {
-      jest.spyOn(service, 'findOne').mockResolvedValue({} as any);
+      jest
+        .spyOn(service, 'findOne')
+        .mockResolvedValue(
+          {} as unknown as Awaited<ReturnType<ResourcesService['findOne']>>,
+        );
       mockPrismaService.resourceRating.findMany.mockResolvedValue([]);
 
       const result = await service.getRatings('org-1', 'res-1');

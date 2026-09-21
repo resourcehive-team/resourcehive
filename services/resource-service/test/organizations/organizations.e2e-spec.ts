@@ -160,6 +160,11 @@ describe('OrganizationsController (e2e)', () => {
 
   afterAll(async () => {
     // delete created items
+    await prisma.pointTransaction
+      .deleteMany({
+        where: { sourceOrganizationId: rootOrgId },
+      })
+      .catch(() => {});
     await prisma.organizationMembership.deleteMany({
       where: { userId: deepAdminUserId },
     });

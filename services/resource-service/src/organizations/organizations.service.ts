@@ -98,30 +98,39 @@ export class OrganizationsService {
       return { count: 0 };
     }
 
-    const existingAllocation = await this.prisma.pointTransaction.findFirst({
-      where: {
-        sourceOrganizationId: organizationId,
-        transactionType: 'SEMESTER_ALLOCATION',
-        description: semesterName,
+    return this.prisma.$transaction(
+      async (tx) => {
+        const existingAllocation = await tx.pointTransaction.findFirst({
+          where: {
+            sourceOrganizationId: organizationId,
+            transactionType: 'SEMESTER_ALLOCATION',
+            description: semesterName,
+          },
+        });
+
+        if (existingAllocation) {
+          throw new ConflictException(
+            `Semester points for '${semesterName}' have already been allocated.`,
+          );
+        }
+
+        const data = memberships.map((membership) => ({
+          userId: membership.userId,
+          amount,
+          transactionType: 'SEMESTER_ALLOCATION',
+          sourceOrganizationId: organizationId,
+          description: semesterName,
+        }));
+
+        const result = await tx.pointTransaction.createMany({
+          data,
+        });
+
+        return { count: result.count };
       },
-    });
-
-    if (existingAllocation) {
-      throw new ConflictException(`Semester points for '${semesterName}' have already been allocated.`);
-    }
-
-    const data = memberships.map((membership) => ({
-      userId: membership.userId,
-      amount,
-      transactionType: 'SEMESTER_ALLOCATION',
-      sourceOrganizationId: organizationId,
-      description: semesterName,
-    }));
-
-    const result = await this.prisma.pointTransaction.createMany({
-      data,
-    });
-
-    return { count: result.count };
+      {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      },
+    );
   }
 }

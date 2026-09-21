@@ -26,10 +26,17 @@ describe('OrganizationsService', () => {
     },
     pointTransaction: {
       createMany: jest.fn(),
+      findFirst: jest.fn(),
     },
+    $transaction: jest.fn(),
   };
 
   beforeEach(async () => {
+    /* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return */
+    mockPrismaService.$transaction.mockImplementation((cb: any) =>
+      cb(mockPrismaService),
+    );
+    /* eslint-enable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return */
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         OrganizationsService,
@@ -108,6 +115,7 @@ describe('OrganizationsService', () => {
 
   describe('allocateSemesterPoints', () => {
     it('should allocate points to all active members', async () => {
+      mockPrismaService.pointTransaction.findFirst.mockResolvedValue(null);
       mockPrismaService.organizationMembership.findMany.mockResolvedValue([
         { userId: 'user1' },
         { userId: 'user2' },
@@ -123,6 +131,15 @@ describe('OrganizationsService', () => {
       );
 
       expect(result).toEqual({ count: 2 });
+      expect(mockPrismaService.pointTransaction.findFirst).toHaveBeenCalledWith(
+        {
+          where: {
+            sourceOrganizationId: 'org1',
+            transactionType: 'SEMESTER_ALLOCATION',
+            description: 'Semester-1/2026',
+          },
+        },
+      );
       expect(
         mockPrismaService.organizationMembership.findMany,
       ).toHaveBeenCalledWith({
@@ -150,7 +167,41 @@ describe('OrganizationsService', () => {
       });
     });
 
+    it('should throw ConflictException if points already allocated for the semester', async () => {
+      mockPrismaService.organizationMembership.findMany.mockResolvedValue([
+        { userId: 'user1' },
+      ]);
+      mockPrismaService.pointTransaction.findFirst.mockResolvedValue({
+        id: 'existing-tx',
+      });
+
+      await expect(
+        service.allocateSemesterPoints('org1', 500, 'Semester-1/2026'),
+      ).rejects.toThrow(
+        "Semester points for 'Semester-1/2026' have already been allocated.",
+      );
+
+      expect(
+        mockPrismaService.organizationMembership.findMany,
+      ).toHaveBeenCalledWith({
+        where: { organizationId: 'org1', status: 'APPROVED' },
+      });
+      expect(mockPrismaService.pointTransaction.findFirst).toHaveBeenCalledWith(
+        {
+          where: {
+            sourceOrganizationId: 'org1',
+            transactionType: 'SEMESTER_ALLOCATION',
+            description: 'Semester-1/2026',
+          },
+        },
+      );
+      expect(
+        mockPrismaService.pointTransaction.createMany,
+      ).not.toHaveBeenCalled();
+    });
+
     it('should return count 0 if no active members', async () => {
+      mockPrismaService.pointTransaction.findFirst.mockResolvedValue(null);
       mockPrismaService.organizationMembership.findMany.mockResolvedValue([]);
 
       const result = await service.allocateSemesterPoints(
@@ -160,6 +211,14 @@ describe('OrganizationsService', () => {
       );
 
       expect(result).toEqual({ count: 0 });
+      expect(
+        mockPrismaService.organizationMembership.findMany,
+      ).toHaveBeenCalledWith({
+        where: { organizationId: 'org1', status: 'APPROVED' },
+      });
+      expect(
+        mockPrismaService.pointTransaction.findFirst,
+      ).not.toHaveBeenCalled();
       expect(
         mockPrismaService.pointTransaction.createMany,
       ).not.toHaveBeenCalled();
