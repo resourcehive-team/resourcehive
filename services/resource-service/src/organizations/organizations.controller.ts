@@ -22,6 +22,7 @@ import type { AuthenticatedUser } from '@resourcehive/service-auth';
 import { TenantGuard } from '../auth/tenant.guard';
 import { AdminGuard } from '../auth/admin.guard';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
+import { AllocateSemesterPointsDto } from './dto/allocate-semester-points.dto';
 
 @ApiTags('Organizations')
 @ApiBearerAuth()
@@ -145,5 +146,23 @@ export class OrganizationsController {
     @Body() updateOrganizationDto: UpdateOrganizationDto,
   ) {
     return this.orgsService.update(id, updateOrganizationDto);
+  }
+
+  @UseGuards(TenantGuard, AdminGuard)
+  @Post(':organizationId/semester-points')
+  @ApiOperation({ summary: 'Allocate semester points to all active members' })
+  @ApiCreatedResponse({ description: 'Points allocated successfully.' })
+  @ApiForbiddenResponse({
+    description: 'Forbidden. Requires Admin privileges.',
+  })
+  allocateSemesterPoints(
+    @Param('organizationId') id: string,
+    @Body() dto: AllocateSemesterPointsDto,
+  ) {
+    return this.orgsService.allocateSemesterPoints(
+      id,
+      dto.amount,
+      dto.semesterName,
+    );
   }
 }

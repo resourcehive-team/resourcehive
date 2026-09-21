@@ -35,6 +35,7 @@ model User {
   notifications           Notification[]
   webPushSubscriptions    WebPushSubscription[]
   notificationDeliveries  NotificationDelivery[]
+  ratings                 ResourceRating[]
 
   @@map("users")
 }
@@ -130,6 +131,7 @@ model Resource {
   createdByUser        User                          @relation("ResourceCreatedBy", fields: [createdByUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   allowedOrganizations ResourceAllowedOrganization[]
   slots                ResourceSlot[]
+  ratings              ResourceRating[]
 
   @@unique([id, rootOrganizationId], map: "resources_id_root_unique")
   @@index([ownerOrganizationId, status], map: "resources_owner_status_idx")
@@ -333,4 +335,20 @@ model ProcessedEvent {
 
   @@unique([eventId, consumerName], map: "processed_events_event_consumer_unique")
   @@map("processed_events")
+}
+
+model ResourceRating {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  resourceId String   @map("resource_id") @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  rating     Int
+  comment    String?
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  resource   Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: NoAction)
+
+  @@unique([resourceId, userId], map: "resource_ratings_resource_user_unique")
+  @@index([resourceId], map: "resource_ratings_resource_idx")
+  @@map("resource_ratings")
 }

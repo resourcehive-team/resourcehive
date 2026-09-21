@@ -318,4 +318,49 @@ describe('ResourcesController (e2e)', () => {
       'This resource is not active and cannot be booked',
     );
   });
+
+  describe('Resource Ratings', () => {
+    it('should submit a rating successfully', async () => {
+      // First reactivate the resource for this test so it is accessible
+      await request(app.getHttpServer())
+        .patch(
+          `/resources/organization/${demoOrganizationId}/${createdResourceId}`,
+        )
+        .set('Authorization', `Bearer ${adminJwtToken}`)
+        .send({ status: 'ACTIVE' })
+        .expect(200);
+
+      await request(app.getHttpServer())
+        .post(
+          `/resources/organization/${demoOrganizationId}/${createdResourceId}/ratings`,
+        )
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .send({ rating: 4, comment: 'Good resource' })
+        .expect(201);
+    });
+
+    it('should get ratings and calculate average', async () => {
+      const res = await request(app.getHttpServer())
+        .get(
+          `/resources/organization/${demoOrganizationId}/${createdResourceId}/ratings`,
+        )
+        .set('Authorization', `Bearer ${adminJwtToken}`)
+        .expect(200);
+
+      const body = res.body as {
+        total: number;
+        average: number;
+        ratings: {
+          comment: string;
+          rating: number;
+          user: { firstName: string };
+        }[];
+      };
+      expect(body.total).toBe(1);
+      expect(body.average).toBe(4);
+      expect(body.ratings[0].comment).toBe('Good resource');
+      expect(body.ratings[0].rating).toBe(4);
+      expect(body.ratings[0].user.firstName).toBe('Member');
+    });
+  });
 });

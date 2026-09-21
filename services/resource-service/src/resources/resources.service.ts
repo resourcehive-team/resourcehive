@@ -163,4 +163,60 @@ export class ResourcesService {
       ownerOrganizationId: resource.ownerOrganizationId,
     };
   }
+
+  async upsertRating(
+    organizationId: string,
+    resourceId: string,
+    userId: string,
+    rating: number,
+    comment?: string,
+  ) {
+    // Check if user has access to the resource
+    await this.findOne(organizationId, resourceId);
+
+    return this.prisma.resourceRating.upsert({
+      where: {
+        resourceId_userId: {
+          resourceId,
+          userId,
+        },
+      },
+      update: {
+        rating,
+        comment,
+      },
+      create: {
+        resourceId,
+        userId,
+        rating,
+        comment,
+      },
+    });
+  }
+
+  async getRatings(organizationId: string, resourceId: string) {
+    // Check access first
+    await this.findOne(organizationId, resourceId);
+
+    const ratings = await this.prisma.resourceRating.findMany({
+      where: { resourceId },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        user: {
+          select: { id: true, email: true, firstName: true, lastName: true },
+        },
+      },
+    });
+
+    const average =
+      ratings.length > 0
+        ? ratings.reduce((acc, curr) => acc + curr.rating, 0) / ratings.length
+        : 0;
+
+    return {
+      average,
+      total: ratings.length,
+      ratings,
+    };
+  }
 }
