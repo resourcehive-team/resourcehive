@@ -15,6 +15,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -25,28 +26,23 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { ApiAuthenticationError } from "@/lib/api-client";
 import { openDispute } from "@/lib/booking-service/dispute-api";
-import type {
-  Dispute,
-  DisputeReason,
-  UserBooking,
-} from "@/lib/booking-service/types";
+import type { Dispute, DisputeReason } from "@/lib/booking-service/types";
 
 const reasonLabels: Record<DisputeReason, string> = {
-  NOT_RETURNED: "Resource was not returned",
-  DAMAGED: "Resource was damaged",
-  MISPLACED: "Resource was misplaced",
+  UNAVAILABLE: "Resource was unavailable",
+  BROKEN: "Resource was broken",
+  NOT_AS_DESCRIBED: "Resource didn't match the description",
   OTHER: "Other issue",
 };
 
 export function OpenDisputeDialog({
-  booking,
   onOpened,
 }: {
-  booking: UserBooking;
   onOpened: (dispute: Dispute) => void;
 }) {
   const [open, setOpen] = React.useState(false);
-  const [reason, setReason] = React.useState<DisputeReason>("NOT_RETURNED");
+  const [bookingId, setBookingId] = React.useState("");
+  const [reason, setReason] = React.useState<DisputeReason>("UNAVAILABLE");
   const [description, setDescription] = React.useState("");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [error, setError] = React.useState("");
@@ -55,7 +51,8 @@ export function OpenDisputeDialog({
     setOpen(nextOpen);
 
     if (nextOpen) {
-      setReason("NOT_RETURNED");
+      setBookingId("");
+      setReason("UNAVAILABLE");
       setDescription("");
       setError("");
     }
@@ -72,11 +69,7 @@ export function OpenDisputeDialog({
     setError("");
 
     try {
-      const dispute = await openDispute({
-        bookingId: booking.id,
-        reason,
-        description,
-      });
+      const dispute = await openDispute({ bookingId, reason, description });
       onOpened(dispute);
       setOpen(false);
     } catch (requestError) {
@@ -97,20 +90,20 @@ export function OpenDisputeDialog({
 
   return (
     <Dialog open={open} onOpenChange={changeOpen}>
-      <DialogTrigger render={<Button variant="outline" size="sm" />}>
+      <DialogTrigger render={<Button variant="outline" />}>
         <FlagIcon data-icon="inline-start" />
-        Report an issue
+        Open a dispute
       </DialogTrigger>
       <DialogContent className="rounded-none sm:max-w-xl">
         <DialogHeader>
           <p className="eyebrow text-clay">Open a dispute</p>
           <DialogTitle className="text-3xl font-normal leading-none">
-            {booking.resourceSlot.resource.name}
+            Report an issue
           </DialogTitle>
           <DialogDescription>
             Let the resource&apos;s administrators know about a problem with
-            this booking, such as a resource that was not returned, damaged,
-            or misplaced.
+            a completed booking of yours, such as a resource that was
+            unavailable, broken, or didn&apos;t match the description.
           </DialogDescription>
         </DialogHeader>
         <form
@@ -119,9 +112,27 @@ export function OpenDisputeDialog({
           onSubmit={submitDispute}
         >
           <Field>
-            <FieldLabel htmlFor={`dispute-reason-${booking.id}`}>
-              Reason
+            <FieldLabel htmlFor="dispute-booking-id">
+              Booking ID
+              <span className="text-destructive" aria-hidden="true">
+                *
+              </span>
             </FieldLabel>
+            <Input
+              id="dispute-booking-id"
+              value={bookingId}
+              placeholder="e.g. 3fa85f64-5717-4562-b3fc-2c963f66afa6"
+              onChange={(event) => setBookingId(event.target.value)}
+              required
+            />
+            <FieldDescription>
+              Find this on your completed booking under &quot;My
+              bookings&quot;.
+            </FieldDescription>
+          </Field>
+
+          <Field>
+            <FieldLabel htmlFor="dispute-reason">Reason</FieldLabel>
             <Select
               items={reasonLabels}
               value={reason}
@@ -131,7 +142,7 @@ export function OpenDisputeDialog({
                 }
               }}
             >
-              <SelectTrigger id={`dispute-reason-${booking.id}`} className="w-full">
+              <SelectTrigger id="dispute-reason" className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -145,14 +156,14 @@ export function OpenDisputeDialog({
           </Field>
 
           <Field>
-            <FieldLabel htmlFor={`dispute-description-${booking.id}`}>
+            <FieldLabel htmlFor="dispute-description">
               Description
               <span className="text-destructive" aria-hidden="true">
                 *
               </span>
             </FieldLabel>
             <Textarea
-              id={`dispute-description-${booking.id}`}
+              id="dispute-description"
               maxLength={2000}
               value={description}
               placeholder="Describe what happened"

@@ -9,22 +9,21 @@ import { OpenDisputeDialog } from "@/components/open-dispute-dialog";
 import { RequestErrorCard } from "@/components/request-error-card";
 import {
   Card,
-  CardContent,
+  CardAction,
   CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ApiAuthenticationError } from "@/lib/api-client";
-import { getMyBookings } from "@/lib/booking-service/booking-api";
 import { getMyDisputes } from "@/lib/booking-service/dispute-api";
 import { formatDisputeReason } from "@/lib/booking-service/dispute-format";
-import type { Dispute, UserBooking } from "@/lib/booking-service/types";
+import type { Dispute } from "@/lib/booking-service/types";
 import { formatOrganizationDate } from "@/lib/resource-service/organization-format";
 
 type State =
   | { status: "loading" }
-  | { status: "loaded"; bookings: UserBooking[]; disputes: Dispute[] }
+  | { status: "loaded"; disputes: Dispute[] }
   | { status: "error"; error: unknown };
 
 export function MyDisputes() {
@@ -35,12 +34,9 @@ export function MyDisputes() {
   React.useEffect(() => {
     const controller = new AbortController();
 
-    Promise.all([
-      getMyBookings(controller.signal),
-      getMyDisputes(controller.signal),
-    ])
-      .then(([bookings, disputes]) => {
-        setState({ status: "loaded", bookings, disputes });
+    getMyDisputes(controller.signal)
+      .then((disputes) => {
+        setState({ status: "loaded", disputes });
       })
       .catch((requestError: unknown) => {
         if (controller.signal.aborted) {
@@ -83,52 +79,20 @@ export function MyDisputes() {
     );
   }
 
-  const disputedBookingIds = new Set(
-    state.disputes.map((dispute) => dispute.bookingId),
-  );
-  const eligibleBookings = state.bookings.filter(
-    (booking) =>
-      booking.status.toUpperCase() === "COMPLETED" &&
-      !disputedBookingIds.has(booking.id),
-  );
-
   return (
     <div className="grid gap-8">
       <Card>
         <CardHeader>
           <CardTitle>Report an issue with a completed booking</CardTitle>
+          <CardAction>
+            <OpenDisputeDialog onOpened={handleOpened} />
+          </CardAction>
           <CardDescription>
-            If a resource was not returned, was damaged, or was misplaced,
-            open a dispute so the resource&apos;s administrators can review
-            it.
+            If a resource you booked was unavailable, broken, or didn&apos;t
+            match the description, enter its booking ID to open a dispute so
+            the resource&apos;s administrators can review it.
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          {eligibleBookings.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No completed bookings are currently eligible for a dispute.
-            </p>
-          ) : (
-            <div className="border border-line">
-              {eligibleBookings.map((booking) => (
-                <div
-                  key={booking.id}
-                  className="flex flex-wrap items-center justify-between gap-3 border-b border-line p-4 last:border-b-0"
-                >
-                  <div>
-                    <p className="font-medium">
-                      {booking.resourceSlot.resource.name}
-                    </p>
-                    <code className="mt-1 block text-xs text-muted-foreground">
-                      {booking.id}
-                    </code>
-                  </div>
-                  <OpenDisputeDialog booking={booking} onOpened={handleOpened} />
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
       </Card>
 
       {state.disputes.length === 0 ? (
