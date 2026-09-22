@@ -2,11 +2,12 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { GavelIcon } from "lucide-react";
+import { GavelIcon, MailIcon } from "lucide-react";
 
 import { DisputeStatusBadge } from "@/components/dispute-status-badge";
 import { RequestErrorCard } from "@/components/request-error-card";
 import { ReviewDisputeDialog } from "@/components/review-dispute-dialog";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardDescription,
@@ -119,8 +120,28 @@ export function OrganizationDisputes() {
               Opened {formatOrganizationDate(dispute.createdAt)} · Booking{" "}
               <code>{dispute.bookingId}</code>
             </p>
+            {dispute.submittedByUser ? (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Submitted by {dispute.submittedByUser.firstName}{" "}
+                {dispute.submittedByUser.lastName}
+              </p>
+            ) : null}
           </div>
-          <ReviewDisputeDialog dispute={dispute} onUpdated={handleUpdated} />
+          <div className="flex flex-wrap items-center gap-2 md:justify-end">
+            {dispute.submittedByUser ? (
+              <Button
+                variant="outline"
+                size="sm"
+                render={
+                  <a href={`mailto:${dispute.submittedByUser.email}`} />
+                }
+              >
+                <MailIcon data-icon="inline-start" />
+                Contact
+              </Button>
+            ) : null}
+            <ReviewDisputeDialog dispute={dispute} onUpdated={handleUpdated} />
+          </div>
         </div>
       ))}
     </div>
