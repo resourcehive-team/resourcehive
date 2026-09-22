@@ -29,7 +29,8 @@ export function AnalyticsSections() {
         setState({
           status: "loaded",
           isPlatformAdmin: account.user.platformRole === "PLATFORM_ADMIN",
-          isOrgAdmin: account.organizationContext.role === "ADMIN",
+          isOrgAdmin:
+            account.organizationContext.role?.toUpperCase() === "ADMIN",
         });
       })
       .catch((requestError: unknown) => {
