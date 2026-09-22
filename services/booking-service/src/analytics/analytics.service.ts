@@ -57,7 +57,7 @@ export class AnalyticsService {
       LEFT JOIN bookings b ON b.resource_slot_id = rs.id
         AND b.status IN ${ACTIVE_STATUSES}
         AND b.created_at BETWEEN ${from} AND ${to}
-      WHERE r.owner_organization_id IN (${Prisma.join(orgIds)})
+      WHERE r.owner_organization_id IN (${Prisma.join(orgIds.map((id) => Prisma.sql`${id}::uuid`))})
       GROUP BY r.id, r.name
       ORDER BY "bookingCount" DESC
     `;
@@ -77,7 +77,7 @@ export class AnalyticsService {
       JOIN resources r ON r.id = rs.resource_id
       JOIN organization_memberships om ON om.user_id = b.user_id
       JOIN organizations o ON o.id = om.organization_id
-      WHERE r.owner_organization_id IN (${Prisma.join(orgIds)})
+      WHERE r.owner_organization_id IN (${Prisma.join(orgIds.map((id) => Prisma.sql`${id}::uuid`))})
         AND b.status IN ${ACTIVE_STATUSES}
         AND b.created_at BETWEEN ${from} AND ${to}
       GROUP BY om.organization_id, o.name
@@ -98,7 +98,7 @@ export class AnalyticsService {
       FROM bookings b
       JOIN resource_slots rs ON rs.id = b.resource_slot_id
       JOIN resources r ON r.id = rs.resource_id
-      WHERE r.owner_organization_id IN (${Prisma.join(orgIds)})
+      WHERE r.owner_organization_id IN (${Prisma.join(orgIds.map((id) => Prisma.sql`${id}::uuid`))})
         AND b.status IN ${ACTIVE_STATUSES}
         AND b.created_at BETWEEN ${from} AND ${to}
       GROUP BY 1, 2
@@ -117,7 +117,7 @@ export class AnalyticsService {
       FROM bookings b
       JOIN resource_slots rs ON rs.id = b.resource_slot_id
       JOIN resources r ON r.id = rs.resource_id
-      WHERE b.user_id = ${user.userId}
+      WHERE b.user_id = ${user.userId}::uuid
         AND b.status IN ${ACTIVE_STATUSES}
         AND b.created_at BETWEEN ${from} AND ${to}
       GROUP BY r.id, r.name
