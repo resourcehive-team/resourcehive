@@ -4,6 +4,7 @@ import { apiRequest } from "@/lib/api-client";
 import type {
   OrganizationAnalytics,
   PersonalAnalytics,
+  PlatformAnalytics,
 } from "@/lib/booking-service/types";
 
 export interface AnalyticsRangeOptions {
@@ -31,6 +32,17 @@ export function getPersonalAnalytics(
   return apiRequest<PersonalAnalytics>(`/analytics/me${rangeQuery(range)}`, {
     signal,
   });
+}
+
+export function getPlatformAnalytics(
+  options: AnalyticsRangeOptions = {},
+): Promise<PlatformAnalytics> {
+  const { signal, ...range } = options;
+
+  return apiRequest<PlatformAnalytics>(
+    `/analytics/platform${rangeQuery(range)}`,
+    { signal },
+  );
 }
 
 function rangeQuery({ from, to }: { from?: Date; to?: Date }): string {

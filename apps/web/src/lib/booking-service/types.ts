@@ -101,6 +101,18 @@ export interface PersonalAnalytics {
   peakTimes: PeakSlot[];
 }
 
+export interface PlatformCompanyOverview {
+  organizationId: string;
+  organizationName: string;
+  newSignups: number;
+  totalItemsListed: number;
+  totalBorrows: number;
+}
+
+export interface PlatformAnalytics {
+  companies: PlatformCompanyOverview[];
+}
+
 export interface Dispute {
   id: string;
   bookingId: string;
