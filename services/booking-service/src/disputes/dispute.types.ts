@@ -6,9 +6,9 @@ export type DisputeTransactionClient = Pick<
 >;
 
 export const DISPUTE_REASONS = [
-  "NOT_RETURNED",
-  "DAMAGED",
-  "MISPLACED",
+  "UNAVAILABLE",
+  "BROKEN",
+  "NOT_AS_DESCRIBED",
   "OTHER",
 ] as const;
 export type DisputeReason = (typeof DISPUTE_REASONS)[number];
@@ -30,6 +30,7 @@ export type ResourceAction = (typeof RESOURCE_ACTIONS)[number];
 
 export interface CreateDisputeInput {
   bookingId: string;
+  resolverOrganizationId: string;
   submittedByUserId: string;
   reason: DisputeReason;
   description: string;
@@ -46,6 +47,7 @@ export interface DisputeRecord {
   id: string;
   bookingId: string;
   rootOrganizationId: string;
+  resolverOrganizationId: string;
   submittedByUserId: string;
   reason: string;
   description: string;
@@ -56,6 +58,16 @@ export interface DisputeRecord {
   createdAt: Date;
   updatedAt: Date;
   resolvedAt: Date | null;
+}
+
+export interface DisputeSubmitterContact {
+  firstName: string;
+  lastName: string;
+  email: string;
+}
+
+export interface DisputeWithSubmitter extends DisputeRecord {
+  submittedByUser: DisputeSubmitterContact;
 }
 
 export interface DisputeWithBookingContext extends DisputeRecord {

@@ -1,8 +1,6 @@
 import { HttpException, Injectable } from "@nestjs/common";
 import { PrismaService } from "@resourcehive/database";
 import { AuthenticatedUser } from "@resourcehive/service-auth";
-import { BookingAuthorizationService } from "../authorization/booking-authorization.service";
-import { SlotRepository } from "../slots/slot.repository";
 import { CreateDisputeDto, UpdateDisputeDto } from "./dispute.dto";
 import { DisputeRepository } from "./dispute.repository";
 import {
@@ -12,11 +10,17 @@ import {
   DisputeBookingNotFoundError,
   DisputeForbiddenError,
   DisputeInvalidTransitionError,
+  DisputeNoOrganizationError,
   DisputeNotFoundError,
   DisputeOperationError,
   DisputeResolutionNotesRequiredError,
+  DisputeTenantAdminCannotOpenError,
 } from "./dispute.errors";
-import { DisputeRecord, DisputeStatus } from "./dispute.types";
+import {
+  DisputeRecord,
+  DisputeStatus,
+  DisputeWithSubmitter,
+} from "./dispute.types";
 
 const TERMINAL_STATUSES: DisputeStatus[] = ["RESOLVED", "REJECTED"];
 const ALLOWED_TRANSITIONS: Record<DisputeStatus, DisputeStatus[]> = {
@@ -30,8 +34,6 @@ const ALLOWED_TRANSITIONS: Record<DisputeStatus, DisputeStatus[]> = {
 export class DisputeService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly authorization: BookingAuthorizationService,
-    private readonly slots: SlotRepository,
     private readonly disputes: DisputeRepository,
   ) {}
 
@@ -40,6 +42,10 @@ export class DisputeService {
     user: AuthenticatedUser,
   ): Promise<DisputeRecord> {
     try {
+      const resolverOrganizationId = await this.resolveResolverOrganizationId(
+        user.userId,
+      );
+
       return await this.prisma.$transaction(async (transaction) => {
         const booking = await transaction.booking.findFirst({
           where: { id: dto.bookingId, userId: user.userId },
@@ -59,6 +65,7 @@ export class DisputeService {
         const dispute = await this.disputes.create(
           {
             bookingId: dto.bookingId,
+            resolverOrganizationId,
             submittedByUserId: user.userId,
             reason: dto.reason,
             description: dto.description,
@@ -89,18 +96,15 @@ export class DisputeService {
     }
   }
 
-  async listForOrg(user: AuthenticatedUser): Promise<DisputeRecord[]> {
+  async listForOrg(user: AuthenticatedUser): Promise<DisputeWithSubmitter[]> {
     try {
-      const memberships = await this.prisma.organizationMembership.findMany({
-        where: { userId: user.userId, role: "ADMIN", status: "APPROVED" },
-        select: { organizationId: true },
-      });
-      if (memberships.length === 0) {
+      const organizationIds = await this.administeredOrganizationIds(
+        user.userId,
+      );
+      if (organizationIds.length === 0) {
         throw new DisputeAdministratorRequiredError();
       }
-      return await this.disputes.findForOrganizations(
-        memberships.map((m) => m.organizationId),
-      );
+      return await this.disputes.findForResolverOrganizations(organizationIds);
     } catch (error) {
       this.handleError(error, "retrieve");
     }
@@ -111,10 +115,7 @@ export class DisputeService {
       const dispute = await this.disputes.findById(id);
       if (!dispute) throw new DisputeNotFoundError();
       if (dispute.submittedByUserId !== user.userId) {
-        await this.assertCanManage(
-          dispute.booking.resourceSlot.resource.id,
-          user,
-        );
+        await this.assertCanManage(dispute.resolverOrganizationId, user);
       }
       return dispute;
     } catch (error) {
@@ -130,10 +131,7 @@ export class DisputeService {
     try {
       const dispute = await this.disputes.findById(id);
       if (!dispute) throw new DisputeNotFoundError();
-      await this.assertCanManage(
-        dispute.booking.resourceSlot.resource.id,
-        user,
-      );
+      await this.assertCanManage(dispute.resolverOrganizationId, user);
 
       const nextStatus = dto.status ?? (dispute.status as DisputeStatus);
       if (dto.status && dto.status !== dispute.status) {
@@ -173,17 +171,54 @@ export class DisputeService {
     }
   }
 
+  /**
+   * The submitter's own organization resolves their disputes. If the
+   * submitter is themselves an organization admin, resolution escalates to
+   * their closest parent organization's admin, since there is no one above
+   * them within their own organization. A tenant (root organization) admin
+   * has no parent to escalate to and cannot open disputes.
+   */
+  private async resolveResolverOrganizationId(userId: string): Promise<string> {
+    const membership = await this.prisma.organizationMembership.findFirst({
+      where: { userId, status: "APPROVED" },
+      orderBy: { joinedAt: "asc" },
+      select: { organizationId: true, role: true },
+    });
+    if (!membership) throw new DisputeNoOrganizationError();
+    if (membership.role !== "ADMIN") return membership.organizationId;
+
+    const organization = await this.prisma.organization.findUnique({
+      where: { id: membership.organizationId },
+      select: { parentId: true },
+    });
+    if (!organization?.parentId) {
+      throw new DisputeTenantAdminCannotOpenError();
+    }
+    return organization.parentId;
+  }
+
+  private async administeredOrganizationIds(userId: string): Promise<string[]> {
+    const memberships = await this.prisma.organizationMembership.findMany({
+      where: { userId, role: "ADMIN", status: "APPROVED" },
+      select: { organizationId: true },
+    });
+    return memberships.map((m) => m.organizationId);
+  }
+
   private async assertCanManage(
-    resourceId: string,
+    resolverOrganizationId: string,
     user: AuthenticatedUser,
   ): Promise<void> {
-    const context = await this.authorization.resolve(user);
-    const canManage = await this.slots.canManageResource(
-      resourceId,
-      context.userId,
-      context.rootOrganizationId,
-    );
-    if (!canManage) throw new DisputeForbiddenError();
+    const membership = await this.prisma.organizationMembership.findFirst({
+      where: {
+        userId: user.userId,
+        organizationId: resolverOrganizationId,
+        role: "ADMIN",
+        status: "APPROVED",
+      },
+      select: { id: true },
+    });
+    if (!membership) throw new DisputeForbiddenError();
   }
 
   private handleError(error: unknown, operation: string): never {

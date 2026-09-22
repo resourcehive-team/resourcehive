@@ -38,7 +38,19 @@ export class DisputeForbiddenError extends ForbiddenException {
 
 export class DisputeAdministratorRequiredError extends ForbiddenException {
   constructor() {
-    super("Administrator access to the resource's organization is required");
+    super("Administrator access to an organization is required");
+  }
+}
+
+export class DisputeNoOrganizationError extends ForbiddenException {
+  constructor() {
+    super("You must belong to an organization to open a dispute");
+  }
+}
+
+export class DisputeTenantAdminCannotOpenError extends ForbiddenException {
+  constructor() {
+    super("Tenant administrators cannot open disputes");
   }
 }
 

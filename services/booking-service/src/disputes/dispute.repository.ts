@@ -6,6 +6,7 @@ import {
   DisputeRecord,
   DisputeTransactionClient,
   DisputeWithBookingContext,
+  DisputeWithSubmitter,
   ResourceAction,
   TransitionDisputeInput,
 } from "./dispute.types";
@@ -46,6 +47,7 @@ export class DisputeRepository {
       data: {
         bookingId: input.bookingId,
         rootOrganizationId: booking!.resourceSlot.resource.rootOrganizationId,
+        resolverOrganizationId: input.resolverOrganizationId,
         submittedByUserId: input.submittedByUserId,
         reason: input.reason,
         description: input.description,
@@ -71,15 +73,14 @@ export class DisputeRepository {
     });
   }
 
-  findForOrganizations(
-    ownerOrganizationIds: string[],
-  ): Promise<DisputeRecord[]> {
+  findForResolverOrganizations(
+    resolverOrganizationIds: string[],
+  ): Promise<DisputeWithSubmitter[]> {
     return this.prisma.bookingDispute.findMany({
-      where: {
-        booking: {
-          resourceSlot: {
-            resource: { ownerOrganizationId: { in: ownerOrganizationIds } },
-          },
+      where: { resolverOrganizationId: { in: resolverOrganizationIds } },
+      include: {
+        submittedByUser: {
+          select: { firstName: true, lastName: true, email: true },
         },
       },
       orderBy: { createdAt: "desc" },

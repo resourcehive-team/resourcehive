@@ -1,7 +1,5 @@
 import { ConflictException, ForbiddenException } from "@nestjs/common";
 import { PrismaService } from "@resourcehive/database";
-import { BookingAuthorizationService } from "../authorization/booking-authorization.service";
-import { SlotRepository } from "../slots/slot.repository";
 import { DisputeRepository } from "./dispute.repository";
 import { DisputeService } from "./dispute.service";
 
@@ -10,32 +8,30 @@ describe("DisputeService", () => {
     booking: { findFirst: jest.fn() },
     bookingDispute: { findUnique: jest.fn() },
   };
+  const membershipFindFirst = jest.fn();
+  const membershipFindMany = jest.fn();
+  const organizationFindUnique = jest.fn();
   const prisma = {
     $transaction: jest.fn(
       async (callback: (client: typeof transaction) => Promise<unknown>) =>
         callback(transaction),
     ),
-    organizationMembership: { findMany: jest.fn() },
+    organizationMembership: {
+      findFirst: membershipFindFirst,
+      findMany: membershipFindMany,
+    },
+    organization: { findUnique: organizationFindUnique },
   } as unknown as PrismaService;
-  const authorization = {
-    resolve: jest.fn().mockResolvedValue({
-      userId: "admin-id",
-      organizationId: "org-id",
-      rootOrganizationId: "root-id",
-      role: "ADMIN",
-    }),
-  } as unknown as BookingAuthorizationService;
-  const slots = {
-    canManageResource: jest.fn(),
-  } as unknown as SlotRepository;
   const applyTransition = jest.fn();
+  const createDispute = jest.fn();
   const disputes = {
-    create: jest.fn(),
+    create: createDispute,
     addEvent: jest.fn(),
     findById: jest.fn(),
+    findForResolverOrganizations: jest.fn(),
     applyTransition,
   } as unknown as DisputeRepository;
-  const service = new DisputeService(prisma, authorization, slots, disputes);
+  const service = new DisputeService(prisma, disputes);
   const user = {
     userId: "user-id",
     email: "user@example.edu",
@@ -46,6 +42,10 @@ describe("DisputeService", () => {
   beforeEach(() => jest.clearAllMocks());
 
   it("rejects opening a dispute for a booking that is not completed", async () => {
+    membershipFindFirst.mockResolvedValue({
+      organizationId: "org-id",
+      role: "MEMBER",
+    });
     transaction.booking.findFirst.mockResolvedValue({
       id: "booking-id",
       status: "CONFIRMED",
@@ -53,13 +53,17 @@ describe("DisputeService", () => {
 
     await expect(
       service.open(
-        { bookingId: "booking-id", reason: "DAMAGED", description: "broken" },
+        { bookingId: "booking-id", reason: "BROKEN", description: "broken" },
         user,
       ),
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
   it("rejects opening a second dispute for the same booking", async () => {
+    membershipFindFirst.mockResolvedValue({
+      organizationId: "org-id",
+      role: "MEMBER",
+    });
     transaction.booking.findFirst.mockResolvedValue({
       id: "booking-id",
       status: "COMPLETED",
@@ -68,17 +72,70 @@ describe("DisputeService", () => {
 
     await expect(
       service.open(
-        { bookingId: "booking-id", reason: "DAMAGED", description: "broken" },
+        { bookingId: "booking-id", reason: "BROKEN", description: "broken" },
         user,
       ),
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
-  it("requires resource-management authority to update a dispute", async () => {
+  it("rejects opening a dispute when the user has no organization", async () => {
+    membershipFindFirst.mockResolvedValue(null);
+
+    await expect(
+      service.open(
+        { bookingId: "booking-id", reason: "BROKEN", description: "broken" },
+        user,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(transaction.booking.findFirst).not.toHaveBeenCalled();
+  });
+
+  it("escalates an admin's dispute to their parent organization", async () => {
+    membershipFindFirst.mockResolvedValue({
+      organizationId: "child-org-id",
+      role: "ADMIN",
+    });
+    organizationFindUnique.mockResolvedValue({ parentId: "parent-org-id" });
+    transaction.booking.findFirst.mockResolvedValue({
+      id: "booking-id",
+      status: "COMPLETED",
+    });
+    transaction.bookingDispute.findUnique.mockResolvedValue(null);
+    createDispute.mockResolvedValue({ id: "dispute-id", status: "OPEN" });
+
+    await service.open(
+      { bookingId: "booking-id", reason: "BROKEN", description: "broken" },
+      user,
+    );
+
+    expect(createDispute).toHaveBeenCalledWith(
+      expect.objectContaining({ resolverOrganizationId: "parent-org-id" }),
+      transaction,
+    );
+  });
+
+  it("rejects a tenant (root organization) admin opening a dispute", async () => {
+    membershipFindFirst.mockResolvedValue({
+      organizationId: "root-org-id",
+      role: "ADMIN",
+    });
+    organizationFindUnique.mockResolvedValue({ parentId: null });
+
+    await expect(
+      service.open(
+        { bookingId: "booking-id", reason: "BROKEN", description: "broken" },
+        user,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(transaction.booking.findFirst).not.toHaveBeenCalled();
+  });
+
+  it("requires resolver-organization admin authority to update a dispute", async () => {
     jest.spyOn(disputes, "findById").mockResolvedValue({
       id: "dispute-id",
       status: "OPEN",
       submittedByUserId: "someone-else",
+      resolverOrganizationId: "org-id",
       resolutionNotes: null,
       booking: {
         userId: "someone-else",
@@ -92,7 +149,7 @@ describe("DisputeService", () => {
         },
       },
     } as never);
-    jest.spyOn(slots, "canManageResource").mockResolvedValue(false);
+    membershipFindFirst.mockResolvedValue(null);
 
     await expect(
       service.transition("dispute-id", { status: "UNDER_REVIEW" }, user),
@@ -104,6 +161,7 @@ describe("DisputeService", () => {
       id: "dispute-id",
       status: "OPEN",
       submittedByUserId: "someone-else",
+      resolverOrganizationId: "org-id",
       resolutionNotes: null,
       booking: {
         userId: "someone-else",
@@ -117,7 +175,7 @@ describe("DisputeService", () => {
         },
       },
     } as never);
-    jest.spyOn(slots, "canManageResource").mockResolvedValue(true);
+    membershipFindFirst.mockResolvedValue({ id: "membership-id" });
 
     await expect(
       service.transition("dispute-id", { status: "RESOLVED" }, user),
