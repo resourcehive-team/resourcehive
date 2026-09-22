@@ -4,6 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Building2Icon } from "lucide-react";
 
+import { CategoryLineChart } from "@/components/category-line-chart";
 import { RequestErrorCard } from "@/components/request-error-card";
 import {
   Card,
@@ -69,39 +70,91 @@ export function PlatformAnalyticsSection() {
 
   const { companies } = state.analytics;
 
-  return (
-    <Card>
-      <CardHeader>
-        <Building2Icon className="mb-2 size-6 text-clay" />
-        <CardTitle>Companies on the platform</CardTitle>
-        <CardDescription>
-          Signup pace, listed inventory, and successful borrows per company
-          over the last 90 days.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {companies.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
+  if (companies.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <Building2Icon className="mb-2 size-6 text-clay" />
+          <CardTitle>Companies on the platform</CardTitle>
+          <CardDescription>
             No companies have been onboarded yet.
-          </p>
-        ) : (
-          <div className="border border-line">
-            {companies.map((company) => (
-              <div
-                key={company.organizationId}
-                className="flex flex-wrap items-center justify-between gap-4 border-b border-line p-4 last:border-b-0"
-              >
-                <p className="font-medium">{company.organizationName}</p>
-                <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted-foreground">
-                  <span>{company.newSignups} new signups</span>
-                  <span>{company.totalItemsListed} items listed</span>
-                  <span>{company.totalBorrows} borrows/shares</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
+
+  const chartData = companies.map((company) => ({
+    name: company.organizationName,
+    newSignups: company.newSignups,
+    totalItemsListed: company.totalItemsListed,
+    totalBorrows: company.totalBorrows,
+  }));
+
+  return (
+    <div className="grid gap-6">
+      <Card>
+        <CardHeader>
+          <Building2Icon className="mb-2 size-6 text-clay" />
+          <CardTitle>New signups</CardTitle>
+          <CardDescription>
+            How fast each company is adding new users to the platform, over
+            the last 90 days.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <CategoryLineChart
+            data={chartData}
+            categoryKey="name"
+            series={[{ key: "newSignups", label: "New signups" }]}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Total items listed</CardTitle>
+          <CardDescription>
+            The total number of resources each company has uploaded to the
+            platform.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <CategoryLineChart
+            data={chartData}
+            categoryKey="name"
+            series={[
+              {
+                key: "totalItemsListed",
+                label: "Items listed",
+                color: "var(--chart-3)",
+              },
+            ]}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Total borrows/shares</CardTitle>
+          <CardDescription>
+            Successful bookings each company has made over the last 90 days.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <CategoryLineChart
+            data={chartData}
+            categoryKey="name"
+            series={[
+              {
+                key: "totalBorrows",
+                label: "Borrows/shares",
+                color: "var(--chart-4)",
+              },
+            ]}
+          />
+        </CardContent>
+      </Card>
+    </div>
   );
 }

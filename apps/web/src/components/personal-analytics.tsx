@@ -4,6 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { ChartColumnIcon } from "lucide-react";
 
+import { CategoryLineChart } from "@/components/category-line-chart";
 import { PeakTimesHeatmap } from "@/components/peak-times-heatmap";
 import { RequestErrorCard } from "@/components/request-error-card";
 import {
@@ -85,21 +86,18 @@ export function PersonalAnalyticsSection() {
               No bookings in this range yet.
             </p>
           ) : (
-            <div className="border border-line">
-              {usage.map((resource) => (
-                <div
-                  key={resource.resourceId}
-                  className="flex flex-wrap items-center justify-between gap-3 border-b border-line p-4 last:border-b-0"
-                >
-                  <p className="font-medium">{resource.name}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {resource.bookingCount} booking
-                    {resource.bookingCount === 1 ? "" : "s"} ·{" "}
-                    {resource.totalHours.toFixed(1)} hours
-                  </p>
-                </div>
-              ))}
-            </div>
+            <CategoryLineChart
+              data={usage.map((resource) => ({
+                name: resource.name,
+                bookingCount: resource.bookingCount,
+                totalHours: Number(resource.totalHours.toFixed(1)),
+              }))}
+              categoryKey="name"
+              series={[
+                { key: "bookingCount", label: "Bookings" },
+                { key: "totalHours", label: "Hours" },
+              ]}
+            />
           )}
         </CardContent>
       </Card>
