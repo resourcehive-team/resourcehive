@@ -22,12 +22,22 @@ describe("Booking service health (e2e)", () => {
 
   it("returns service and database readiness", async () => {
     const response = await request(app.getHttpServer())
-      .get("/health")
+      .get("/health/ready")
       .expect(200);
     expect(response.body).toMatchObject({
       service: "booking-service",
       status: "ok",
       database: "connected",
+    });
+  });
+
+  it("returns liveness without querying the database", async () => {
+    const response = await request(app.getHttpServer())
+      .get("/health/live")
+      .expect(200);
+    expect(response.body).toMatchObject({
+      service: "booking-service",
+      status: "ok",
     });
   });
 

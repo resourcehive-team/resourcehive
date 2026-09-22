@@ -8,11 +8,25 @@ export interface HealthResponse {
   timestamp: string;
 }
 
+export interface LivenessResponse {
+  service: "booking-service";
+  status: "ok";
+  timestamp: string;
+}
+
 @Injectable()
 export class HealthService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async check(): Promise<HealthResponse> {
+  checkLiveness(): LivenessResponse {
+    return {
+      service: "booking-service",
+      status: "ok",
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  async checkReadiness(): Promise<HealthResponse> {
     try {
       await this.prisma.$queryRaw`SELECT 1`;
     } catch {
