@@ -72,7 +72,28 @@ export class ResourcesService {
       this.prisma.resource.count({ where: whereClause }),
     ]);
 
-    return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+    const resourceIds = data.map((r) => r.id);
+    const ratingsAggr = await this.prisma.resourceRating.groupBy({
+      by: ['resourceId'],
+      where: { resourceId: { in: resourceIds } },
+      _avg: { rating: true },
+      _count: { rating: true },
+    });
+
+    const aggrMap = new Map(ratingsAggr.map((a) => [a.resourceId, a]));
+
+    const enrichedData = data.map((resource) => {
+      const aggr = aggrMap.get(resource.id);
+      return {
+        ...resource,
+        ratingSummary: {
+          average: aggr?._avg.rating ?? 0,
+          total: aggr?._count.rating ?? 0,
+        },
+      };
+    });
+
+    return { data: enrichedData, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
   async findOne(organizationId: string, resourceId: string) {
@@ -184,6 +205,7 @@ export class ResourcesService {
       update: {
         rating,
         comment,
+        createdAt: new Date(),
       },
       create: {
         resourceId,
