@@ -29,6 +29,14 @@ export interface PersonalResourceUsage extends ResourceDemand {
   totalHours: number;
 }
 
+export interface PlatformCompanyOverview {
+  organizationId: string;
+  organizationName: string;
+  newSignups: number;
+  totalItemsListed: number;
+  totalBorrows: number;
+}
+
 @Injectable()
 export class AnalyticsService {
   constructor(
@@ -136,6 +144,60 @@ export class AnalyticsService {
       GROUP BY 1, 2
       ORDER BY "bookingCount" DESC
     `;
+  }
+
+  async platformOverview(
+    user: AuthenticatedUser,
+    range: DateRangeDto,
+  ): Promise<PlatformCompanyOverview[]> {
+    await this.assertPlatformAdmin(user);
+    const { from, to } = this.resolveRange(range);
+    return this.prisma.$queryRaw<PlatformCompanyOverview[]>`
+      WITH companies AS (
+        SELECT id, name FROM organizations WHERE parent_id IS NULL
+      ),
+      signups AS (
+        SELECT o.root_organization_id AS company_id,
+          COUNT(DISTINCT om.user_id)::int AS count
+        FROM organization_memberships om
+        JOIN organizations o ON o.id = om.organization_id
+        WHERE om.joined_at BETWEEN ${from} AND ${to}
+        GROUP BY o.root_organization_id
+      ),
+      items AS (
+        SELECT root_organization_id AS company_id, COUNT(*)::int AS count
+        FROM resources
+        GROUP BY root_organization_id
+      ),
+      borrows AS (
+        SELECT r.root_organization_id AS company_id, COUNT(b.id)::int AS count
+        FROM bookings b
+        JOIN resource_slots rs ON rs.id = b.resource_slot_id
+        JOIN resources r ON r.id = rs.resource_id
+        WHERE b.status IN ${ACTIVE_STATUSES}
+          AND b.created_at BETWEEN ${from} AND ${to}
+        GROUP BY r.root_organization_id
+      )
+      SELECT c.id AS "organizationId", c.name AS "organizationName",
+        COALESCE(s.count, 0) AS "newSignups",
+        COALESCE(i.count, 0) AS "totalItemsListed",
+        COALESCE(b.count, 0) AS "totalBorrows"
+      FROM companies c
+      LEFT JOIN signups s ON s.company_id = c.id
+      LEFT JOIN items i ON i.company_id = c.id
+      LEFT JOIN borrows b ON b.company_id = c.id
+      ORDER BY c.name
+    `;
+  }
+
+  private async assertPlatformAdmin(user: AuthenticatedUser): Promise<void> {
+    const record = await this.prisma.user.findUnique({
+      where: { id: user.userId },
+      select: { platformRole: true },
+    });
+    if (record?.platformRole !== "PLATFORM_ADMIN") {
+      throw new ForbiddenException("Platform administrator access is required");
+    }
   }
 
   private async administeredOrganizationIds(

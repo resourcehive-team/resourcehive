@@ -39,4 +39,12 @@ export class AnalyticsController {
     ]);
     return { usage, peakTimes };
   }
+
+  @Get("platform")
+  async platform(
+    @Query() range: DateRangeDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return { companies: await this.analytics.platformOverview(user, range) };
+  }
 }

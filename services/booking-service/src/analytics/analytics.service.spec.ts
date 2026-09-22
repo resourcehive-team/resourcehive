@@ -5,9 +5,11 @@ import { AnalyticsService } from "./analytics.service";
 
 describe("AnalyticsService", () => {
   const organizationMembership = { findMany: jest.fn() };
+  const findUniqueUser = jest.fn();
   const queryRaw = jest.fn().mockResolvedValue([]);
   const prisma = {
     organizationMembership,
+    user: { findUnique: findUniqueUser },
     $queryRaw: queryRaw,
   } as unknown as PrismaService;
   const authorization = {
@@ -55,6 +57,23 @@ describe("AnalyticsService", () => {
     await service.myUsage(user, {});
 
     expect(organizationMembership.findMany).not.toHaveBeenCalled();
+    expect(queryRaw).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects platform analytics for a non platform administrator", async () => {
+    findUniqueUser.mockResolvedValue({ platformRole: "USER" });
+
+    await expect(service.platformOverview(user, {})).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    expect(queryRaw).not.toHaveBeenCalled();
+  });
+
+  it("queries platform overview for a platform administrator", async () => {
+    findUniqueUser.mockResolvedValue({ platformRole: "PLATFORM_ADMIN" });
+
+    await service.platformOverview(user, {});
+
     expect(queryRaw).toHaveBeenCalledTimes(1);
   });
 });
