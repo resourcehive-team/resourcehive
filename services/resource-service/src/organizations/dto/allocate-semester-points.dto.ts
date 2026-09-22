@@ -17,4 +17,12 @@ export class AllocateSemesterPointsDto {
   @IsString()
   @IsNotEmpty()
   semesterName: string;
+
+  @ApiProperty({
+    description: 'The target child organization ID to receive points',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @IsString()
+  @IsNotEmpty()
+  targetOrganizationId: string;
 }

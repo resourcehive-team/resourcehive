@@ -17,6 +17,7 @@ describe('ResourcesService', () => {
     resourceRating: {
       upsert: jest.fn(),
       findMany: jest.fn(),
+      groupBy: jest.fn(),
     },
     organization: {
       findUnique: jest.fn(),

@@ -87,14 +87,55 @@ export class OrganizationsService {
 
   async allocateSemesterPoints(
     organizationId: string,
+    targetOrganizationId: string,
     amount: number,
     semesterName: string,
   ) {
-    const memberships = await this.prisma.organizationMembership.findMany({
-      where: { organizationId, status: 'APPROVED' },
+    const targetOrg = await this.prisma.organization.findUnique({
+      where: { id: targetOrganizationId },
+      select: { rootOrganizationId: true },
     });
 
-    if (memberships.length === 0) {
+    if (!targetOrg) {
+      throw new ConflictException(`Target organization not found.`);
+    }
+
+    const allOrgs = await this.prisma.organization.findMany({
+      where: { rootOrganizationId: targetOrg.rootOrganizationId },
+      select: { id: true, parentId: true },
+    });
+
+    const descendants = new Set<string>();
+    descendants.add(targetOrganizationId);
+    let added = true;
+    while (added) {
+      added = false;
+      for (const org of allOrgs) {
+        if (
+          org.parentId &&
+          descendants.has(org.parentId) &&
+          !descendants.has(org.id)
+        ) {
+          descendants.add(org.id);
+          added = true;
+        }
+      }
+    }
+
+    const memberships = await this.prisma.organizationMembership.findMany({
+      where: { organizationId: { in: Array.from(descendants) }, status: 'APPROVED' },
+    });
+
+    const uniqueMemberships = [];
+    const seenUsers = new Set<string>();
+    for (const m of memberships) {
+      if (!seenUsers.has(m.userId)) {
+        seenUsers.add(m.userId);
+        uniqueMemberships.push(m);
+      }
+    }
+
+    if (uniqueMemberships.length === 0) {
       return { count: 0 };
     }
 
@@ -102,7 +143,7 @@ export class OrganizationsService {
       async (tx) => {
         const existingAllocation = await tx.pointTransaction.findFirst({
           where: {
-            sourceOrganizationId: organizationId,
+            sourceOrganizationId: targetOrganizationId,
             transactionType: 'SEMESTER_ALLOCATION',
             description: semesterName,
           },
@@ -110,15 +151,15 @@ export class OrganizationsService {
 
         if (existingAllocation) {
           throw new ConflictException(
-            `Semester points for '${semesterName}' have already been allocated.`,
+            `Semester points for '${semesterName}' have already been allocated to this organization.`,
           );
         }
 
-        const data = memberships.map((membership) => ({
+        const data = uniqueMemberships.map((membership) => ({
           userId: membership.userId,
           amount,
           transactionType: 'SEMESTER_ALLOCATION',
-          sourceOrganizationId: organizationId,
+          sourceOrganizationId: targetOrganizationId,
           description: semesterName,
         }));
 
