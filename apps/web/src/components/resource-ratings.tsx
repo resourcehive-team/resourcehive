@@ -128,7 +128,7 @@ export function ResourceRatingsList({
                 : "Unrated"}
             </span>
             <span className="text-sm text-muted-foreground">
-              ({summary.total}{" "}
+              ({summary.total ?? 0}{" "}
               {summary.total === 1 ? "review" : "reviews"})
             </span>
           </div>
