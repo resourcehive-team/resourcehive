@@ -2,12 +2,12 @@ import type { DisputeReason } from "@/lib/booking-service/types";
 
 export function formatDisputeReason(reason: DisputeReason): string {
   switch (reason) {
-    case "NOT_RETURNED":
-      return "Resource was not returned";
-    case "DAMAGED":
-      return "Resource was damaged";
-    case "MISPLACED":
-      return "Resource was misplaced";
+    case "UNAVAILABLE":
+      return "Resource was unavailable";
+    case "BROKEN":
+      return "Resource was broken";
+    case "NOT_AS_DESCRIBED":
+      return "Resource didn't match the description";
     default:
       return "Other issue";
   }

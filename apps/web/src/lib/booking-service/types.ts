@@ -58,7 +58,11 @@ export interface CancelledBooking extends OrganizationBooking {
   slotStatus: string;
 }
 
-export type DisputeReason = "NOT_RETURNED" | "DAMAGED" | "MISPLACED" | "OTHER";
+export type DisputeReason =
+  | "UNAVAILABLE"
+  | "BROKEN"
+  | "NOT_AS_DESCRIBED"
+  | "OTHER";
 
 export type DisputeStatus =
   | "OPEN"
@@ -113,10 +117,17 @@ export interface PlatformAnalytics {
   companies: PlatformCompanyOverview[];
 }
 
+export interface DisputeSubmitter {
+  firstName: string;
+  lastName: string;
+  email: string;
+}
+
 export interface Dispute {
   id: string;
   bookingId: string;
   rootOrganizationId: string;
+  resolverOrganizationId: string;
   submittedByUserId: string;
   reason: DisputeReason;
   description: string;
@@ -127,4 +138,6 @@ export interface Dispute {
   createdAt: string;
   updatedAt: string;
   resolvedAt: string | null;
+  /** Only present when listed via the organization/manage endpoint. */
+  submittedByUser?: DisputeSubmitter;
 }
