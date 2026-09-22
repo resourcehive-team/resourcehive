@@ -4,6 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { BoxesIcon, ChartColumnIcon, UsersIcon } from "lucide-react";
 
+import { HorizontalBarChart } from "@/components/horizontal-bar-chart";
 import { PeakTimesHeatmap } from "@/components/peak-times-heatmap";
 import { RequestErrorCard } from "@/components/request-error-card";
 import {
@@ -87,20 +88,13 @@ export function OrganizationAnalyticsSection() {
               No resources found for organizations you administer.
             </p>
           ) : (
-            <div className="border border-line">
-              {inventoryDemand.map((resource) => (
-                <div
-                  key={resource.resourceId}
-                  className="flex flex-wrap items-center justify-between gap-3 border-b border-line p-4 last:border-b-0"
-                >
-                  <p className="font-medium">{resource.name}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {resource.bookingCount} booking
-                    {resource.bookingCount === 1 ? "" : "s"}
-                  </p>
-                </div>
-              ))}
-            </div>
+            <HorizontalBarChart
+              data={inventoryDemand.map((resource) => ({
+                label: resource.name,
+                value: resource.bookingCount,
+              }))}
+              valueLabel="Bookings"
+            />
           )}
         </CardContent>
       </Card>
@@ -119,22 +113,14 @@ export function OrganizationAnalyticsSection() {
               No bookings in this range yet.
             </p>
           ) : (
-            <div className="border border-line">
-              {userSegmentation.map((organization) => (
-                <div
-                  key={organization.organizationId}
-                  className="flex flex-wrap items-center justify-between gap-3 border-b border-line p-4 last:border-b-0"
-                >
-                  <p className="font-medium">
-                    {organization.organizationName}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {organization.bookingCount} booking
-                    {organization.bookingCount === 1 ? "" : "s"}
-                  </p>
-                </div>
-              ))}
-            </div>
+            <HorizontalBarChart
+              data={userSegmentation.map((organization) => ({
+                label: organization.organizationName,
+                value: organization.bookingCount,
+              }))}
+              valueLabel="Bookings"
+              color="var(--chart-3)"
+            />
           )}
         </CardContent>
       </Card>
