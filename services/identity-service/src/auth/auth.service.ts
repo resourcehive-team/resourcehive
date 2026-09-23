@@ -65,6 +65,20 @@ export class AuthService {
     return secret;
   }
 
+  async uploadAvatar(userId: string, avatarUrl: string) {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { avatarUrl },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        avatarUrl: true,
+      },
+    });
+  }
+
   async register(registration: RegisterDto) {
     const email = registration.email.trim().toLowerCase();
     const emailDomain = this.getEmailDomain(email);

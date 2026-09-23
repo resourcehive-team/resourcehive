@@ -8,6 +8,7 @@ import { PrismaModule } from '@resourcehive/database';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { MembershipsModule } from './memberships/memberships.module';
 import { ResourcesModule } from './resources/resources.module';
+import { CloudinaryModule } from './cloudinary/cloudinary.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { ResourcesModule } from './resources/resources.module';
     OrganizationsModule,
     MembershipsModule,
     ResourcesModule,
+    CloudinaryModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -146,6 +146,23 @@ export class ResourcesService {
     });
   }
 
+  async uploadImage(
+    organizationId: string,
+    resourceId: string,
+    imageUrl: string,
+  ) {
+    const resource = await this.prisma.resource.findUnique({
+      where: { id: resourceId },
+    });
+    if (!resource || resource.ownerOrganizationId !== organizationId) {
+      throw new NotFoundException('Resource not found');
+    }
+    return this.prisma.resource.update({
+      where: { id: resourceId },
+      data: { imageUrl },
+    });
+  }
+
   async checkBookingAccess(organizationId: string, resourceId: string) {
     const resource = await this.findOne(organizationId, resourceId);
 
