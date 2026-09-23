@@ -126,7 +126,7 @@ export class OrganizationsService {
       where: { organizationId: { in: Array.from(descendants) }, status: 'APPROVED' },
     });
 
-    const uniqueMemberships = [];
+    const uniqueMemberships: typeof memberships = [];
     const seenUsers = new Set<string>();
     for (const m of memberships) {
       if (!seenUsers.has(m.userId)) {
@@ -166,6 +166,19 @@ export class OrganizationsService {
         const result = await tx.pointTransaction.createMany({
           data,
         });
+
+        for (const membership of uniqueMemberships) {
+          await tx.userPointBalance.upsert({
+            where: { userId: membership.userId },
+            update: {
+              availablePoints: { increment: amount },
+            },
+            create: {
+              userId: membership.userId,
+              availablePoints: amount,
+            },
+          });
+        }
 
         return { count: result.count };
       },
