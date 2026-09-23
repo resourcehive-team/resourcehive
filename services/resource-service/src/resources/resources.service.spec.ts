@@ -17,6 +17,7 @@ describe('ResourcesService', () => {
     resourceRating: {
       upsert: jest.fn(),
       findMany: jest.fn(),
+      groupBy: jest.fn(),
     },
     organization: {
       findUnique: jest.fn(),
@@ -142,11 +143,14 @@ describe('ResourcesService', () => {
       const data = [{ id: 'res-1' }];
       mockPrismaService.resource.findMany.mockResolvedValue(data);
       mockPrismaService.resource.count.mockResolvedValue(1);
+      mockPrismaService.resourceRating.groupBy.mockResolvedValue([
+        { resourceId: 'res-1', _avg: { rating: 4 }, _count: { rating: 2 } },
+      ]);
 
       const result = await service.findAll('org-1', 1, 10);
 
       expect(result).toEqual({
-        data,
+        data: [{ id: 'res-1', ratingSummary: { average: 4, total: 2 } }],
         total: 1,
         page: 1,
         limit: 10,
@@ -191,6 +195,39 @@ describe('ResourcesService', () => {
     });
   });
 
+  describe('uploadImage', () => {
+    it('should update the resource imageUrl', async () => {
+      mockPrismaService.resource.findUnique.mockResolvedValue({
+        id: 'res-1',
+        ownerOrganizationId: 'org-1',
+      });
+      mockPrismaService.resource.update.mockResolvedValue({
+        id: 'res-1',
+        imageUrl: 'http://example.com/image.png',
+      });
+
+      const result = await service.uploadImage(
+        'org-1',
+        'res-1',
+        'http://example.com/image.png',
+      );
+
+      expect(mockPrismaService.resource.update).toHaveBeenCalledWith({
+        where: { id: 'res-1' },
+        data: { imageUrl: 'http://example.com/image.png' },
+      });
+      expect(result.imageUrl).toBe('http://example.com/image.png');
+    });
+
+    it('should throw NotFoundException if resource not found or unauthorized', async () => {
+      mockPrismaService.resource.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.uploadImage('org-1', 'res-1', 'http://example.com/image.png'),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
   describe('upsertRating', () => {
     it('should upsert a rating if user has access to the resource', async () => {
       // Mock findOne for access check
@@ -216,7 +253,8 @@ describe('ResourcesService', () => {
       expect(result).toEqual(mockUpsertResult);
       expect(mockPrismaService.resourceRating.upsert).toHaveBeenCalledWith({
         where: { resourceId_userId: { resourceId: 'res-1', userId: 'user-1' } },
-        update: { rating: 5, comment: 'Great' },
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        update: { rating: 5, comment: 'Great', createdAt: expect.any(Date) },
         create: {
           resourceId: 'res-1',
           userId: 'user-1',

@@ -16,6 +16,7 @@ export interface AuthenticatedUser {
   email: string;
   firstName: string;
   lastName: string;
+  avatarUrl: string | null;
   status: string;
   platformRole: string;
   emailVerifiedAt: Date | null;
@@ -67,6 +68,7 @@ export class JwtAuthGuard implements CanActivate {
           email: true,
           firstName: true,
           lastName: true,
+          avatarUrl: true,
           status: true,
           platformRole: true,
           emailVerifiedAt: true,
@@ -93,6 +95,7 @@ export class JwtAuthGuard implements CanActivate {
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
+        avatarUrl: user.avatarUrl,
         status: user.status,
         platformRole: user.platformRole,
         emailVerifiedAt: user.emailVerifiedAt,

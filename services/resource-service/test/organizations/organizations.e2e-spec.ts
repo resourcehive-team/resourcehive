@@ -243,7 +243,11 @@ describe('OrganizationsController (e2e)', () => {
       const response = await request(app.getHttpServer())
         .post(`/organizations/${rootOrgId}/semester-points`)
         .set('Authorization', `Bearer ${adminJwtToken}`)
-        .send({ amount: 500, semesterName: uniqueSemester })
+        .send({
+          targetOrganizationIds: [rootOrgId],
+          amount: 500,
+          semesterName: uniqueSemester,
+        })
         .expect(201);
 
       expect(response.body).toHaveProperty('count');
@@ -267,7 +271,11 @@ describe('OrganizationsController (e2e)', () => {
       await request(app.getHttpServer())
         .post(`/organizations/${rootOrgId}/semester-points`)
         .set('Authorization', `Bearer ${jwtToken}`)
-        .send({ amount: 500, semesterName: 'Semester-1/2026' })
+        .send({
+          targetOrganizationIds: [rootOrgId],
+          amount: 500,
+          semesterName: 'Semester-1/2026',
+        })
         .expect(403);
     });
   });

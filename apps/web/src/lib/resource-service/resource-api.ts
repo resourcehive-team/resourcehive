@@ -6,6 +6,8 @@ import type {
   PaginatedResources,
   Resource,
   ResourceDetails,
+  ResourceRating,
+  ResourceRatingSummary,
 } from "@/lib/resource-service/types";
 
 export interface CreateResourceInput {
@@ -20,6 +22,11 @@ export interface ResourceListOptions {
   limit?: number;
   search?: string;
   signal?: AbortSignal;
+}
+
+export interface SubmitRatingInput {
+  rating: number;
+  comment?: string;
 }
 
 export function createResource(
@@ -103,10 +110,72 @@ export function getResourceDetails(
   );
 }
 
+export function getResourceRatings(
+  organizationId: string,
+  resourceId: string,
+  signal?: AbortSignal,
+): Promise<ResourceRatingSummary> {
+  const organization = apiPathSegment(organizationId, "Organization ID");
+  const resource = apiPathSegment(resourceId, "Resource ID");
+
+  return apiRequest<ResourceRatingSummary>(
+    `/resources/organization/${organization}/${resource}/ratings`,
+    { signal },
+  );
+}
+
+export function submitResourceRating(
+  organizationId: string,
+  resourceId: string,
+  input: SubmitRatingInput,
+): Promise<ResourceRating> {
+  const organization = apiPathSegment(organizationId, "Organization ID");
+  const resource = apiPathSegment(resourceId, "Resource ID");
+
+  if (!Number.isInteger(input.rating) || input.rating < 1 || input.rating > 5) {
+    throw new Error("Rating must be an integer between 1 and 5.");
+  }
+
+  return apiRequest<ResourceRating>(
+    `/resources/organization/${organization}/${resource}/ratings`,
+    {
+      method: "POST",
+      json: {
+        rating: input.rating,
+        ...(input.comment?.trim() ? { comment: input.comment.trim() } : {}),
+      },
+    },
+  );
+}
+
 function positiveInteger(value: number, label: string): number {
   if (!Number.isInteger(value) || value < 1) {
     throw new Error(`${label} must be a positive integer.`);
   }
 
   return value;
+}
+
+export interface ResourceImageUploadResponse {
+  imageUrl: string;
+}
+
+export function uploadResourceImage(
+  organizationId: string,
+  resourceId: string,
+  file: File,
+): Promise<ResourceImageUploadResponse> {
+  const organization = apiPathSegment(organizationId, "Organization ID");
+  const resource = apiPathSegment(resourceId, "Resource ID");
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+  return apiRequest<ResourceImageUploadResponse>(
+    `/resources/organization/${organization}/${resource}/image`,
+    {
+      method: "POST",
+      body: formData,
+    },
+  );
 }

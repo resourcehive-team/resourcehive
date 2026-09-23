@@ -2,19 +2,23 @@ import {
   Body,
   ConflictException,
   Controller,
+  Delete,
   Get,
   Header,
   HttpCode,
   HttpStatus,
   Post,
-  Delete,
   Req,
   Res,
   UnauthorizedException,
   ServiceUnavailableException,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import type { Request, Response } from 'express';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import {
   clearAuthenticationCookies,
   extractRefreshToken,
@@ -38,7 +42,10 @@ import {
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly cloudinaryService: CloudinaryService,
+  ) {}
 
   @Get('providers')
   getProviders() {
@@ -259,6 +266,7 @@ export class AuthController {
         lastName: user.lastName,
         displayName: `${user.firstName} ${user.lastName}`.trim(),
         emailVerified: user.emailVerifiedAt !== null,
+        avatarUrl: user.avatarUrl,
         status: user.status,
         platformRole: user.platformRole,
         createdAt: user.createdAt.toISOString(),
@@ -271,6 +279,38 @@ export class AuthController {
         role: user.role || null,
       },
     };
+  }
+
+  @Post('me/avatar')
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadAvatar(
+    @Req() request: AuthenticatedRequest,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    const user = request.user;
+    if (!user) {
+      throw new UnauthorizedException('Authentication is required');
+    }
+
+    const uploadResult = await this.cloudinaryService.uploadFile(
+      file,
+      `avatars/${user.userId}`,
+    );
+
+    return this.authService.uploadAvatar(user.userId, uploadResult.secure_url);
+  }
+
+  @Delete('me/avatar')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async removeAvatar(@Req() request: AuthenticatedRequest) {
+    const user = request.user;
+    if (!user) {
+      throw new UnauthorizedException('Authentication is required');
+    }
+
+    return this.authService.uploadAvatar(user.userId, null);
   }
 
   @Get('me/points')
