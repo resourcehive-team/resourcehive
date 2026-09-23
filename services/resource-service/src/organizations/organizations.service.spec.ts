@@ -201,7 +201,6 @@ describe('OrganizationsService', () => {
       );
     });
 
-
     it('should return count 0 if no active members exist', async () => {
       mockPrismaService.organization.findUnique.mockResolvedValue({
         rootOrganizationId: 'root-org',
