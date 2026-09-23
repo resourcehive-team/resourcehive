@@ -47,6 +47,15 @@ const mockUser: CurrentUserResponse["user"] = {
   platformRole: "USER",
   createdAt: "2026-07-01T00:00:00.000Z",
   avatarUrl: undefined,
+  authenticationMethods: {
+    password: true,
+    google: {
+      enabled: false,
+      connected: false,
+      email: null,
+      connectedAt: null,
+    },
+  },
 };
 
 describe("AccountProfileCard", () => {
