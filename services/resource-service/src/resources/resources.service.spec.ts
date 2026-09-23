@@ -220,7 +220,8 @@ describe('ResourcesService', () => {
       expect(result).toEqual(mockUpsertResult);
       expect(mockPrismaService.resourceRating.upsert).toHaveBeenCalledWith({
         where: { resourceId_userId: { resourceId: 'res-1', userId: 'user-1' } },
-        update: { rating: 5, comment: 'Great', createdAt: expect.any(Date) as unknown as Date },
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        update: { rating: 5, comment: 'Great', createdAt: expect.any(Date) },
         create: {
           resourceId: 'res-1',
           userId: 'user-1',
