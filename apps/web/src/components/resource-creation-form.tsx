@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeftIcon, CheckCircle2Icon, PlusIcon } from "lucide-react";
+import { ArrowLeftIcon, CheckCircle2Icon, PlusIcon, UploadIcon, ImageIcon, XIcon } from "lucide-react";
 
 import { RequestErrorCard } from "@/components/request-error-card";
 import { Button } from "@/components/ui/button";
@@ -45,7 +45,7 @@ import {
   getOrganizationDetails,
   getRootOrganizationDescendants,
 } from "@/lib/resource-service/organization-api";
-import { createResource } from "@/lib/resource-service/resource-api";
+import { createResource, uploadResourceImage } from "@/lib/resource-service/resource-api";
 import type {
   Organization,
   Resource,
@@ -74,6 +74,8 @@ export function ResourceCreationForm() {
   const [name, setName] = React.useState("");
   const [description, setDescription] = React.useState("");
   const [pointCost, setPointCost] = React.useState("0");
+  const [imageFile, setImageFile] = React.useState<File | null>(null);
+  const [imagePreview, setImagePreview] = React.useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [formError, setFormError] = React.useState("");
   const [createdResource, setCreatedResource] = React.useState<Resource | null>(
@@ -163,6 +165,11 @@ export function ResourceCreationForm() {
         pointCost: numericPointCost,
         allowedOrganizationIds,
       });
+      
+      if (imageFile) {
+        await uploadResourceImage(ownerOrganizationId, resource.id, imageFile);
+      }
+      
       setCreatedResource(resource);
     } catch (requestError) {
       if (requestError instanceof ApiAuthenticationError) {
@@ -181,6 +188,8 @@ export function ResourceCreationForm() {
     setName("");
     setDescription("");
     setPointCost("0");
+    setImageFile(null);
+    setImagePreview(null);
     setAllowedOrganizationIds(
       ownerOrganizationId ? [ownerOrganizationId] : [],
     );
@@ -296,6 +305,69 @@ export function ResourceCreationForm() {
                 onChange={(event) => setDescription(event.target.value)}
                 placeholder="What is this resource used for?"
               />
+            </Field>
+
+            <Field>
+              <FieldLabel htmlFor="resource-image">
+                Resource Image
+              </FieldLabel>
+              <div
+                className="relative flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-line bg-paper-alt p-6 transition-colors hover:bg-line/50 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2"
+                onClick={() => document.getElementById("resource-image")?.click()}
+              >
+                {imagePreview ? (
+                  <>
+                    <img
+                      src={imagePreview}
+                      alt="Preview"
+                      className="max-h-48 rounded-md object-contain"
+                    />
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="icon"
+                      className="absolute right-2 top-2 h-8 w-8 rounded-full"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setImageFile(null);
+                        setImagePreview(null);
+                        const input = document.getElementById("resource-image") as HTMLInputElement;
+                        if (input) input.value = "";
+                      }}
+                    >
+                      <XIcon className="h-4 w-4" />
+                      <span className="sr-only">Remove image</span>
+                    </Button>
+                  </>
+                ) : (
+                  <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                    <UploadIcon className="h-8 w-8" />
+                    <span className="text-sm font-medium">
+                      Click to upload an image
+                    </span>
+                    <span className="text-xs">PNG, JPG, or WEBP</span>
+                  </div>
+                )}
+                <input
+                  id="resource-image"
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) {
+                      setImageFile(file);
+                      setImagePreview(URL.createObjectURL(file));
+                    } else {
+                      setImageFile(null);
+                      setImagePreview(null);
+                    }
+                  }}
+                />
+              </div>
+              <FieldDescription>
+                Upload an image to represent this resource.
+              </FieldDescription>
             </Field>
 
             <Field>

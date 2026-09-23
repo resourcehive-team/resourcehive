@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Header,
   HttpCode,
@@ -182,6 +183,18 @@ export class AuthController {
     );
 
     return this.authService.uploadAvatar(user.userId, uploadResult.secure_url);
+  }
+
+  @Delete('me/avatar')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async removeAvatar(@Req() request: AuthenticatedRequest) {
+    const user = request.user;
+    if (!user) {
+      throw new UnauthorizedException('Authentication is required');
+    }
+
+    return this.authService.uploadAvatar(user.userId, null);
   }
 
   @Get('me/points')

@@ -1,3 +1,6 @@
+import * as React from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import {
   Avatar,
   AvatarFallback,
@@ -25,19 +28,62 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import type { CurrentUserResponse } from "@/lib/auth-api";
-import { PencilIcon, Trash2Icon, UploadIcon } from "lucide-react";
+import { uploadAvatar, removeAvatar, type CurrentUserResponse } from "@/lib/auth-api";
+import { PencilIcon, Trash2Icon, UploadIcon, Loader2Icon } from "lucide-react";
 
 export function AccountProfileCard({
   user,
 }: {
   user: CurrentUserResponse["user"];
 }) {
+  const router = useRouter();
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = React.useState(false);
+  const [localAvatarUrl, setLocalAvatarUrl] = React.useState<string | undefined>(user.avatarUrl);
+
+  React.useEffect(() => {
+    setLocalAvatarUrl(user.avatarUrl);
+  }, [user.avatarUrl]);
+
   const initials =
     [user.firstName, user.lastName]
       .filter(Boolean)
       .map((name) => name[0]?.toUpperCase())
       .join("") || "RU";
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsUploading(true);
+      const response = await uploadAvatar(file);
+      setLocalAvatarUrl(response.avatarUrl || undefined);
+      toast.success("Profile picture updated successfully.");
+      router.refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to upload profile picture.");
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
+  const handleRemove = async () => {
+    try {
+      setIsUploading(true);
+      await removeAvatar();
+      setLocalAvatarUrl(undefined);
+      toast.success("Profile picture removed successfully.");
+      router.refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to remove profile picture.");
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   return (
     <Card>
@@ -51,7 +97,7 @@ export function AccountProfileCard({
         <FieldGroup>
           <div className="flex items-center gap-4">
             <Avatar size="lg">
-              <AvatarImage alt={`${user.displayName} profile`} />
+              <AvatarImage src={localAvatarUrl} alt={`${user.displayName} profile`} />
               <AvatarFallback>{initials}</AvatarFallback>
             </Avatar>
             <div className="flex flex-col gap-1">
@@ -62,6 +108,7 @@ export function AccountProfileCard({
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger
+                disabled={isUploading}
                 render={
                   <Button
                     variant="ghost"
@@ -70,19 +117,35 @@ export function AccountProfileCard({
                   />
                 }
               >
-                <PencilIcon />
+                {isUploading ? <Loader2Icon className="animate-spin" /> : <PencilIcon />}
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
-                <DropdownMenuItem>
-                  <UploadIcon />
+                <DropdownMenuItem
+                  render={<label htmlFor="avatar-upload" className="flex w-full cursor-pointer items-center" />}
+                >
+                  <UploadIcon className="mr-2 size-4" />
                   Upload
                 </DropdownMenuItem>
-                <DropdownMenuItem variant="destructive">
-                  <Trash2Icon />
+                <DropdownMenuItem
+                  variant="destructive"
+                  disabled={!localAvatarUrl}
+                  render={<div onClick={handleRemove} className="flex w-full cursor-pointer items-center text-left" />}
+                >
+                  <Trash2Icon className="mr-2 size-4" />
                   Remove
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            
+            {/* Hidden file input */}
+            <input
+              id="avatar-upload"
+              type="file"
+              ref={fileInputRef}
+              className="hidden"
+              accept="image/*"
+              onChange={handleFileChange}
+            />
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">

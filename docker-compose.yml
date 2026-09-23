@@ -55,6 +55,9 @@ services:
       KAFKA_SASL_USERNAME: ${KAFKA_SASL_USERNAME:?Set KAFKA_SASL_USERNAME in .env}
       KAFKA_SASL_PASSWORD: ${KAFKA_SASL_PASSWORD:?Set KAFKA_SASL_PASSWORD in .env}
       NODE_ENV: development
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
     command: >-
       sh -c "/migrator/node_modules/.bin/prisma migrate deploy
       --schema /migrator/schema/schema.prisma &&
@@ -83,6 +86,9 @@ services:
       KAFKA_SASL_USERNAME: ${KAFKA_SASL_USERNAME:?Set KAFKA_SASL_USERNAME in .env}
       KAFKA_SASL_PASSWORD: ${KAFKA_SASL_PASSWORD:?Set KAFKA_SASL_PASSWORD in .env}
       NODE_ENV: development
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3004/health"]
       interval: 15s

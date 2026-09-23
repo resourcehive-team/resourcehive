@@ -66,7 +66,8 @@ const resource: ResourceDetailsData = {
   status: "ACTIVE",
   pointCost: 10,
   createdAt: "2026-08-10T00:00:00.000Z",
-  allowedOrganizations: [
+  imageUrl: null,
+    allowedOrganizations: [
     {
       resourceId: "resource-1",
       organizationId: "organization-1",

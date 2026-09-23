@@ -38,6 +38,7 @@ export interface CurrentUserResponse {
     status: string;
     platformRole: string;
     createdAt: string;
+    avatarUrl?: string;
   };
   organizationContext: {
     organizationId: string | null;
@@ -512,6 +513,7 @@ function isCurrentUserResponse(data: unknown): data is CurrentUserResponse {
     typeof user.platformRole === "string" &&
     "createdAt" in user &&
     typeof user.createdAt === "string" &&
+    (!("avatarUrl" in user) || typeof user.avatarUrl === "string" || user.avatarUrl === null) &&
     "organizationId" in organizationContext &&
     (typeof organizationContext.organizationId === "string" ||
       organizationContext.organizationId === null) &&
@@ -619,5 +621,58 @@ function isMessageResponse(data: unknown): data is { message: string } {
     typeof data === "object" &&
     "message" in data &&
     typeof data.message === "string"
+  );
+}
+
+export interface AvatarUploadResponse {
+  avatarUrl: string | null;
+}
+
+export async function uploadAvatar(file: File): Promise<AvatarUploadResponse> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await fetch(`${apiUrl}/auth/me/avatar`, {
+    method: "POST",
+    credentials: "include",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new AuthenticationRequiredError();
+    }
+    throw new Error("Unable to upload avatar.");
+  }
+
+  const data: unknown = await response.json().catch(() => null);
+
+  if (!isAvatarUploadResponse(data)) {
+    throw new Error("The identity service returned an invalid response.");
+  }
+
+  return data;
+}
+
+export async function removeAvatar(): Promise<void> {
+  const response = await fetch(`${apiUrl}/auth/me/avatar`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new AuthenticationRequiredError();
+    }
+    throw new Error("Unable to remove avatar.");
+  }
+}
+
+function isAvatarUploadResponse(data: unknown): data is AvatarUploadResponse {
+  return (
+    !!data &&
+    typeof data === "object" &&
+    "avatarUrl" in data &&
+    (typeof data.avatarUrl === "string" || data.avatarUrl === null)
   );
 }

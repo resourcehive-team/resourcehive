@@ -65,7 +65,7 @@ export class AuthService {
     return secret;
   }
 
-  async uploadAvatar(userId: string, avatarUrl: string) {
+  async uploadAvatar(userId: string, avatarUrl: string | null) {
     return this.prisma.user.update({
       where: { id: userId },
       data: { avatarUrl },
