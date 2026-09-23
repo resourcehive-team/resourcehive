@@ -465,6 +465,68 @@ SELECT pg_temp.expect_error(
     $statement$
 );
 
+INSERT INTO users (
+    id,
+    email,
+    password_hash,
+    first_name,
+    last_name
+)
+VALUES (
+    '10000000-0000-0000-0000-000000000003',
+    'google@example.com',
+    NULL,
+    'Google',
+    'User'
+);
+
+INSERT INTO external_identities (
+    user_id,
+    provider,
+    provider_subject,
+    provider_email
+)
+VALUES (
+    '10000000-0000-0000-0000-000000000003',
+    'GOOGLE',
+    'google-subject-1',
+    'google@example.com'
+);
+
+SELECT pg_temp.expect_error(
+    'external identity provider restriction',
+    $statement$
+        INSERT INTO external_identities (user_id, provider, provider_subject, provider_email)
+        VALUES ('10000000-0000-0000-0000-000000000003', 'GITHUB', 'github-1', 'google@example.com')
+    $statement$
+);
+
+SELECT pg_temp.expect_error(
+    'external identity subject uniqueness',
+    $statement$
+        INSERT INTO external_identities (user_id, provider, provider_subject, provider_email)
+        VALUES ('10000000-0000-0000-0000-000000000002', 'GOOGLE', 'google-subject-1', 'google@example.com')
+    $statement$
+);
+
+SELECT pg_temp.expect_error(
+    'one Google identity per ResourceHive user',
+    $statement$
+        INSERT INTO external_identities (user_id, provider, provider_subject, provider_email)
+        VALUES ('10000000-0000-0000-0000-000000000003', 'GOOGLE', 'google-subject-2', 'other@example.com')
+    $statement$
+);
+
+DELETE FROM users WHERE id = '10000000-0000-0000-0000-000000000003';
+
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM external_identities WHERE provider_subject = 'google-subject-1') THEN
+        RAISE EXCEPTION 'external identity did not cascade with user deletion';
+    END IF;
+END;
+$$;
+
 ROLLBACK;
 
 \echo 'Database integrity tests passed.'

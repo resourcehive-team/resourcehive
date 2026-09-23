@@ -113,6 +113,50 @@ docker compose logs -f identity-service
 To test real email locally, change `EMAIL_TRANSPORT` to `smtp` and configure
 the SMTP variables described in the production section.
 
+### Google sign-in (OAuth/OIDC)
+
+Google sign-in is disabled by default. It is implemented as a server-side
+OAuth 2.0 Authorization Code flow with PKCE and OpenID Connect nonce/state;
+Google tokens are verified by Identity Service and are never stored. A new
+Google account is created without a password or organization membership and is
+sent to the membership-request onboarding flow. Organization access still
+requires administrator approval. Existing password users can connect Google
+from **Account → Sign-in methods** after confirming their password.
+
+To enable it locally:
+
+1. In [Google Cloud Console](https://console.cloud.google.com/), create or
+   select a project, configure the OAuth consent screen, and create an OAuth
+   client of type **Web application**.
+2. Add `http://localhost:8000/auth/google/callback` as an authorized redirect
+   URI. Keep the URI exact; path, scheme, host, and port must match.
+3. Put the client values in the root `.env` (Identity Service only reads these
+   variables):
+
+   ```env
+   GOOGLE_OAUTH_ENABLED=true
+   GOOGLE_OAUTH_CLIENT_ID=your-client-id.apps.googleusercontent.com
+   GOOGLE_OAUTH_CLIENT_SECRET=your-client-secret
+   GOOGLE_OAUTH_CALLBACK_URL=http://localhost:8000/auth/google/callback
+   ```
+
+4. Apply the migration and regenerate the shared Prisma client, then rebuild
+   Identity Service:
+
+   ```bash
+   pnpm db:migrate
+   pnpm db:generate
+   docker compose up --build -d identity-service api-gateway
+   ```
+
+The frontend discovers availability through `GET /auth/providers`, so email
+and password login remains usable if discovery fails or Google is disabled.
+For production, register the exact HTTPS callback URL used by the deployment
+and set the equivalent values in `.env.production`; never commit the client
+secret. See Google’s [web-server flow](https://developers.google.com/identity/protocols/oauth2/web-server)
+and [OIDC reference](https://developers.google.com/identity/openid-connect/reference)
+for provider-console details.
+
 ### Local browser notifications
 
 Browser notifications use two Firebase configurations from the same Firebase
