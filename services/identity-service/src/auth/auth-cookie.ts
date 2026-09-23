@@ -2,6 +2,7 @@ import { RESOURCEHIVE_ACCESS_TOKEN_COOKIE } from '@resourcehive/service-auth';
 import type { CookieOptions, Request, Response } from 'express';
 
 export const RESOURCEHIVE_REFRESH_TOKEN_COOKIE = 'resourcehive_refresh_token';
+export const GOOGLE_OAUTH_FLOW_COOKIE = 'resourcehive_google_oauth_flow';
 const DEFAULT_ACCESS_TOKEN_LIFETIME = '15m';
 
 export function setAccessTokenCookie(response: Response, token: string): void {
@@ -40,6 +41,43 @@ export function clearRefreshTokenCookie(response: Response): void {
 export function clearAuthenticationCookies(response: Response): void {
   clearAccessTokenCookie(response);
   clearRefreshTokenCookie(response);
+}
+
+export function setGoogleOAuthFlowCookie(
+  response: Response,
+  value: string,
+): void {
+  response.cookie(GOOGLE_OAUTH_FLOW_COOKIE, value, {
+    ...getSharedCookieOptions('/auth/google'),
+    maxAge: 10 * 60 * 1000,
+  });
+}
+
+export function clearGoogleOAuthFlowCookie(response: Response): void {
+  response.clearCookie(
+    GOOGLE_OAUTH_FLOW_COOKIE,
+    getSharedCookieOptions('/auth/google'),
+  );
+}
+
+export function extractGoogleOAuthFlow(request: Request): string | null {
+  const header = request.headers.cookie;
+  if (!header) return null;
+  for (const cookie of header.split(';')) {
+    const separatorIndex = cookie.indexOf('=');
+    if (separatorIndex === -1) continue;
+    if (cookie.slice(0, separatorIndex).trim() !== GOOGLE_OAUTH_FLOW_COOKIE) {
+      continue;
+    }
+    const value = cookie.slice(separatorIndex + 1).trim();
+    if (!value) return null;
+    try {
+      return decodeURIComponent(value);
+    } catch {
+      return value;
+    }
+  }
+  return null;
 }
 
 export function extractRefreshToken(request: Request): string | null {

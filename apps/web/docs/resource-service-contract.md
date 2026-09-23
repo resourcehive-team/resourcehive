@@ -12,7 +12,7 @@ Person A's service.
 The frontend must use the public API gateway:
 
 ```text
-Browser → http://localhost:8000 → Caddy → Resource Service
+Browser → http://localhost:8088 → Caddy → Resource Service
 ```
 
 The frontend must not call the private Resource Service container or port
@@ -354,7 +354,7 @@ The current frontend and gateway use different local origins:
 
 ```text
 Frontend: http://localhost:3000
-Gateway:  http://localhost:8000
+Gateway:  http://localhost:8088
 ```
 
 NestJS services own CORS and use the explicit `CORS_ORIGINS` allowlist with

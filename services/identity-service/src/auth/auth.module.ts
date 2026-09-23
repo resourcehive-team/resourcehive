@@ -6,6 +6,7 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { CloudinaryModule } from '../cloudinary/cloudinary.module';
+import { GoogleOAuthService } from './google-oauth.service';
 
 @Module({
   imports: [
@@ -14,6 +15,6 @@ import { CloudinaryModule } from '../cloudinary/cloudinary.module';
     CloudinaryModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, EmailService, JwtAuthGuard],
+  providers: [AuthService, EmailService, JwtAuthGuard, GoogleOAuthService],
 })
 export class AuthModule {}

@@ -12,7 +12,7 @@ datasource db {
 model User {
   id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   email           String    @unique(map: "users_email_unique")
-  passwordHash    String    @map("password_hash")
+  passwordHash    String?   @map("password_hash")
   firstName       String    @map("first_name")
   lastName        String    @map("last_name")
   emailVerifiedAt DateTime? @map("email_verified_at") @db.Timestamptz
@@ -37,8 +37,26 @@ model User {
   webPushSubscriptions    WebPushSubscription[]
   notificationDeliveries  NotificationDelivery[]
   ratings                 ResourceRating[]
+  externalIdentities      ExternalIdentity[]
 
   @@map("users")
+}
+
+model ExternalIdentity {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId          String    @map("user_id") @db.Uuid
+  provider        String
+  providerSubject String    @map("provider_subject")
+  providerEmail   String    @map("provider_email")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  lastUsedAt      DateTime? @map("last_used_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([provider, providerSubject], map: "external_identities_provider_subject_unique")
+  @@unique([userId, provider], map: "external_identities_user_provider_unique")
+  @@index([userId], map: "external_identities_user_id_idx")
+  @@map("external_identities")
 }
 
 model Organization {

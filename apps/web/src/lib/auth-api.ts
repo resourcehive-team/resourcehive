@@ -10,6 +10,20 @@ export interface LoginResponse {
   message: "user login successfully";
 }
 
+export interface AuthProvidersResponse {
+  google: { enabled: boolean };
+}
+
+export interface AuthenticationMethods {
+  password: boolean;
+  google: {
+    enabled: boolean;
+    connected: boolean;
+    email: string | null;
+    connectedAt: string | null;
+  };
+}
+
 export interface ForgotPasswordRequest {
   email: string;
 }
@@ -39,6 +53,7 @@ export interface CurrentUserResponse {
     platformRole: string;
     createdAt: string;
     avatarUrl?: string;
+    authenticationMethods: AuthenticationMethods;
   };
   organizationContext: {
     organizationId: string | null;
@@ -224,6 +239,44 @@ export async function logout(): Promise<void> {
   if (!response.ok) {
     throw new Error("Unable to log out. Please try again.");
   }
+}
+
+export async function getAuthProviders(signal?: AbortSignal): Promise<AuthProvidersResponse> {
+  const response = await fetch(`${apiUrl}/auth/providers`, { cache: "no-store", signal });
+  const data: unknown = await response.json().catch(() => null);
+  if (!response.ok || !data || typeof data !== "object" || !("google" in data) || !data.google || typeof data.google !== "object" || !("enabled" in data.google) || typeof data.google.enabled !== "boolean") {
+    throw new Error("Unable to load sign-in providers.");
+  }
+  return data as AuthProvidersResponse;
+}
+
+export function getGoogleLoginUrl(next = "/dashboard") {
+  return `${apiUrl}/auth/google/login?next=${encodeURIComponent(next)}`;
+}
+
+export async function connectGoogle(password: string): Promise<{ authorizationUrl: string }> {
+  const response = await fetchWithSessionRefresh(`${apiUrl}/auth/google/connect`, {
+    method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password }),
+  });
+  const data: unknown = await response.json().catch(() => null);
+  if (!response.ok || !data || typeof data !== "object" || !("authorizationUrl" in data) || typeof data.authorizationUrl !== "string") throw new Error(getApiErrorMessage(data, "Unable to connect Google."));
+  return data as { authorizationUrl: string };
+}
+
+export async function disconnectGoogle(password: string): Promise<{ message: string }> {
+  const response = await fetchWithSessionRefresh(`${apiUrl}/auth/google/connection`, {
+    method: "DELETE", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password }),
+  });
+  const data: unknown = await response.json().catch(() => null);
+  if (!response.ok || !isMessageResponse(data)) throw new Error(getApiErrorMessage(data, "Unable to disconnect Google."));
+  return data;
+}
+
+export async function requestPasswordSetup(): Promise<{ message: string }> {
+  const response = await fetchWithSessionRefresh(`${apiUrl}/auth/password/setup-request`, { method: "POST", credentials: "include" });
+  const data: unknown = await response.json().catch(() => null);
+  if (!response.ok || !isMessageResponse(data)) throw new Error(getApiErrorMessage(data, "Unable to send the password setup email."));
+  return data;
 }
 
 export async function requestPasswordReset(
@@ -514,6 +567,8 @@ function isCurrentUserResponse(data: unknown): data is CurrentUserResponse {
     "createdAt" in user &&
     typeof user.createdAt === "string" &&
     (!("avatarUrl" in user) || typeof user.avatarUrl === "string" || user.avatarUrl === null) &&
+    "authenticationMethods" in user &&
+    !!user.authenticationMethods &&
     "organizationId" in organizationContext &&
     (typeof organizationContext.organizationId === "string" ||
       organizationContext.organizationId === null) &&

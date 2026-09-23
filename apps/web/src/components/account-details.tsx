@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { AccountProfileCard } from "@/components/account-profile-card";
 import { AccountStatusCard } from "@/components/account-status-card";
+import { SignInMethodsCard } from "@/components/sign-in-methods-card";
 import { RequestErrorCard } from "@/components/request-error-card";
 import {
   Card,
@@ -82,6 +83,7 @@ export function AccountDetails() {
     <>
       <AccountProfileCard user={state.account.user} />
       <AccountStatusCard account={state.account} />
+      <SignInMethodsCard account={state.account} onAccountUpdated={(account) => setState({ status: "loaded", account })} />
     </>
   );
 }

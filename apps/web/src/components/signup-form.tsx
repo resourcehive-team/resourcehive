@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/password-input";
-import { register, RegistrationError } from "@/lib/auth-api";
+import { getAuthProviders, getGoogleLoginUrl, register, RegistrationError } from "@/lib/auth-api";
 import { storeSignupDebugData } from "@/lib/auth-storage";
 import { cn } from "@/lib/utils";
 
@@ -32,6 +32,13 @@ export function SignupForm({
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [googleEnabled, setGoogleEnabled] = useState(false);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void getAuthProviders(controller.signal).then((providers) => setGoogleEnabled(providers.google.enabled)).catch(() => setGoogleEnabled(false));
+    return () => controller.abort();
+  }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -78,7 +85,7 @@ export function SignupForm({
         <CardHeader>
           <CardTitle className="auth-form-title">Create an account</CardTitle>
           <CardDescription>
-            Use the email address provided by your organization
+            Continue with Google, or create an account with your institutional email
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -88,6 +95,15 @@ export function SignupForm({
             </span>{" "}
             Required fields
           </p>
+          {googleEnabled && (
+            <>
+              <Button type="button" variant="outline" className="mb-4 w-full" disabled={isSubmitting} onClick={() => window.location.assign(getGoogleLoginUrl("/dashboard"))}>
+                <span aria-hidden="true" className="mr-2 font-semibold">G</span>
+                Continue with Google
+              </Button>
+              <div className="mb-4 flex items-center gap-3 text-xs text-muted-foreground" aria-hidden="true"><span className="h-px flex-1 bg-border" /><span>or create an account with institutional email</span><span className="h-px flex-1 bg-border" /></div>
+            </>
+          )}
           <form onSubmit={handleSubmit} aria-busy={isSubmitting}>
             <FieldGroup>
               <Field>

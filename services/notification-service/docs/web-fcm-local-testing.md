@@ -30,7 +30,7 @@ generate a key pair, and copy the public key.
 Create `apps/web/.env.local` and set:
 
 ```dotenv
-NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_API_URL=http://localhost:8088
 NEXT_PUBLIC_FIREBASE_API_KEY=
 NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=
 NEXT_PUBLIC_FIREBASE_PROJECT_ID=resourcehive-96c6f
@@ -73,7 +73,7 @@ For a host-run Notification Service, restart it with:
 pnpm.cmd --filter notification-service run start:dev
 ```
 
-When the web app uses Caddy at `http://localhost:8000`, Caddy forwards
+When the web app uses Caddy at `http://localhost:8088`, Caddy forwards
 notification requests to the Docker container. Start that container with the
 FCM override instead:
 

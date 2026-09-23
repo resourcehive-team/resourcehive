@@ -15,10 +15,12 @@ schema_directory=$(cd "$test_directory/.." && pwd)
 initial_migration="$schema_directory/migrations/20260724000000_initial/migration.sql"
 notification_migration="$schema_directory/migrations/20260831000000_notification_delivery_pipeline/migration.sql"
 web_push_migration="$schema_directory/migrations/20260901080000_web_push_subscriptions/migration.sql"
+google_identity_migration="$schema_directory/migrations/20260923000000_google_external_identities/migration.sql"
 
 psql "$TEST_DATABASE_URL" -v ON_ERROR_STOP=1 -f "$initial_migration"
 psql "$TEST_DATABASE_URL" -v ON_ERROR_STOP=1 -f "$notification_migration"
 psql "$TEST_DATABASE_URL" -v ON_ERROR_STOP=1 -f "$web_push_migration"
+psql "$TEST_DATABASE_URL" -v ON_ERROR_STOP=1 -f "$google_identity_migration"
 psql "$TEST_DATABASE_URL" -v ON_ERROR_STOP=1 -f "$test_directory/notification_delivery.sql"
 psql "$TEST_DATABASE_URL" -v ON_ERROR_STOP=1 -f "$test_directory/integrity.sql"
 psql "$TEST_DATABASE_URL" -v ON_ERROR_STOP=1 -f "$test_directory/concurrent_booking_fixture.sql"
