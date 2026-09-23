@@ -10,6 +10,7 @@ import {
 } from "@/components/booking-history";
 import { RequestErrorCard } from "@/components/request-error-card";
 import { ResourceBookingDialog } from "@/components/resource-booking-dialog";
+import { ResourceRatingsList } from "@/components/resource-ratings";
 import { ResourceSlotCreationDialog } from "@/components/resource-slot-creation-dialog";
 import { ScreenHeading } from "@/components/screen-heading";
 import { Badge } from "@/components/ui/badge";
@@ -184,6 +185,11 @@ export function ResourceDetails({
       <ProtectedBookingHistory
         ownerOrganizationId={resource.ownerOrganizationId}
         resourceId={resource.id}
+      />
+      <ResourceRatingsList
+        organizationId={organizationId}
+        resourceId={resourceId}
+        isActive={isActive}
       />
     </>
   );

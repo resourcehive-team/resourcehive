@@ -34,3 +34,21 @@ export function getRootOrganizationDescendants(
     signal,
   });
 }
+
+export function allocateSemesterPoints(
+  rootOrganizationId: string,
+  targetOrganizationIds: string[],
+  amount: number,
+  semesterName: string,
+): Promise<{ count: number }> {
+  const id = apiPathSegment(rootOrganizationId, "Root organization ID");
+
+  return apiRequest<{ count: number }>(`/organizations/${id}/semester-points`, {
+    method: "POST",
+    json: {
+      targetOrganizationIds,
+      amount,
+      semesterName,
+    },
+  });
+}

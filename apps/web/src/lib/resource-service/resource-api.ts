@@ -6,6 +6,8 @@ import type {
   PaginatedResources,
   Resource,
   ResourceDetails,
+  ResourceRating,
+  ResourceRatingSummary,
 } from "@/lib/resource-service/types";
 
 export interface CreateResourceInput {
@@ -20,6 +22,11 @@ export interface ResourceListOptions {
   limit?: number;
   search?: string;
   signal?: AbortSignal;
+}
+
+export interface SubmitRatingInput {
+  rating: number;
+  comment?: string;
 }
 
 export function createResource(
@@ -100,6 +107,44 @@ export function getResourceDetails(
   return apiRequest<ResourceDetails>(
     `/resources/organization/${organization}/${resource}`,
     { signal },
+  );
+}
+
+export function getResourceRatings(
+  organizationId: string,
+  resourceId: string,
+  signal?: AbortSignal,
+): Promise<ResourceRatingSummary> {
+  const organization = apiPathSegment(organizationId, "Organization ID");
+  const resource = apiPathSegment(resourceId, "Resource ID");
+
+  return apiRequest<ResourceRatingSummary>(
+    `/resources/organization/${organization}/${resource}/ratings`,
+    { signal },
+  );
+}
+
+export function submitResourceRating(
+  organizationId: string,
+  resourceId: string,
+  input: SubmitRatingInput,
+): Promise<ResourceRating> {
+  const organization = apiPathSegment(organizationId, "Organization ID");
+  const resource = apiPathSegment(resourceId, "Resource ID");
+
+  if (!Number.isInteger(input.rating) || input.rating < 1 || input.rating > 5) {
+    throw new Error("Rating must be an integer between 1 and 5.");
+  }
+
+  return apiRequest<ResourceRating>(
+    `/resources/organization/${organization}/${resource}/ratings`,
+    {
+      method: "POST",
+      json: {
+        rating: input.rating,
+        ...(input.comment?.trim() ? { comment: input.comment.trim() } : {}),
+      },
+    },
   );
 }
 

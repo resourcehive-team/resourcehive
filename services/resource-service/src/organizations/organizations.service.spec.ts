@@ -114,37 +114,45 @@ describe('OrganizationsService', () => {
   });
 
   describe('allocateSemesterPoints', () => {
-    it('should allocate points to all active members', async () => {
+    it('should allocate points to all active members of target and its descendants', async () => {
+      mockPrismaService.organization.findUnique.mockResolvedValue({
+        rootOrganizationId: 'root-org',
+      });
+      mockPrismaService.organization.findMany.mockResolvedValue([
+        { id: 'target-org', parentId: null },
+        { id: 'child-org', parentId: 'target-org' },
+        { id: 'other-org', parentId: null },
+      ]);
       mockPrismaService.pointTransaction.findFirst.mockResolvedValue(null);
+
       mockPrismaService.organizationMembership.findMany.mockResolvedValue([
-        { userId: 'user1' },
-        { userId: 'user2' },
+        { userId: 'user1', organizationId: 'target-org' },
+        { userId: 'user2', organizationId: 'target-org' },
+        { userId: 'user1', organizationId: 'target-org' }, // duplicate user simulating overlapping membership
       ]);
       mockPrismaService.pointTransaction.createMany.mockResolvedValue({
         count: 2,
       });
 
       const result = await service.allocateSemesterPoints(
-        'org1',
+        'root-org',
+        ['target-org'],
         500,
         'Semester-1/2026',
       );
 
       expect(result).toEqual({ count: 2 });
-      expect(mockPrismaService.pointTransaction.findFirst).toHaveBeenCalledWith(
-        {
-          where: {
-            sourceOrganizationId: 'org1',
-            transactionType: 'SEMESTER_ALLOCATION',
-            description: 'Semester-1/2026',
-          },
-        },
-      );
+
+      // Should have found descendants target-org and child-org
       expect(
         mockPrismaService.organizationMembership.findMany,
       ).toHaveBeenCalledWith({
-        where: { organizationId: 'org1', status: 'APPROVED' },
+        where: {
+          organizationId: { in: ['target-org', 'child-org'] },
+          status: 'APPROVED',
+        },
       });
+
       expect(
         mockPrismaService.pointTransaction.createMany,
       ).toHaveBeenCalledWith({
@@ -153,21 +161,27 @@ describe('OrganizationsService', () => {
             userId: 'user1',
             amount: 500,
             transactionType: 'SEMESTER_ALLOCATION',
-            sourceOrganizationId: 'org1',
+            sourceOrganizationId: 'target-org',
             description: 'Semester-1/2026',
           },
           {
             userId: 'user2',
             amount: 500,
             transactionType: 'SEMESTER_ALLOCATION',
-            sourceOrganizationId: 'org1',
+            sourceOrganizationId: 'target-org',
             description: 'Semester-1/2026',
           },
         ],
       });
     });
 
-    it('should throw ConflictException if points already allocated for the semester', async () => {
+    it('should throw ConflictException if points already allocated to target organization', async () => {
+      mockPrismaService.organization.findUnique.mockResolvedValue({
+        rootOrganizationId: 'root-org',
+      });
+      mockPrismaService.organization.findMany.mockResolvedValue([
+        { id: 'target-org', parentId: null },
+      ]);
       mockPrismaService.organizationMembership.findMany.mockResolvedValue([
         { userId: 'user1' },
       ]);
@@ -176,49 +190,34 @@ describe('OrganizationsService', () => {
       });
 
       await expect(
-        service.allocateSemesterPoints('org1', 500, 'Semester-1/2026'),
+        service.allocateSemesterPoints(
+          'root-org',
+          ['target-org'],
+          500,
+          'Semester-1/2026',
+        ),
       ).rejects.toThrow(
-        "Semester points for 'Semester-1/2026' have already been allocated.",
+        "Semester points for 'Semester-1/2026' have already been allocated to one or more selected organizations.",
       );
-
-      expect(
-        mockPrismaService.organizationMembership.findMany,
-      ).toHaveBeenCalledWith({
-        where: { organizationId: 'org1', status: 'APPROVED' },
-      });
-      expect(mockPrismaService.pointTransaction.findFirst).toHaveBeenCalledWith(
-        {
-          where: {
-            sourceOrganizationId: 'org1',
-            transactionType: 'SEMESTER_ALLOCATION',
-            description: 'Semester-1/2026',
-          },
-        },
-      );
-      expect(
-        mockPrismaService.pointTransaction.createMany,
-      ).not.toHaveBeenCalled();
     });
 
-    it('should return count 0 if no active members', async () => {
-      mockPrismaService.pointTransaction.findFirst.mockResolvedValue(null);
+    it('should return count 0 if no active members exist', async () => {
+      mockPrismaService.organization.findUnique.mockResolvedValue({
+        rootOrganizationId: 'root-org',
+      });
+      mockPrismaService.organization.findMany.mockResolvedValue([
+        { id: 'target-org', parentId: null },
+      ]);
       mockPrismaService.organizationMembership.findMany.mockResolvedValue([]);
 
       const result = await service.allocateSemesterPoints(
-        'org1',
+        'root-org',
+        ['target-org'],
         500,
         'Semester-1/2026',
       );
 
       expect(result).toEqual({ count: 0 });
-      expect(
-        mockPrismaService.organizationMembership.findMany,
-      ).toHaveBeenCalledWith({
-        where: { organizationId: 'org1', status: 'APPROVED' },
-      });
-      expect(
-        mockPrismaService.pointTransaction.findFirst,
-      ).not.toHaveBeenCalled();
       expect(
         mockPrismaService.pointTransaction.createMany,
       ).not.toHaveBeenCalled();

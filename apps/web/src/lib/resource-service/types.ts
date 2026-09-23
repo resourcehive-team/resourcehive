@@ -62,6 +62,10 @@ export interface Resource {
   pointCost: number;
   createdAt: string;
   allowedOrganizations: AllowedOrganization[];
+  ratingSummary?: {
+    average: number;
+    total: number;
+  };
 }
 
 export interface ResourceDetails extends Resource {
@@ -74,4 +78,19 @@ export interface PaginatedResources {
   page: number;
   limit: number;
   totalPages: number;
+}
+
+export interface ResourceRating {
+  id: string;
+  resourceId: string;
+  userId: string;
+  rating: number;
+  comment: string | null;
+  createdAt: string;
+}
+
+export interface ResourceRatingSummary {
+  average: number;
+  total: number;
+  ratings: ResourceRating[];
 }

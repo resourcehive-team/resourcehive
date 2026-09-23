@@ -8,6 +8,7 @@ import { ArrowLeftIcon } from "lucide-react";
 import { MembershipRequestCard } from "@/components/membership-request-card";
 import { OrganizationSummaryCard } from "@/components/organization-summary-card";
 import { RequestErrorCard } from "@/components/request-error-card";
+import { AllocatePointsDialog } from "@/components/allocate-points-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -108,6 +109,21 @@ export function OrganizationDetailsView({
           organizationId={state.organization.id}
           organizationName={state.organization.name}
         />
+        {state.organization.parentId === null && (
+          <div className="mt-4 flex flex-col">
+            <Card>
+              <CardHeader>
+                <CardTitle>Semester Points</CardTitle>
+                <CardDescription>
+                  Allocate points to child organizations and their members.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <AllocatePointsDialog rootOrganizationId={state.organization.id} />
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
       <div className="lg:col-span-12">
         <ChildOrganizationList organizations={state.organization.children} />

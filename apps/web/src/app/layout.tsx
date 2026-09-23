@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Geist, Instrument_Serif } from "next/font/google";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Toaster } from "@/components/ui/sonner";
 import { Analytics } from "@vercel/analytics/next";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist" });
@@ -32,6 +33,7 @@ export default function RootLayout({
     >
       <body>
         <TooltipProvider>{children}</TooltipProvider>
+        <Toaster />
         <Analytics />
       </body>
     </html>
