@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Building2Icon, CalendarDaysIcon, PackageIcon } from "lucide-react";
+import { toast } from "sonner";
 
 import {
   BookingHistory,
@@ -14,6 +15,7 @@ import { ResourceRatingsList } from "@/components/resource-ratings";
 import { ResourceSlotCreationDialog } from "@/components/resource-slot-creation-dialog";
 import { ScreenHeading } from "@/components/screen-heading";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ApiAuthenticationError } from "@/lib/api-client";
 import { getOrganizationBookings } from "@/lib/booking-service/booking-api";
@@ -24,7 +26,7 @@ import {
   formatOrganizationLabel,
   formatOrganizationPoints,
 } from "@/lib/resource-service/organization-format";
-import { getResourceDetails } from "@/lib/resource-service/resource-api";
+import { getResourceDetails, uploadResourceImage } from "@/lib/resource-service/resource-api";
 import type {
   MembershipWithOrganization,
   ResourceDetails as ResourceDetailsData,
@@ -116,11 +118,26 @@ export function ResourceDetails({
               resourceId={resource.id}
               resourceName={resource.name}
             />
+            <ProtectedResourceImageUpload
+              disabled={!isActive}
+              ownerOrganizationId={resource.ownerOrganizationId}
+              resourceId={resource.id}
+            />
           </div>
         }
       />
       <section className="grid gap-px border border-line bg-line lg:grid-cols-12">
-        <article className="bg-paper-alt p-5 lg:col-span-8 lg:p-7">
+        {resource.imageUrl && (
+          <aside className="bg-paper-alt p-5 lg:col-span-3 lg:p-7 flex flex-col justify-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img 
+              src={resource.imageUrl} 
+              alt={resource.name} 
+              className="max-h-64 w-full object-contain rounded-md" 
+            />
+          </aside>
+        )}
+        <article className={`bg-paper-alt p-5 lg:p-7 ${resource.imageUrl ? 'lg:col-span-6' : 'lg:col-span-8'}`}>
           <div className="flex items-start justify-between gap-4 border-b border-line pb-5">
             <div>
               <p className="eyebrow text-clay">Resource information</p>
@@ -159,7 +176,7 @@ export function ResourceDetails({
             />
           </dl>
         </article>
-        <aside className="flex flex-col justify-between gap-8 bg-ink p-5 text-paper lg:col-span-4 lg:p-7">
+        <aside className={`flex flex-col justify-between gap-8 bg-ink p-5 text-paper lg:p-7 ${resource.imageUrl ? 'lg:col-span-3' : 'lg:col-span-4'}`}>
           <div>
             <p className="eyebrow text-ochre">Booking cost</p>
             <p className="mt-3 font-heading text-5xl leading-none">
@@ -299,6 +316,79 @@ function ProtectedSlotCreationDialog({
       resourceId={resourceId}
       resourceName={resourceName}
     />
+  ) : null;
+}
+
+function ProtectedResourceImageUpload({
+  disabled,
+  ownerOrganizationId,
+  resourceId,
+}: {
+  disabled: boolean;
+  ownerOrganizationId: string;
+  resourceId: string;
+}) {
+  const router = useRouter();
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = React.useState(false);
+  const [isAuthorized, setIsAuthorized] = React.useState(false);
+
+  React.useEffect(() => {
+    const controller = new AbortController();
+
+    getCurrentUserMemberships(controller.signal)
+      .then((memberships) => {
+        if (!controller.signal.aborted) {
+          setIsAuthorized(
+            isOwnerOrganizationAdmin(memberships, ownerOrganizationId),
+          );
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setIsAuthorized(false);
+        }
+      });
+
+    return () => controller.abort();
+  }, [ownerOrganizationId]);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsUploading(true);
+      await uploadResourceImage(ownerOrganizationId, resourceId, file);
+      toast.success("Resource image updated successfully.");
+      router.refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to upload resource image.");
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
+  return isAuthorized ? (
+    <>
+      <Button
+        variant="outline"
+        disabled={disabled || isUploading}
+        onClick={() => fileInputRef.current?.click()}
+      >
+        {isUploading ? "Uploading..." : "Upload Image"}
+      </Button>
+      <input
+        type="file"
+        ref={fileInputRef}
+        className="hidden"
+        accept="image/*"
+        onChange={handleFileChange}
+      />
+    </>
   ) : null;
 }
 

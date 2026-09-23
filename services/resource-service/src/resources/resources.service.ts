@@ -135,7 +135,8 @@ export class ResourcesService {
       throw new NotFoundException('Resource not found');
     }
 
-    const { allowedOrganizationIds, ...rest } = dto;
+    const { allowedOrganizationIds, ...rest } =
+      dto as Partial<CreateResourceDto> & UpdateResourceDto;
 
     let allowedOrganizationsUpdate = {};
     if (allowedOrganizationIds) {
@@ -170,6 +171,23 @@ export class ResourcesService {
     return this.prisma.resource.update({
       where: { id: resourceId },
       data: { status: 'INACTIVE' },
+    });
+  }
+
+  async uploadImage(
+    organizationId: string,
+    resourceId: string,
+    imageUrl: string,
+  ) {
+    const resource = await this.prisma.resource.findUnique({
+      where: { id: resourceId },
+    });
+    if (!resource || resource.ownerOrganizationId !== organizationId) {
+      throw new NotFoundException('Resource not found');
+    }
+    return this.prisma.resource.update({
+      where: { id: resourceId },
+      data: { imageUrl },
     });
   }
 

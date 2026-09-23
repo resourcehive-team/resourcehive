@@ -71,6 +71,7 @@ const firstPage: PaginatedResources = {
       status: "ACTIVE",
       pointCost: 25,
       createdAt: "2026-07-10T00:00:00.000Z",
+      imageUrl: null,
       allowedOrganizations: [],
     },
   ],

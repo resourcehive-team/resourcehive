@@ -195,6 +195,39 @@ describe('ResourcesService', () => {
     });
   });
 
+  describe('uploadImage', () => {
+    it('should update the resource imageUrl', async () => {
+      mockPrismaService.resource.findUnique.mockResolvedValue({
+        id: 'res-1',
+        ownerOrganizationId: 'org-1',
+      });
+      mockPrismaService.resource.update.mockResolvedValue({
+        id: 'res-1',
+        imageUrl: 'http://example.com/image.png',
+      });
+
+      const result = await service.uploadImage(
+        'org-1',
+        'res-1',
+        'http://example.com/image.png',
+      );
+
+      expect(mockPrismaService.resource.update).toHaveBeenCalledWith({
+        where: { id: 'res-1' },
+        data: { imageUrl: 'http://example.com/image.png' },
+      });
+      expect(result.imageUrl).toBe('http://example.com/image.png');
+    });
+
+    it('should throw NotFoundException if resource not found or unauthorized', async () => {
+      mockPrismaService.resource.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.uploadImage('org-1', 'res-1', 'http://example.com/image.png'),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
   describe('upsertRating', () => {
     it('should upsert a rating if user has access to the resource', async () => {
       // Mock findOne for access check

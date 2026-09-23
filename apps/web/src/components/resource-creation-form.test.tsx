@@ -110,7 +110,8 @@ const createdResource: Resource = {
   status: "ACTIVE",
   pointCost: 25,
   createdAt: "2026-08-04T00:00:00.000Z",
-  allowedOrganizations: [],
+  imageUrl: null,
+      allowedOrganizations: [],
 };
 
 describe("ResourceCreationForm", () => {

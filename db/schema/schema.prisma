@@ -16,6 +16,7 @@ model User {
   firstName       String    @map("first_name")
   lastName        String    @map("last_name")
   emailVerifiedAt DateTime? @map("email_verified_at") @db.Timestamptz
+  avatarUrl       String?   @map("avatar_url")
   status          String    @default("ACTIVE")
   platformRole    String    @default("USER") @map("platform_role")
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
@@ -143,6 +144,7 @@ model Resource {
   createdByUserId     String   @map("created_by_user_id") @db.Uuid
   status              String   @default("ACTIVE")
   pointCost           Int      @default(0) @map("point_cost")
+  imageUrl            String?  @map("image_url")
   createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   ownerOrganization    Organization                  @relation("ResourceOwner", fields: [ownerOrganizationId, rootOrganizationId], references: [id, rootOrganizationId], onDelete: NoAction, onUpdate: NoAction)

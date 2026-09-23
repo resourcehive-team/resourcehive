@@ -155,3 +155,27 @@ function positiveInteger(value: number, label: string): number {
 
   return value;
 }
+
+export interface ResourceImageUploadResponse {
+  imageUrl: string;
+}
+
+export function uploadResourceImage(
+  organizationId: string,
+  resourceId: string,
+  file: File,
+): Promise<ResourceImageUploadResponse> {
+  const organization = apiPathSegment(organizationId, "Organization ID");
+  const resource = apiPathSegment(resourceId, "Resource ID");
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+  return apiRequest<ResourceImageUploadResponse>(
+    `/resources/organization/${organization}/${resource}/image`,
+    {
+      method: "POST",
+      body: formData,
+    },
+  );
+}

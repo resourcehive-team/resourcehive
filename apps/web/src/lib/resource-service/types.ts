@@ -61,6 +61,7 @@ export interface Resource {
   status: string;
   pointCost: number;
   createdAt: string;
+  imageUrl: string | null;
   allowedOrganizations: AllowedOrganization[];
   ratingSummary?: {
     average: number;

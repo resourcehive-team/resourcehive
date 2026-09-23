@@ -10,8 +10,12 @@ import {
   Query,
   DefaultValuePipe,
   ParseIntPipe,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ResourcesService } from './resources.service';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { CreateResourceDto } from './dto/create-resource.dto';
 import { UpdateResourceDto } from './dto/update-resource.dto';
 import { CreateRatingDto } from './dto/create-rating.dto';
@@ -35,7 +39,10 @@ import { AdminGuard } from '../auth/admin.guard';
 @UseGuards(JwtAuthGuard)
 @Controller('resources')
 export class ResourcesController {
-  constructor(private readonly resourcesService: ResourcesService) {}
+  constructor(
+    private readonly resourcesService: ResourcesService,
+    private readonly cloudinaryService: CloudinaryService,
+  ) {}
 
   @UseGuards(TenantGuard, AdminGuard)
   @Post('organization/:organizationId')
@@ -112,6 +119,27 @@ export class ResourcesController {
       user.userId,
       dto.rating,
       dto.comment,
+    );
+  }
+
+  @UseGuards(TenantGuard, AdminGuard)
+  @Post('organization/:organizationId/:resourceId/image')
+  @ApiOperation({ summary: 'Upload an image for a resource' })
+  @ApiCreatedResponse({ description: 'Image uploaded successfully.' })
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadImage(
+    @Param('organizationId') organizationId: string,
+    @Param('resourceId') resourceId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    const uploadResult = await this.cloudinaryService.uploadFile(
+      file,
+      `resources/${organizationId}/${resourceId}`,
+    );
+    return this.resourcesService.uploadImage(
+      organizationId,
+      resourceId,
+      uploadResult.secure_url,
     );
   }
 
