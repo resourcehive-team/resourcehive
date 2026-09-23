@@ -7,7 +7,6 @@ import {
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ResourceRatingsList } from "@/components/resource-ratings";
-import { ApiError } from "@/lib/api-client";
 import {
   getResourceRatings,
   submitResourceRating,

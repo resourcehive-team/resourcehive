@@ -1,4 +1,11 @@
-import { IsInt, IsNotEmpty, IsString, Min, IsArray, ArrayNotEmpty } from 'class-validator';
+import {
+  IsInt,
+  IsNotEmpty,
+  IsString,
+  Min,
+  IsArray,
+  ArrayNotEmpty,
+} from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class AllocateSemesterPointsDto {

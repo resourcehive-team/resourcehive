@@ -115,14 +115,16 @@ describe('OrganizationsService', () => {
 
   describe('allocateSemesterPoints', () => {
     it('should allocate points to all active members of target and its descendants', async () => {
-      mockPrismaService.organization.findUnique.mockResolvedValue({ rootOrganizationId: 'root-org' });
+      mockPrismaService.organization.findUnique.mockResolvedValue({
+        rootOrganizationId: 'root-org',
+      });
       mockPrismaService.organization.findMany.mockResolvedValue([
         { id: 'target-org', parentId: null },
         { id: 'child-org', parentId: 'target-org' },
         { id: 'other-org', parentId: null },
       ]);
       mockPrismaService.pointTransaction.findFirst.mockResolvedValue(null);
-      
+
       mockPrismaService.organizationMembership.findMany.mockResolvedValue([
         { userId: 'user1' },
         { userId: 'user2' },
@@ -140,12 +142,15 @@ describe('OrganizationsService', () => {
       );
 
       expect(result).toEqual({ count: 2 });
-      
+
       // Should have found descendants target-org and child-org
       expect(
         mockPrismaService.organizationMembership.findMany,
       ).toHaveBeenCalledWith({
-        where: { organizationId: { in: ['target-org', 'child-org'] }, status: 'APPROVED' },
+        where: {
+          organizationId: { in: ['target-org', 'child-org'] },
+          status: 'APPROVED',
+        },
       });
 
       expect(
@@ -171,7 +176,9 @@ describe('OrganizationsService', () => {
     });
 
     it('should throw ConflictException if points already allocated to target organization', async () => {
-      mockPrismaService.organization.findUnique.mockResolvedValue({ rootOrganizationId: 'root-org' });
+      mockPrismaService.organization.findUnique.mockResolvedValue({
+        rootOrganizationId: 'root-org',
+      });
       mockPrismaService.organization.findMany.mockResolvedValue([
         { id: 'target-org', parentId: null },
       ]);
@@ -183,7 +190,12 @@ describe('OrganizationsService', () => {
       });
 
       await expect(
-        service.allocateSemesterPoints('root-org', 'target-org', 500, 'Semester-1/2026'),
+        service.allocateSemesterPoints(
+          'root-org',
+          'target-org',
+          500,
+          'Semester-1/2026',
+        ),
       ).rejects.toThrow(
         "Semester points for 'Semester-1/2026' have already been allocated to this organization.",
       );
@@ -193,12 +205,19 @@ describe('OrganizationsService', () => {
       mockPrismaService.organization.findUnique.mockResolvedValue(null);
 
       await expect(
-        service.allocateSemesterPoints('root-org', 'invalid-target', 500, 'Semester-1/2026'),
+        service.allocateSemesterPoints(
+          'root-org',
+          'invalid-target',
+          500,
+          'Semester-1/2026',
+        ),
       ).rejects.toThrow('Target organization not found.');
     });
 
     it('should return count 0 if no active members exist', async () => {
-      mockPrismaService.organization.findUnique.mockResolvedValue({ rootOrganizationId: 'root-org' });
+      mockPrismaService.organization.findUnique.mockResolvedValue({
+        rootOrganizationId: 'root-org',
+      });
       mockPrismaService.organization.findMany.mockResolvedValue([
         { id: 'target-org', parentId: null },
       ]);

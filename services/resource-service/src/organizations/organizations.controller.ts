@@ -150,7 +150,10 @@ export class OrganizationsController {
 
   @UseGuards(TenantGuard, AdminGuard)
   @Post(':organizationId/semester-points')
-  @ApiOperation({ summary: 'Allocate semester points to all active members of a target organization' })
+  @ApiOperation({
+    summary:
+      'Allocate semester points to all active members of a target organization',
+  })
   @ApiCreatedResponse({ description: 'Points allocated successfully.' })
   @ApiForbiddenResponse({
     description: 'Forbidden. Requires Admin privileges.',

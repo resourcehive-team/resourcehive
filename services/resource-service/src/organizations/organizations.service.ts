@@ -92,7 +92,7 @@ export class OrganizationsService {
     semesterName: string,
   ) {
     if (targetOrganizationIds.length === 0) {
-       return { count: 0 };
+      return { count: 0 };
     }
 
     const allOrgs = await this.prisma.organization.findMany({
@@ -120,7 +120,10 @@ export class OrganizationsService {
     }
 
     const memberships = await this.prisma.organizationMembership.findMany({
-      where: { organizationId: { in: Array.from(descendants) }, status: 'APPROVED' },
+      where: {
+        organizationId: { in: Array.from(descendants) },
+        status: 'APPROVED',
+      },
     });
 
     const uniqueMemberships: typeof memberships = [];
@@ -157,13 +160,13 @@ export class OrganizationsService {
         // Group users by the first selected organization they belong to (to credit the transaction source correctly)
         // Or simply credit it to the organizationId (root) since it's a batch operation
         for (const membership of uniqueMemberships) {
-           data.push({
-             userId: membership.userId,
-             amount,
-             transactionType: 'SEMESTER_ALLOCATION',
-             sourceOrganizationId: membership.organizationId, // attribute to their actual org
-             description: semesterName,
-           });
+          data.push({
+            userId: membership.userId,
+            amount,
+            transactionType: 'SEMESTER_ALLOCATION',
+            sourceOrganizationId: membership.organizationId, // attribute to their actual org
+            description: semesterName,
+          });
         }
 
         const result = await tx.pointTransaction.createMany({

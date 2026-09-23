@@ -93,7 +93,13 @@ export class ResourcesService {
       };
     });
 
-    return { data: enrichedData, total, page, limit, totalPages: Math.ceil(total / limit) };
+    return {
+      data: enrichedData,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   async findOne(organizationId: string, resourceId: string) {

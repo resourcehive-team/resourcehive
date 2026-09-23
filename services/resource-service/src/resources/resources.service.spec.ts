@@ -144,7 +144,7 @@ describe('ResourcesService', () => {
       mockPrismaService.resource.findMany.mockResolvedValue(data);
       mockPrismaService.resource.count.mockResolvedValue(1);
       mockPrismaService.resourceRating.groupBy.mockResolvedValue([
-        { resourceId: 'res-1', _avg: { rating: 4 }, _count: { rating: 2 } }
+        { resourceId: 'res-1', _avg: { rating: 4 }, _count: { rating: 2 } },
       ]);
 
       const result = await service.findAll('org-1', 1, 10);
@@ -220,7 +220,7 @@ describe('ResourcesService', () => {
       expect(result).toEqual(mockUpsertResult);
       expect(mockPrismaService.resourceRating.upsert).toHaveBeenCalledWith({
         where: { resourceId_userId: { resourceId: 'res-1', userId: 'user-1' } },
-        update: { rating: 5, comment: 'Great', createdAt: expect.any(Date) },
+        update: { rating: 5, comment: 'Great', createdAt: expect.any(Date) as unknown as Date },
         create: {
           resourceId: 'res-1',
           userId: 'user-1',

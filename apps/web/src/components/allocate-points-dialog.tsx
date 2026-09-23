@@ -31,6 +31,7 @@ export function AllocatePointsDialog({ rootOrganizationId }: { rootOrganizationI
 
   useEffect(() => {
     if (open && descendants.length === 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLoading(true);
       getRootOrganizationDescendants(rootOrganizationId)
         .then(setDescendants)
@@ -71,8 +72,8 @@ export function AllocatePointsDialog({ rootOrganizationId }: { rootOrganizationI
       const result = await allocateSemesterPoints(rootOrganizationId, targetOrganizationIds, amount, semesterName);
       toast.success(`Successfully allocated points to ${result.count} members!`);
       setOpen(false);
-    } catch (err: any) {
-      toast.error(err.message || "Failed to allocate points");
+    } catch (err: unknown) {
+      toast.error((err as Error).message || "Failed to allocate points");
     } finally {
       setSubmitting(false);
     }
