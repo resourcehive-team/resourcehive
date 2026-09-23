@@ -8,7 +8,6 @@ import {
   HttpCode,
   HttpStatus,
   Post,
-  Delete,
   Req,
   Res,
   UnauthorizedException,

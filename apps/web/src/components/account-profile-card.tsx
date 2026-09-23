@@ -40,10 +40,12 @@ export function AccountProfileCard({
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = React.useState(false);
   const [localAvatarUrl, setLocalAvatarUrl] = React.useState<string | undefined>(user.avatarUrl);
+  const [prevUserAvatarUrl, setPrevUserAvatarUrl] = React.useState<string | undefined>(user.avatarUrl);
 
-  React.useEffect(() => {
+  if (user.avatarUrl !== prevUserAvatarUrl) {
     setLocalAvatarUrl(user.avatarUrl);
-  }, [user.avatarUrl]);
+    setPrevUserAvatarUrl(user.avatarUrl);
+  }
 
   const initials =
     [user.firstName, user.lastName]

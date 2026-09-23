@@ -128,6 +128,7 @@ export function ResourceDetails({
       <section className="grid gap-px border border-line bg-line lg:grid-cols-12">
         {resource.imageUrl && (
           <aside className="bg-paper-alt p-5 lg:col-span-3 lg:p-7 flex flex-col justify-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img 
               src={resource.imageUrl} 
               alt={resource.name} 

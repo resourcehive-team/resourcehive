@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeftIcon, CheckCircle2Icon, PlusIcon, UploadIcon, ImageIcon, XIcon } from "lucide-react";
+import { ArrowLeftIcon, CheckCircle2Icon, PlusIcon, UploadIcon, XIcon } from "lucide-react";
 
 import { RequestErrorCard } from "@/components/request-error-card";
 import { Button } from "@/components/ui/button";
@@ -317,6 +317,7 @@ export function ResourceCreationForm() {
               >
                 {imagePreview ? (
                   <>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={imagePreview}
                       alt="Preview"
