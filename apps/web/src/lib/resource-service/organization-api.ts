@@ -45,10 +45,10 @@ export function allocateSemesterPoints(
 
   return apiRequest<{ count: number }>(`/organizations/${id}/semester-points`, {
     method: "POST",
-    body: JSON.stringify({
+    json: {
       targetOrganizationId,
       amount,
       semesterName,
-    }),
+    },
   });
 }

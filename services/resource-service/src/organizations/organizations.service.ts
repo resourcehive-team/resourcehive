@@ -167,19 +167,6 @@ export class OrganizationsService {
           data,
         });
 
-        for (const membership of uniqueMemberships) {
-          await tx.userPointBalance.upsert({
-            where: { userId: membership.userId },
-            update: {
-              availablePoints: { increment: amount },
-            },
-            create: {
-              userId: membership.userId,
-              availablePoints: amount,
-            },
-          });
-        }
-
         return { count: result.count };
       },
       {
