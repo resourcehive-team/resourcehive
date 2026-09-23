@@ -126,9 +126,9 @@ describe('OrganizationsService', () => {
       mockPrismaService.pointTransaction.findFirst.mockResolvedValue(null);
 
       mockPrismaService.organizationMembership.findMany.mockResolvedValue([
-        { userId: 'user1' },
-        { userId: 'user2' },
-        { userId: 'user1' }, // duplicate user simulating overlapping membership
+        { userId: 'user1', organizationId: 'target-org' },
+        { userId: 'user2', organizationId: 'target-org' },
+        { userId: 'user1', organizationId: 'target-org' }, // duplicate user simulating overlapping membership
       ]);
       mockPrismaService.pointTransaction.createMany.mockResolvedValue({
         count: 2,
@@ -136,7 +136,7 @@ describe('OrganizationsService', () => {
 
       const result = await service.allocateSemesterPoints(
         'root-org',
-        'target-org',
+        ['target-org'],
         500,
         'Semester-1/2026',
       );
@@ -192,27 +192,15 @@ describe('OrganizationsService', () => {
       await expect(
         service.allocateSemesterPoints(
           'root-org',
-          'target-org',
+          ['target-org'],
           500,
           'Semester-1/2026',
         ),
       ).rejects.toThrow(
-        "Semester points for 'Semester-1/2026' have already been allocated to this organization.",
+        "Semester points for 'Semester-1/2026' have already been allocated to one or more selected organizations.",
       );
     });
 
-    it('should throw ConflictException if target organization is not found', async () => {
-      mockPrismaService.organization.findUnique.mockResolvedValue(null);
-
-      await expect(
-        service.allocateSemesterPoints(
-          'root-org',
-          'invalid-target',
-          500,
-          'Semester-1/2026',
-        ),
-      ).rejects.toThrow('Target organization not found.');
-    });
 
     it('should return count 0 if no active members exist', async () => {
       mockPrismaService.organization.findUnique.mockResolvedValue({
@@ -225,7 +213,7 @@ describe('OrganizationsService', () => {
 
       const result = await service.allocateSemesterPoints(
         'root-org',
-        'target-org',
+        ['target-org'],
         500,
         'Semester-1/2026',
       );
