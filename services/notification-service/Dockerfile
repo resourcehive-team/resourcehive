@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM node:22-alpine AS base
+FROM node:22.23.2-alpine3.24 AS base
 WORKDIR /app
 RUN apk add --no-cache openssl
 
@@ -36,8 +36,9 @@ RUN --mount=type=cache,id=resourcehive-pnpm,target=/pnpm/store \
 
 FROM base AS runner
 ENV NODE_ENV=production
-COPY --from=builder /prod/service ./
+COPY --from=builder --chown=node:node /prod/service ./
 EXPOSE 3003
+USER node
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD wget -qO- http://127.0.0.1:3003/health || exit 1
 CMD ["node", "dist/main.js"]

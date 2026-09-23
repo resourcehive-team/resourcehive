@@ -1,10 +1,88 @@
 name: resourcehive
 
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+  init: true
+  stop_grace_period: 30s
+
+x-kafka-client-environment: &kafka-client-environment
+  KAFKA_ENABLED: ${KAFKA_ENABLED:-true}
+  KAFKA_BROKERS: kafka:19092
+  KAFKA_SSL: "false"
+  KAFKA_SASL_USERNAME: ""
+  KAFKA_SASL_PASSWORD: ""
+
 services:
+  kafka:
+    image: apache/kafka:4.3.1
+    hostname: kafka
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${KAFKA_HOST_PORT:-9092}:9092"
+    environment:
+      CLUSTER_ID: 4L6g3nShT-eMCtK--X86sw
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: CONTROLLER://:29093,PLAINTEXT_HOST://:9092,PLAINTEXT://:19092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT_HOST://localhost:${KAFKA_HOST_PORT:-9092},PLAINTEXT://kafka:19092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
+      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_SHARE_COORDINATOR_STATE_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_SHARE_COORDINATOR_STATE_TOPIC_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+    volumes:
+      - kafka_data:/tmp/kraft-combined-logs
+    depends_on:
+      kafka-data-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 30s
+
+  kafka-data-init:
+    image: busybox:1.36
+    restart: "no"
+    volumes:
+      - kafka_data:/tmp/kraft-combined-logs
+    command: ["sh", "-c", "chown -R 1000:1000 /tmp/kraft-combined-logs"]
+
+  kafka-init:
+    image: apache/kafka:4.3.1
+    restart: "no"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        for topic in \
+          resourcehive.notification.commands.v1 \
+          resourcehive.identity.notification-commands.v1 \
+          resourcehive.booking.events.v1; do
+          /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:19092 \
+            --create --if-not-exists --topic "$$topic" --partitions 3 \
+            --replication-factor 1
+        done
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:19092 \
+          --create --if-not-exists \
+          --topic resourcehive.notification.dead-letter.v1 \
+          --partitions 1 --replication-factor 1
+
   api-gateway:
     image: caddy:2-alpine
-    container_name: resourcehive-api-gateway
-    restart: unless-stopped
+    <<: *service-defaults
     ports:
       - "${API_PORT:-8088}:8000"
     environment:
@@ -23,11 +101,10 @@ services:
         condition: service_healthy
 
   identity-service:
+    <<: *service-defaults
     build:
       context: .
       dockerfile: services/identity-service/Dockerfile
-    container_name: resourcehive-identity
-    restart: unless-stopped
     environment:
       DATABASE_URL: ${DATABASE_URL}
       DATABASE_URL_UNPOOLED: ${DATABASE_URL_UNPOOLED}
@@ -46,11 +123,7 @@ services:
       BCRYPT_ROUNDS: ${BCRYPT_ROUNDS:-12}
       EMAIL_VERIFICATION_TOKEN_EXPIRES_IN: ${EMAIL_VERIFICATION_TOKEN_EXPIRES_IN:-24h}
       PASSWORD_RESET_TOKEN_EXPIRES_IN: ${PASSWORD_RESET_TOKEN_EXPIRES_IN:-1h}
-      KAFKA_ENABLED: ${KAFKA_ENABLED:-true}
-      KAFKA_BROKERS: ${KAFKA_BROKERS:?Set KAFKA_BROKERS in .env}
-      KAFKA_SSL: ${KAFKA_SSL:-true}
-      KAFKA_SASL_USERNAME: ${KAFKA_SASL_USERNAME:-}
-      KAFKA_SASL_PASSWORD: ${KAFKA_SASL_PASSWORD:-}
+      <<: *kafka-client-environment
       NODE_ENV: development
       CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
       CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
@@ -59,77 +132,65 @@ services:
       sh -c "/migrator/node_modules/.bin/prisma migrate deploy
       --schema /migrator/schema/schema.prisma &&
       exec node dist/main.js"
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
 
   resource-service:
+    <<: *service-defaults
     build:
       context: .
       dockerfile: services/resource-service/Dockerfile
-    container_name: resourcehive-resource
-    restart: unless-stopped
     environment:
       DATABASE_URL: ${DATABASE_URL}
       JWT_SECRET: ${JWT_SECRET}
       PORT: 3004
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
-      KAFKA_ENABLED: ${KAFKA_ENABLED:-true}
-      KAFKA_BROKERS: ${KAFKA_BROKERS:?Set KAFKA_BROKERS in .env}
-      KAFKA_SSL: ${KAFKA_SSL:-true}
-      KAFKA_SASL_USERNAME: ${KAFKA_SASL_USERNAME:-}
-      KAFKA_SASL_PASSWORD: ${KAFKA_SASL_PASSWORD:-}
+      <<: *kafka-client-environment
       NODE_ENV: development
       CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
       CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
       CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3004/health"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
 
   booking-service:
+    <<: *service-defaults
     build:
       context: .
       dockerfile: services/booking-service/Dockerfile
-    container_name: resourcehive-booking
-    restart: unless-stopped
     environment:
       DATABASE_URL: ${DATABASE_URL}
       JWT_SECRET: ${JWT_SECRET}
       PORT: 3002
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
-      KAFKA_ENABLED: ${KAFKA_ENABLED:-true}
-      KAFKA_BROKERS: ${KAFKA_BROKERS:?Set KAFKA_BROKERS in .env}
-      KAFKA_SSL: ${KAFKA_SSL:-true}
-      KAFKA_SASL_USERNAME: ${KAFKA_SASL_USERNAME:-}
-      KAFKA_SASL_PASSWORD: ${KAFKA_SASL_PASSWORD:-}
+      <<: *kafka-client-environment
       NODE_ENV: development
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
 
   notification-service:
+    <<: *service-defaults
     build:
       context: .
       dockerfile: services/notification-service/Dockerfile
-    container_name: resourcehive-notification
-    restart: unless-stopped
     environment:
       DATABASE_URL: ${DATABASE_URL}
       JWT_SECRET: ${JWT_SECRET}
       PORT: 3003
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
       NODE_ENV: development
-      KAFKA_ENABLED: ${KAFKA_ENABLED:-true}
-      KAFKA_BROKERS: ${KAFKA_BROKERS:?Set KAFKA_BROKERS in .env}
+      <<: *kafka-client-environment
       KAFKA_CLIENT_ID: notification-service
       KAFKA_CONSUMER_GROUP: notification-service-v1
-      KAFKA_SSL: ${KAFKA_SSL:-true}
-      KAFKA_SASL_USERNAME: ${KAFKA_SASL_USERNAME:-}
-      KAFKA_SASL_PASSWORD: ${KAFKA_SASL_PASSWORD:-}
       RESEND_ENABLED: ${RESEND_ENABLED:-false}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-}
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+
+volumes:
+  kafka_data:
