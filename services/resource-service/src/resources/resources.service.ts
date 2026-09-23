@@ -108,7 +108,7 @@ export class ResourcesService {
       throw new NotFoundException('Resource not found');
     }
 
-    const { allowedOrganizationIds, ...rest } = dto;
+    const { allowedOrganizationIds, ...rest } = dto as Partial<CreateResourceDto> & UpdateResourceDto;
 
     let allowedOrganizationsUpdate = {};
     if (allowedOrganizationIds) {
