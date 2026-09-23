@@ -34,6 +34,21 @@ export interface SendVerificationEmailInput {
   correlationId?: string;
 }
 
+export interface SendPasswordResetEmailInput {
+  commandId?: string;
+  recipientUserId: string;
+  email: string;
+  resetUrl: string;
+  correlationId?: string;
+}
+
+export interface SendPasswordChangedEmailInput {
+  commandId?: string;
+  recipientUserId: string;
+  email: string;
+  correlationId?: string;
+}
+
 export interface PublishBookingEventInput {
   eventId?: string;
   eventType: BookingEventType;
@@ -99,6 +114,71 @@ export class NotificationClientService {
         key: NOTIFICATION_TEMPLATES.identityVerifyEmail,
         version: 1,
         variables: { verificationUrl: input.verificationUrl },
+      },
+      correlationId: input.correlationId ?? commandId,
+      occurredAt: new Date().toISOString(),
+    });
+    await this.transport.publish(
+      NOTIFICATION_TOPICS.identityCommands,
+      input.recipientUserId,
+      command,
+    );
+    return command;
+  }
+
+  async sendPasswordResetEmail(
+    input: SendPasswordResetEmailInput,
+  ): Promise<NotificationCommandV1> {
+    return this.sendIdentityEmail({
+      ...input,
+      template: {
+        key: NOTIFICATION_TEMPLATES.identityPasswordReset,
+        variables: { resetUrl: input.resetUrl },
+      },
+    });
+  }
+
+  async sendPasswordChangedEmail(
+    input: SendPasswordChangedEmailInput,
+  ): Promise<NotificationCommandV1> {
+    return this.sendIdentityEmail({
+      ...input,
+      template: {
+        key: NOTIFICATION_TEMPLATES.identityPasswordChanged,
+        variables: {},
+      },
+    });
+  }
+
+  private async sendIdentityEmail(input: {
+    commandId?: string;
+    recipientUserId: string;
+    email: string;
+    template: {
+      key:
+        | typeof NOTIFICATION_TEMPLATES.identityPasswordReset
+        | typeof NOTIFICATION_TEMPLATES.identityPasswordChanged;
+      variables: Record<string, string>;
+    };
+    correlationId?: string;
+  }): Promise<NotificationCommandV1> {
+    if (this.options.producer !== "identity-service") {
+      throw new Error("Only Identity Service may publish identity emails");
+    }
+    const commandId = input.commandId ?? randomUUID();
+    const command = parseNotificationCommand({
+      kind: "notification.command",
+      commandId,
+      producer: this.options.producer,
+      recipient: {
+        userId: input.recipientUserId,
+        email: input.email,
+      },
+      channels: ["EMAIL"],
+      template: {
+        key: input.template.key,
+        version: 1,
+        variables: input.template.variables,
       },
       correlationId: input.correlationId ?? commandId,
       occurredAt: new Date().toISOString(),

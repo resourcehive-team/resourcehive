@@ -97,21 +97,25 @@ pnpm run dev:setup
 
 ### Local email
 
-Local development uses the console email transport by default:
+Local development keeps Resend disabled by default. Email commands still travel
+through Kafka, and Notification Service acknowledges them with its console
+provider:
 
 ```env
-EMAIL_TRANSPORT=console
+KAFKA_ENABLED=true
+RESEND_ENABLED=false
 ```
 
-Verification and password-reset links are printed in the Identity Service
-logs instead of being emailed. Follow them with:
+For real local delivery, set `RESEND_ENABLED=true`, provide
+`RESEND_API_KEY`, and use a verified sender in `RESEND_FROM_EMAIL`. Start the
+Kafka broker and all services before testing email flows. The Resend key is
+passed only to Notification Service.
+
+Inspect queued email status with:
 
 ```bash
-docker compose logs -f identity-service
+docker compose logs -f notification-service
 ```
-
-To test real email locally, change `EMAIL_TRANSPORT` to `smtp` and configure
-the SMTP variables described in the production section.
 
 ### Google sign-in (OAuth/OIDC)
 
@@ -228,9 +232,11 @@ installation separately from the source code, so later builds reuse that work
 unless a package file or lockfile changed. The final service images contain
 only the compiled application and its production dependencies.
 
-Local Compose starts Kafka and creates the required topics automatically. The
-local broker does not need a username, password, or TLS configuration. Kafka
-is also not involved in the **Send test** browser-push action.
+The Compose stack expects a reachable Kafka broker and the required topics;
+the current Compose files do not provision a broker. For local development,
+use the broker settings in `.env` and keep TLS/SASL disabled only when your
+broker is local. Kafka is also not involved in the **Send test** browser-push
+action.
 
 When using Docker Compose, Identity Service applies committed database
 migrations automatically before it starts. For development without Docker,
@@ -462,18 +468,9 @@ APP_URL=https://app.resourcehive.thisismalindu.com
 EMAIL_VERIFICATION_TOKEN_EXPIRES_IN=24h
 PASSWORD_RESET_TOKEN_EXPIRES_IN=1h
 
-EMAIL_TRANSPORT=smtp
-EMAIL_FROM="ResourceHive <no-reply@thisismalindu.com>"
-SMTP_HOST=smtp.example.com
-SMTP_PORT=587
-SMTP_SECURE=false
-SMTP_USER=replace_with_smtp_username
-SMTP_PASSWORD=replace_with_smtp_password
-
-# Notification providers. Kafka and Resend can remain disabled until their
-# production services have been provisioned.
+# Notification providers. Kafka must be reachable for queued email delivery.
 DELIVERY_POLL_INTERVAL_MS=5000
-KAFKA_ENABLED=false
+KAFKA_ENABLED=true
 KAFKA_BROKERS=kafka.example.com:9093
 KAFKA_CLIENT_ID=notification-service
 KAFKA_CONSUMER_GROUP=notification-service-v1-production
@@ -481,7 +478,6 @@ KAFKA_SSL=true
 KAFKA_SASL_USERNAME=
 KAFKA_SASL_PASSWORD=
 
-RESEND_ENABLED=false
 RESEND_API_KEY=
 RESEND_FROM_EMAIL="ResourceHive <notifications@thisismalindu.com>"
 
@@ -496,16 +492,16 @@ Generate a production JWT secret with:
 openssl rand -base64 48
 ```
 
-For email, use credentials from any SMTP provider. Use port 587 with
-`SMTP_SECURE=false` for STARTTLS, or port 465 with `SMTP_SECURE=true`. The
-address in `EMAIL_FROM` must be accepted by the provider, which usually means
-verifying the sender address or domain.
+For email, create a Resend API key and verify the sending domain used by
+`RESEND_FROM_EMAIL`. Production Compose enables Resend and requires both
+values in `.env.production`. Identity Service publishes email commands to
+Kafka; Notification Service persists, retries, and sends them through Resend.
 
-`DELIVERY_POLL_INTERVAL_MS=5000` is suitable for normal use. If Kafka is
-enabled, create the four topics listed in the
+`DELIVERY_POLL_INTERVAL_MS=5000` is suitable for normal use. Create the four
+Kafka topics listed in the
 [notification event contracts](services/notification-service/docs/event-contracts.md)
-and configure the broker address, TLS, and SASL credentials. If Resend is
-enabled, use a Resend API key and an address on a verified sending domain.
+and configure the broker address, TLS, and SASL credentials. Use a Resend API
+key and an address on a verified sending domain.
 
 Do not set `GOOGLE_APPLICATION_CREDENTIALS` in `.env.production`. The
 deployment workflow installs and mounts the Firebase service-account JSON.

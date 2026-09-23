@@ -112,23 +112,22 @@ export function parseNotificationCommand(
     );
   }
   const usesEmail = value.channels.includes("EMAIL");
-  const isVerification =
-    template.key === NOTIFICATION_TEMPLATES.identityVerifyEmail;
-  if (usesEmail && !isVerification) {
+  const isIdentityEmail = String(template.key).startsWith("identity.");
+  if (usesEmail && !isIdentityEmail) {
     throw new NotificationContractError(
       "CHANNEL_FORBIDDEN",
-      "Email is reserved for Identity Service verification commands",
+      "Email is reserved for Identity Service email commands",
     );
   }
   if (
-    isVerification &&
+    isIdentityEmail &&
     (value.producer !== "identity-service" ||
       value.channels.length !== 1 ||
       value.channels[0] !== "EMAIL")
   ) {
     throw new NotificationContractError(
       "CHANNEL_FORBIDDEN",
-      "Email verification commands must use only the EMAIL channel",
+      "Identity email commands must use only the EMAIL channel",
     );
   }
   if (template.version !== 1) {
@@ -156,6 +155,18 @@ function validateTemplateVariables(
       "template.variables.verificationUrl",
       2_000,
     );
+  }
+  if (key === NOTIFICATION_TEMPLATES.identityPasswordReset) {
+    requireText(variables.resetUrl, "template.variables.resetUrl", 2_000);
+    if (Object.keys(variables).some((name) => name !== "resetUrl")) {
+      invalid("template.variables");
+    }
+  }
+  if (
+    key === NOTIFICATION_TEMPLATES.identityPasswordChanged &&
+    Object.keys(variables).length > 0
+  ) {
+    invalid("template.variables");
   }
   if (String(key).startsWith("booking.")) {
     requireText(variables.resourceName, "template.variables.resourceName", 200);

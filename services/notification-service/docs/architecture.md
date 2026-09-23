@@ -32,7 +32,8 @@ redelivery.
 - Producers publish template keys and typed variables, never arbitrary HTML.
 - Provider credentials exist only in Notification Service.
 - Identity owns verification tokens and is the only email-command producer.
-- Email is restricted to `identity.verify-email.v1`.
+- Email is restricted to Identity Service templates: verification,
+  password-reset, and password-changed messages.
 - Booking and other application events use in-app and web push channels.
 - Internal services can use `notification.message.v1` for bounded plain-text
   in-app and browser push messages.

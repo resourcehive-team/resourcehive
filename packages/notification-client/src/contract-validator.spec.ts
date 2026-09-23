@@ -54,7 +54,7 @@ describe("notification command contract", () => {
   it("rejects email for general notifications", () => {
     expect(() =>
       parseNotificationCommand({ ...validCommand, channels: ["EMAIL"] }),
-    ).toThrow("Email is reserved for Identity Service verification commands");
+    ).toThrow("Email is reserved for Identity Service email commands");
   });
 
   it("accepts Identity Service verification email only", () => {
@@ -69,5 +69,78 @@ describe("notification command contract", () => {
       },
     };
     expect(parseNotificationCommand(verification)).toEqual(verification);
+  });
+
+  it("accepts Identity Service password reset email commands", () => {
+    const reset = {
+      ...validCommand,
+      producer: "identity-service",
+      channels: ["EMAIL"],
+      template: {
+        key: "identity.password-reset.v1",
+        version: 1,
+        variables: { resetUrl: "https://app.example/reset-password?token=x" },
+      },
+    };
+    expect(parseNotificationCommand(reset)).toEqual(reset);
+  });
+
+  it("accepts Identity Service password changed email commands", () => {
+    const changed = {
+      ...validCommand,
+      producer: "identity-service",
+      channels: ["EMAIL"],
+      template: {
+        key: "identity.password-changed.v1",
+        version: 1,
+        variables: {},
+      },
+    };
+    expect(parseNotificationCommand(changed)).toEqual(changed);
+  });
+
+  it("rejects password reset commands without a reset URL", () => {
+    expect(() =>
+      parseNotificationCommand({
+        ...validCommand,
+        producer: "identity-service",
+        channels: ["EMAIL"],
+        template: {
+          key: "identity.password-reset.v1",
+          version: 1,
+          variables: {},
+        },
+      }),
+    ).toThrow("template.variables.resetUrl");
+  });
+
+  it("rejects password changed commands with variables", () => {
+    expect(() =>
+      parseNotificationCommand({
+        ...validCommand,
+        producer: "identity-service",
+        channels: ["EMAIL"],
+        template: {
+          key: "identity.password-changed.v1",
+          version: 1,
+          variables: { token: "must-not-be-included" },
+        },
+      }),
+    ).toThrow("template.variables is invalid");
+  });
+
+  it("rejects identity email commands with additional channels", () => {
+    expect(() =>
+      parseNotificationCommand({
+        ...validCommand,
+        producer: "identity-service",
+        channels: ["EMAIL", "PUSH"],
+        template: {
+          key: "identity.password-changed.v1",
+          version: 1,
+          variables: {},
+        },
+      }),
+    ).toThrow("Identity email commands must use only the EMAIL channel");
   });
 });
