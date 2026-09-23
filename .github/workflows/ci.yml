@@ -134,7 +134,7 @@ jobs:
         run: pnpm --filter frontend run build
         env:
           JWT_SECRET: ${{ env.CI_JWT_SECRET }}
-          NEXT_PUBLIC_API_URL: http://localhost:8000
+          NEXT_PUBLIC_API_URL: http://localhost:8088
 
   services:
     name: ${{ matrix.label }} quality

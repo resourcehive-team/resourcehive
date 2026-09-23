@@ -47,6 +47,15 @@ const account: CurrentUserResponse = {
     status: "ACTIVE",
     platformRole: "USER",
     createdAt: "2026-07-01T00:00:00.000Z",
+    authenticationMethods: {
+      password: true,
+      google: {
+        enabled: false,
+        connected: false,
+        email: null,
+        connectedAt: null,
+      },
+    },
   },
   organizationContext: {
     organizationId: "organization-1",
