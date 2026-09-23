@@ -3,8 +3,10 @@
 ## Kafka
 
 Configure brokers, client ID, consumer group, TLS, and SASL through environment
-variables. Development uses a local KRaft broker. Production must use encrypted
-transport and topic ACLs.
+variables. The base development Compose file provisions a single-node KRaft
+broker and creates the required topics automatically. Containers connect to
+`kafka:19092`; processes started directly on the host use `localhost:9092`.
+Production must use encrypted transport and topic ACLs.
 
 Before setting `KAFKA_ENABLED=true`:
 

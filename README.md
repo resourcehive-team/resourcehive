@@ -46,7 +46,7 @@ db/                             Prisma schema, migrations, and tests
 
 ### Requirements
 
-- Node.js 20 or newer
+- Node.js 22 or newer
 - pnpm 10.34.5
 - Docker with Docker Compose
 - Access to a PostgreSQL 15 database
@@ -232,11 +232,28 @@ installation separately from the source code, so later builds reuse that work
 unless a package file or lockfile changed. The final service images contain
 only the compiled application and its production dependencies.
 
-The Compose stack expects a reachable Kafka broker and the required topics;
-the current Compose files do not provision a broker. For local development,
-use the broker settings in `.env` and keep TLS/SASL disabled only when your
-broker is local. Kafka is also not involved in the **Send test** browser-push
-action.
+The base Compose stack provisions a single-node local Kafka KRaft broker and
+creates the four required topics before the application services start. Inside
+Docker, `localhost` means the current container, so Compose services use
+`kafka:19092`; services started directly with pnpm use the host listener at
+`localhost:9092`. TLS and SASL remain disabled only for this local broker.
+
+Inspect the broker and topics with:
+
+```bash
+docker compose ps
+docker compose logs -f kafka
+docker compose exec kafka /opt/kafka/bin/kafka-topics.sh \
+  --bootstrap-server localhost:9092 --list
+```
+
+Kafka data survives `docker compose down` because it is stored in the
+`kafka_data` volume. To intentionally reset local Kafka data and recreate all
+topics, use `docker compose down --volumes`.
+
+Email commands still require Kafka even when `RESEND_ENABLED=false`; the
+console provider is selected only after Notification Service consumes the
+command. Kafka is not involved in the **Send test** browser-push action.
 
 When using Docker Compose, Identity Service applies committed database
 migrations automatically before it starts. For development without Docker,
@@ -475,8 +492,8 @@ KAFKA_BROKERS=kafka.example.com:9093
 KAFKA_CLIENT_ID=notification-service
 KAFKA_CONSUMER_GROUP=notification-service-v1-production
 KAFKA_SSL=true
-KAFKA_SASL_USERNAME=
-KAFKA_SASL_PASSWORD=
+KAFKA_SASL_USERNAME=replace_with_managed_kafka_username
+KAFKA_SASL_PASSWORD=replace_with_managed_kafka_password
 
 RESEND_API_KEY=
 RESEND_FROM_EMAIL="ResourceHive <notifications@thisismalindu.com>"
@@ -497,10 +514,10 @@ For email, create a Resend API key and verify the sending domain used by
 values in `.env.production`. Identity Service publishes email commands to
 Kafka; Notification Service persists, retries, and sends them through Resend.
 
-`DELIVERY_POLL_INTERVAL_MS=5000` is suitable for normal use. Create the four
+`DELIVERY_POLL_INTERVAL_MS=5000` is suitable for normal use. Provision the four
 Kafka topics listed in the
 [notification event contracts](services/notification-service/docs/event-contracts.md)
-and configure the broker address, TLS, and SASL credentials. Use a Resend API
+on the managed broker and configure its broker address, TLS, and SASL credentials. Use a Resend API
 key and an address on a verified sending domain.
 
 Do not set `GOOGLE_APPLICATION_CREDENTIALS` in `.env.production`. The
