@@ -83,7 +83,7 @@ when the provider does not offer separate connections.
 Set these values in `apps/web/.env.local`:
 
 ```env
-NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_API_URL=http://localhost:8088
 JWT_SECRET=replace-with-the-same-secret-used-in-the-root-env
 ```
 
@@ -128,7 +128,7 @@ To enable it locally:
 1. In [Google Cloud Console](https://console.cloud.google.com/), create or
    select a project, configure the OAuth consent screen, and create an OAuth
    client of type **Web application**.
-2. Add `http://localhost:8000/auth/google/callback` as an authorized redirect
+2. Add `http://localhost:8088/auth/google/callback` as an authorized redirect
    URI. Keep the URI exact; path, scheme, host, and port must match.
 3. Put the client values in the root `.env` (Identity Service only reads these
    variables):
@@ -137,7 +137,7 @@ To enable it locally:
    GOOGLE_OAUTH_ENABLED=true
    GOOGLE_OAUTH_CLIENT_ID=your-client-id.apps.googleusercontent.com
    GOOGLE_OAUTH_CLIENT_SECRET=your-client-secret
-   GOOGLE_OAUTH_CALLBACK_URL=http://localhost:8000/auth/google/callback
+   GOOGLE_OAUTH_CALLBACK_URL=http://localhost:8088/auth/google/callback
    ```
 
 4. Apply the migration and regenerate the shared Prisma client, then rebuild
@@ -262,7 +262,7 @@ Password: DemoPassword123!
 The demo seed creates a user, an approved membership, and a demo organization.
 It does not create resources.
 
-The API gateway runs at <http://localhost:8000>. If port 8000 is unavailable,
+The API gateway runs at <http://localhost:8088>. If port 8088 is unavailable,
 change both values:
 
 ```env

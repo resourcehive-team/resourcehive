@@ -6,7 +6,7 @@ services:
     container_name: resourcehive-api-gateway
     restart: unless-stopped
     ports:
-      - "${API_PORT:-8000}:8000"
+      - "${API_PORT:-8088}:8000"
     environment:
       API_DOMAIN: ${API_DOMAIN:-http://localhost:8000}
       ACME_EMAIL: ${ACME_EMAIL:-admin@localhost}
@@ -40,7 +40,7 @@ services:
       GOOGLE_OAUTH_ENABLED: ${GOOGLE_OAUTH_ENABLED:-false}
       GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
       GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:-}
-      GOOGLE_OAUTH_CALLBACK_URL: ${GOOGLE_OAUTH_CALLBACK_URL:-http://localhost:8000/auth/google/callback}
+      GOOGLE_OAUTH_CALLBACK_URL: ${GOOGLE_OAUTH_CALLBACK_URL:-http://localhost:8088/auth/google/callback}
       AUTH_COOKIE_DOMAIN: ${AUTH_COOKIE_DOMAIN:-}
       AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
       BCRYPT_ROUNDS: ${BCRYPT_ROUNDS:-12}

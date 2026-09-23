@@ -41,7 +41,8 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly emailService: EmailService,
-    @Optional() private readonly googleOAuth: GoogleOAuthService = new GoogleOAuthService(),
+    @Optional()
+    private readonly googleOAuth: GoogleOAuthService = new GoogleOAuthService(),
   ) {}
 
   async getCurrentUserPoints(userId: string) {
@@ -180,7 +181,8 @@ export class AuthService {
     if (
       !user ||
       user.status !== 'ACTIVE' ||
-      !user.passwordHash || !(await bcrypt.compare(password, user.passwordHash))
+      !user.passwordHash ||
+      !(await bcrypt.compare(password, user.passwordHash))
     ) {
       throw new UnauthorizedException('Invalid email or password');
     }
@@ -215,7 +217,11 @@ export class AuthService {
 
   async beginGoogleConnection(userId: string, password: string) {
     await this.verifyPassword(userId, password);
-    const flow = this.googleOAuth.createAuthorizationUrl('CONNECT', '/dashboard/account', userId);
+    const flow = this.googleOAuth.createAuthorizationUrl(
+      'CONNECT',
+      '/dashboard/account',
+      userId,
+    );
     const flowToken = await this.jwtService.signAsync(flow.flow, {
       secret: this.getJwtSecret(),
       expiresIn: '10m',
@@ -230,10 +236,14 @@ export class AuthService {
         secret: this.getJwtSecret(),
       });
     } catch {
-      throw new UnauthorizedException('The Google sign-in attempt is invalid or expired');
+      throw new UnauthorizedException(
+        'The Google sign-in attempt is invalid or expired',
+      );
     }
     if (!flow.state || flow.state !== state || !flow.purpose) {
-      throw new UnauthorizedException('The Google sign-in attempt is invalid or expired');
+      throw new UnauthorizedException(
+        'The Google sign-in attempt is invalid or expired',
+      );
     }
 
     const identity = await this.googleOAuth.exchangeAndVerify(code, flow);
@@ -248,22 +258,37 @@ export class AuthService {
     });
 
     if (flow.purpose === 'CONNECT') {
-      if (!flow.userId) throw new UnauthorizedException('The Google sign-in attempt is invalid or expired');
+      if (!flow.userId)
+        throw new UnauthorizedException(
+          'The Google sign-in attempt is invalid or expired',
+        );
       if (existingIdentity && existingIdentity.userId !== flow.userId) {
-        throw new ConflictException('This Google account is already connected to another ResourceHive account');
+        throw new ConflictException(
+          'This Google account is already connected to another ResourceHive account',
+        );
       }
-      const user = await this.prisma.user.findUnique({ where: { id: flow.userId } });
+      const user = await this.prisma.user.findUnique({
+        where: { id: flow.userId },
+      });
       if (!user || user.status !== 'ACTIVE' || !user.passwordHash) {
         throw new UnauthorizedException('Your session is no longer valid');
       }
       const alreadyConnected = await this.prisma.externalIdentity.findFirst({
         where: { userId: flow.userId, provider: 'GOOGLE' },
       });
-      if (alreadyConnected && alreadyConnected.providerSubject !== identity.subject) {
+      if (
+        alreadyConnected &&
+        alreadyConnected.providerSubject !== identity.subject
+      ) {
         throw new ConflictException('Only one Google account can be connected');
       }
       await this.prisma.externalIdentity.upsert({
-        where: { provider_providerSubject: { provider: 'GOOGLE', providerSubject: identity.subject } },
+        where: {
+          provider_providerSubject: {
+            provider: 'GOOGLE',
+            providerSubject: identity.subject,
+          },
+        },
         create: {
           userId: flow.userId,
           provider: 'GOOGLE',
@@ -287,15 +312,24 @@ export class AuthService {
       const membership = await this.prisma.organizationMembership.count({
         where: { userId: existingIdentity.userId, status: 'APPROVED' },
       });
-      return { ...session, redirectPath: membership ? this.safeNext(flow.next) : '/dashboard/onboarding/membership' };
+      return {
+        ...session,
+        redirectPath: membership
+          ? this.safeNext(flow.next)
+          : '/dashboard/onboarding/membership',
+      };
     }
 
-    const emailOwner = await this.prisma.user.findUnique({ where: { email: identity.email } });
+    const emailOwner = await this.prisma.user.findUnique({
+      where: { email: identity.email },
+    });
     if (emailOwner) {
-      throw new ConflictException('An account with this email already exists. Sign in with email and password, then connect Google from Account Settings.');
+      throw new ConflictException(
+        'An account with this email already exists. Sign in with email and password, then connect Google from Account Settings.',
+      );
     }
 
-    let user;
+    let user: { id: string; email: string };
     try {
       user = await this.prisma.$transaction(async (transaction) => {
         const created = await transaction.user.create({
@@ -321,11 +355,20 @@ export class AuthService {
       });
     } catch {
       const racedIdentity = await this.prisma.externalIdentity.findUnique({
-        where: { provider_providerSubject: { provider: 'GOOGLE', providerSubject: identity.subject } },
+        where: {
+          provider_providerSubject: {
+            provider: 'GOOGLE',
+            providerSubject: identity.subject,
+          },
+        },
         include: { user: true },
       });
-      if (!racedIdentity || racedIdentity.user.status !== 'ACTIVE') throw new ConflictException('Unable to create the Google account');
-      await this.prisma.externalIdentity.update({ where: { id: racedIdentity.id }, data: { providerEmail: identity.email, lastUsedAt: new Date() } });
+      if (!racedIdentity || racedIdentity.user.status !== 'ACTIVE')
+        throw new ConflictException('Unable to create the Google account');
+      await this.prisma.externalIdentity.update({
+        where: { id: racedIdentity.id },
+        data: { providerEmail: identity.email, lastUsedAt: new Date() },
+      });
       const session = await this.createSessionForUser(racedIdentity.user);
       return { ...session, redirectPath: '/dashboard/onboarding/membership' };
     }
@@ -336,7 +379,13 @@ export class AuthService {
   async getAuthenticationMethods(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { passwordHash: true, externalIdentities: { where: { provider: 'GOOGLE' }, select: { providerEmail: true, createdAt: true } } },
+      select: {
+        passwordHash: true,
+        externalIdentities: {
+          where: { provider: 'GOOGLE' },
+          select: { providerEmail: true, createdAt: true },
+        },
+      },
     });
     const google = user?.externalIdentities[0];
     return {
@@ -351,23 +400,46 @@ export class AuthService {
   }
 
   async verifyPassword(userId: string, password: string) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { passwordHash: true, status: true } });
-    if (!user || user.status !== 'ACTIVE' || !user.passwordHash || !(await bcrypt.compare(password, user.passwordHash))) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { passwordHash: true, status: true },
+    });
+    if (
+      !user ||
+      user.status !== 'ACTIVE' ||
+      !user.passwordHash ||
+      !(await bcrypt.compare(password, user.passwordHash))
+    ) {
       throw new UnauthorizedException('Invalid password');
     }
   }
 
   async disconnectGoogle(userId: string, password: string) {
     await this.verifyPassword(userId, password);
-    const identity = await this.prisma.externalIdentity.findFirst({ where: { userId, provider: 'GOOGLE' } });
+    const identity = await this.prisma.externalIdentity.findFirst({
+      where: { userId, provider: 'GOOGLE' },
+    });
     if (!identity) throw new BadRequestException('Google is not connected');
     await this.prisma.externalIdentity.delete({ where: { id: identity.id } });
     return { message: 'Google disconnected successfully' };
   }
 
   async requestPasswordSetup(userId: string) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { email: true, passwordHash: true, status: true, emailVerifiedAt: true } });
-    if (!user || user.status !== 'ACTIVE' || !user.emailVerifiedAt || user.passwordHash) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        email: true,
+        passwordHash: true,
+        status: true,
+        emailVerifiedAt: true,
+      },
+    });
+    if (
+      !user ||
+      user.status !== 'ACTIVE' ||
+      !user.emailVerifiedAt ||
+      user.passwordHash
+    ) {
       return { message: PASSWORD_RESET_REQUEST_MESSAGE };
     }
     return this.requestPasswordReset({ email: user.email });
@@ -630,7 +702,10 @@ export class AuthService {
 
     if (
       passwordResetToken.user.passwordHash &&
-      (await bcrypt.compare(reset.password, passwordResetToken.user.passwordHash))
+      (await bcrypt.compare(
+        reset.password,
+        passwordResetToken.user.passwordHash,
+      ))
     ) {
       throw new BadRequestException(
         'New password must be different from your current password.',
@@ -1017,10 +1092,15 @@ export class AuthService {
   }
 
   private safeNext(next: string | undefined): string {
-    if (!next || !next.startsWith('/') || next.startsWith('//')) return '/dashboard';
+    if (!next || !next.startsWith('/') || next.startsWith('//'))
+      return '/dashboard';
     try {
-      const parsed = new URL(next, process.env.APP_URL ?? 'http://localhost:3000');
-      return parsed.origin === new URL(process.env.APP_URL ?? 'http://localhost:3000').origin
+      const parsed = new URL(
+        next,
+        process.env.APP_URL ?? 'http://localhost:3000',
+      );
+      return parsed.origin ===
+        new URL(process.env.APP_URL ?? 'http://localhost:3000').origin
         ? `${parsed.pathname}${parsed.search}${parsed.hash}`
         : '/dashboard';
     } catch {

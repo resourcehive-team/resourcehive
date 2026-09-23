@@ -43,7 +43,10 @@ export function clearAuthenticationCookies(response: Response): void {
   clearRefreshTokenCookie(response);
 }
 
-export function setGoogleOAuthFlowCookie(response: Response, value: string): void {
+export function setGoogleOAuthFlowCookie(
+  response: Response,
+  value: string,
+): void {
   response.cookie(GOOGLE_OAUTH_FLOW_COOKIE, value, {
     ...getSharedCookieOptions('/auth/google'),
     maxAge: 10 * 60 * 1000,

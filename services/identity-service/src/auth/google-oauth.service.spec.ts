@@ -32,7 +32,8 @@ describe('GoogleOAuthService', () => {
     process.env.GOOGLE_OAUTH_ENABLED = 'true';
     process.env.GOOGLE_OAUTH_CLIENT_ID = 'client-id';
     process.env.GOOGLE_OAUTH_CLIENT_SECRET = 'client-secret';
-    process.env.GOOGLE_OAUTH_CALLBACK_URL = 'http://localhost:8000/auth/google/callback';
+    process.env.GOOGLE_OAUTH_CALLBACK_URL =
+      'http://localhost:8088/auth/google/callback';
     const service = new GoogleOAuthService();
     const result = service.createAuthorizationUrl('LOGIN', '/dashboard');
     const url = new URL(result.url);
@@ -47,7 +48,8 @@ describe('GoogleOAuthService', () => {
     process.env.GOOGLE_OAUTH_ENABLED = 'true';
     delete process.env.GOOGLE_OAUTH_CLIENT_ID;
     process.env.GOOGLE_OAUTH_CLIENT_SECRET = 'client-secret';
-    process.env.GOOGLE_OAUTH_CALLBACK_URL = 'http://localhost:8000/auth/google/callback';
+    process.env.GOOGLE_OAUTH_CALLBACK_URL =
+      'http://localhost:8088/auth/google/callback';
     expect(() => new GoogleOAuthService()).toThrow(/GOOGLE_OAUTH_CLIENT_ID/);
   });
 });

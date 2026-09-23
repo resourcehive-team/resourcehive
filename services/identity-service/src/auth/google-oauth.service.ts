@@ -3,7 +3,7 @@ import {
   ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { OAuth2Client } from 'google-auth-library';
+import { OAuth2Client, type TokenPayload } from 'google-auth-library';
 import { createHash, randomBytes } from 'node:crypto';
 
 export type GoogleFlowPurpose = 'LOGIN' | 'CONNECT';
@@ -28,10 +28,15 @@ export interface GoogleIdentity {
 @Injectable()
 export class GoogleOAuthService {
   private readonly client: OAuth2Client | null;
+  private readonly config: {
+    clientId: string;
+    callbackUrl: string;
+  } | null;
 
   constructor() {
     if (!this.isEnabled()) {
       this.client = null;
+      this.config = null;
       return;
     }
 
@@ -44,10 +49,14 @@ export class GoogleOAuthService {
       );
     }
     this.client = new OAuth2Client(clientId, clientSecret, callbackUrl);
+    this.config = { clientId, callbackUrl };
   }
 
   isEnabled(): boolean {
-    return (process.env.GOOGLE_OAUTH_ENABLED ?? 'false').trim().toLowerCase() === 'true';
+    return (
+      (process.env.GOOGLE_OAUTH_ENABLED ?? 'false').trim().toLowerCase() ===
+      'true'
+    );
   }
 
   createAuthorizationUrl(
@@ -55,11 +64,14 @@ export class GoogleOAuthService {
     next: string,
     userId?: string,
   ): { url: string; flow: Omit<GoogleOAuthFlow, 'exp'> } {
-    if (!this.client) throw new ServiceUnavailableException('Google sign-in is unavailable');
+    if (!this.client)
+      throw new ServiceUnavailableException('Google sign-in is unavailable');
     const state = randomBytes(32).toString('base64url');
     const nonce = randomBytes(32).toString('base64url');
     const codeVerifier = randomBytes(48).toString('base64url');
-    const codeChallenge = createHash('sha256').update(codeVerifier).digest('base64url');
+    const codeChallenge = createHash('sha256')
+      .update(codeVerifier)
+      .digest('base64url');
     const flow: Omit<GoogleOAuthFlow, 'exp'> = {
       purpose,
       state,
@@ -68,9 +80,10 @@ export class GoogleOAuthService {
       next,
       ...(userId ? { userId } : {}),
     };
+    const config = this.requireConfig();
     const query = new URLSearchParams({
-      client_id: this.clientId,
-      redirect_uri: this.callbackUrl,
+      client_id: config.clientId,
+      redirect_uri: config.callbackUrl,
       response_type: 'code',
       scope: 'openid email profile',
       state,
@@ -85,36 +98,57 @@ export class GoogleOAuthService {
     };
   }
 
-  async exchangeAndVerify(code: string, flow: GoogleOAuthFlow): Promise<GoogleIdentity> {
-    if (!this.client) throw new ServiceUnavailableException('Google sign-in is unavailable');
-    if (!code || !flow.state || !Number.isFinite(flow.exp) || flow.exp * 1000 < Date.now()) {
-      throw new UnauthorizedException('The Google sign-in attempt is invalid or expired');
+  async exchangeAndVerify(
+    code: string,
+    flow: GoogleOAuthFlow,
+  ): Promise<GoogleIdentity> {
+    if (!this.client)
+      throw new ServiceUnavailableException('Google sign-in is unavailable');
+    if (
+      !code ||
+      !flow.state ||
+      !Number.isFinite(flow.exp) ||
+      flow.exp * 1000 < Date.now()
+    ) {
+      throw new UnauthorizedException(
+        'The Google sign-in attempt is invalid or expired',
+      );
     }
-    let tokens;
+    let idToken: string;
     try {
-      ({ tokens } = await this.client.getToken({
+      const tokenResponse = await this.client.getToken({
         code,
         codeVerifier: flow.codeVerifier,
-        redirect_uri: this.callbackUrl,
-      }));
+        redirect_uri: this.requireConfig().callbackUrl,
+      });
+      if (!tokenResponse.tokens.id_token) {
+        throw new UnauthorizedException(
+          'Google did not return an identity token',
+        );
+      }
+      idToken = tokenResponse.tokens.id_token;
     } catch {
-      throw new UnauthorizedException('The Google sign-in attempt is invalid or expired');
+      throw new UnauthorizedException(
+        'The Google sign-in attempt is invalid or expired',
+      );
     }
-    if (!tokens.id_token) throw new UnauthorizedException('Google did not return an identity token');
-    let payload;
+    let payload: TokenPayload | undefined;
     try {
       const ticket = await this.client.verifyIdToken({
-        idToken: tokens.id_token,
-        audience: this.clientId,
+        idToken,
+        audience: this.requireConfig().clientId,
       });
       payload = ticket.getPayload();
     } catch {
-      throw new UnauthorizedException('The Google identity could not be verified');
+      throw new UnauthorizedException(
+        'The Google identity could not be verified',
+      );
     }
     const issuer = payload?.iss;
     if (
       !payload ||
-      (issuer !== 'https://accounts.google.com' && issuer !== 'accounts.google.com') ||
+      (issuer !== 'https://accounts.google.com' &&
+        issuer !== 'accounts.google.com') ||
       !payload.sub ||
       !payload.email ||
       payload.email_verified !== true ||
@@ -122,9 +156,16 @@ export class GoogleOAuthService {
       payload.exp * 1000 < Date.now() ||
       payload.nonce !== flow.nonce
     ) {
-      throw new UnauthorizedException('The Google identity could not be verified');
+      throw new UnauthorizedException(
+        'The Google identity could not be verified',
+      );
     }
-    const [firstName, lastName] = this.getNames(payload.given_name, payload.family_name, payload.name, payload.email);
+    const [firstName, lastName] = this.getNames(
+      payload.given_name,
+      payload.family_name,
+      payload.name,
+      payload.email,
+    );
     return {
       subject: payload.sub,
       email: payload.email.trim().toLowerCase(),
@@ -133,17 +174,26 @@ export class GoogleOAuthService {
     };
   }
 
-  private get clientId(): string {
-    return process.env.GOOGLE_OAUTH_CLIENT_ID!.trim();
+  private requireConfig(): { clientId: string; callbackUrl: string } {
+    if (!this.config) {
+      throw new ServiceUnavailableException('Google sign-in is unavailable');
+    }
+    return this.config;
   }
 
-  private get callbackUrl(): string {
-    return process.env.GOOGLE_OAUTH_CALLBACK_URL!.trim();
-  }
-
-  private getNames(given?: string, family?: string, full?: string, email?: string): [string, string] {
-    const first = given?.trim() || full?.trim().split(/\s+/)[0] || email?.split('@')[0] || 'User';
-    const last = family?.trim() || full?.trim().split(/\s+/).slice(1).join(' ') || '';
+  private getNames(
+    given?: string,
+    family?: string,
+    full?: string,
+    email?: string,
+  ): [string, string] {
+    const first =
+      given?.trim() ||
+      full?.trim().split(/\s+/)[0] ||
+      email?.split('@')[0] ||
+      'User';
+    const last =
+      family?.trim() || full?.trim().split(/\s+/).slice(1).join(' ') || '';
     return [first, last];
   }
 }

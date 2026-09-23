@@ -48,11 +48,14 @@ export class AuthController {
   @Get('google/login')
   async googleLogin(@Req() request: Request, @Res() response: Response) {
     try {
-      const next = typeof request.query.next === 'string' ? request.query.next : '/dashboard';
+      const next =
+        typeof request.query.next === 'string'
+          ? request.query.next
+          : '/dashboard';
       const flow = await this.authService.beginGoogleLogin(next);
       setGoogleOAuthFlowCookie(response, flow.flowToken);
       return response.redirect(flow.authorizationUrl);
-    } catch (error) {
+    } catch {
       return response.redirect(this.googleErrorRedirect('GOOGLE_UNAVAILABLE'));
     }
   }
@@ -60,9 +63,17 @@ export class AuthController {
   @Post('google/connect')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
-  async googleConnect(@Req() request: AuthenticatedRequest, @Body() body: PasswordActionDto, @Res({ passthrough: true }) response: Response) {
-    if (!request.user) throw new UnauthorizedException('Authentication is required');
-    const flow = await this.authService.beginGoogleConnection(request.user.userId, body.password);
+  async googleConnect(
+    @Req() request: AuthenticatedRequest,
+    @Body() body: PasswordActionDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    if (!request.user)
+      throw new UnauthorizedException('Authentication is required');
+    const flow = await this.authService.beginGoogleConnection(
+      request.user.userId,
+      body.password,
+    );
     setGoogleOAuthFlowCookie(response, flow.flowToken);
     return { authorizationUrl: flow.authorizationUrl };
   }
@@ -70,28 +81,42 @@ export class AuthController {
   @Get('google/callback')
   async googleCallback(@Req() request: Request, @Res() response: Response) {
     const flowToken = extractGoogleOAuthFlow(request);
-    const code = typeof request.query.code === 'string' ? request.query.code : '';
-    const state = typeof request.query.state === 'string' ? request.query.state : '';
-    const providerError = typeof request.query.error === 'string' ? request.query.error : '';
+    const code =
+      typeof request.query.code === 'string' ? request.query.code : '';
+    const state =
+      typeof request.query.state === 'string' ? request.query.state : '';
+    const providerError =
+      typeof request.query.error === 'string' ? request.query.error : '';
     clearGoogleOAuthFlowCookie(response);
     if (providerError === 'access_denied') {
       return response.redirect(this.googleErrorRedirect('GOOGLE_CANCELLED'));
     }
     try {
-      const result = await this.authService.completeGoogleCallback(code, state, flowToken ?? '');
+      const result = await this.authService.completeGoogleCallback(
+        code,
+        state,
+        flowToken ?? '',
+      );
       if ('accessToken' in result) {
         setAccessTokenCookie(response, result.accessToken);
-        setRefreshTokenCookie(response, result.refreshToken, result.refreshTokenExpiresAt);
+        setRefreshTokenCookie(
+          response,
+          result.refreshToken,
+          result.refreshTokenExpiresAt,
+        );
       }
       return response.redirect(this.frontendRedirect(result.redirectPath));
     } catch (error) {
-      const code = error instanceof ServiceUnavailableException
-        ? 'GOOGLE_UNAVAILABLE'
-        : error instanceof ConflictException
-        ? 'ACCOUNT_EMAIL_EXISTS'
-        : error instanceof UnauthorizedException
-          ? (String(error.message).includes('unavailable') ? 'ACCOUNT_SUSPENDED' : 'OAUTH_FAILED')
-          : 'OAUTH_FAILED';
+      const code =
+        error instanceof ServiceUnavailableException
+          ? 'GOOGLE_UNAVAILABLE'
+          : error instanceof ConflictException
+            ? 'ACCOUNT_EMAIL_EXISTS'
+            : error instanceof UnauthorizedException
+              ? String(error.message).includes('unavailable')
+                ? 'ACCOUNT_SUSPENDED'
+                : 'OAUTH_FAILED'
+              : 'OAUTH_FAILED';
       return response.redirect(this.googleErrorRedirect(code));
     }
   }
@@ -99,16 +124,24 @@ export class AuthController {
   @Delete('google/connection')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
-  async googleDisconnect(@Req() request: AuthenticatedRequest, @Body() body: PasswordActionDto) {
-    if (!request.user) throw new UnauthorizedException('Authentication is required');
-    return this.authService.disconnectGoogle(request.user.userId, body.password);
+  async googleDisconnect(
+    @Req() request: AuthenticatedRequest,
+    @Body() body: PasswordActionDto,
+  ) {
+    if (!request.user)
+      throw new UnauthorizedException('Authentication is required');
+    return this.authService.disconnectGoogle(
+      request.user.userId,
+      body.password,
+    );
   }
 
   @Post('password/setup-request')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
   async passwordSetupRequest(@Req() request: AuthenticatedRequest) {
-    if (!request.user) throw new UnauthorizedException('Authentication is required');
+    if (!request.user)
+      throw new UnauthorizedException('Authentication is required');
     return this.authService.requestPasswordSetup(request.user.userId);
   }
 
@@ -229,7 +262,9 @@ export class AuthController {
         status: user.status,
         platformRole: user.platformRole,
         createdAt: user.createdAt.toISOString(),
-        authenticationMethods: await this.authService.getAuthenticationMethods(user.userId),
+        authenticationMethods: await this.authService.getAuthenticationMethods(
+          user.userId,
+        ),
       },
       organizationContext: {
         organizationId: user.tenantId || null,
@@ -268,11 +303,17 @@ export class AuthController {
   }
 
   private frontendRedirect(path: string): string {
-    return new URL(path, process.env.APP_URL ?? 'http://localhost:3000').toString();
+    return new URL(
+      path,
+      process.env.APP_URL ?? 'http://localhost:3000',
+    ).toString();
   }
 
   private googleErrorRedirect(code: string): string {
-    const url = new URL('/login', process.env.APP_URL ?? 'http://localhost:3000');
+    const url = new URL(
+      '/login',
+      process.env.APP_URL ?? 'http://localhost:3000',
+    );
     url.searchParams.set('oauthError', code);
     return url.toString();
   }
