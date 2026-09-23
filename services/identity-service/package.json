@@ -51,6 +51,7 @@
     "@types/jest": "^30.0.0",
     "@types/multer": "^2.2.0",
     "@types/node": "^24.0.0",
+    "@types/streamifier": "^0.1.2",
     "@types/supertest": "^7.0.0",
     "dotenv-cli": "^7.4.4",
     "eslint": "^9.18.0",
