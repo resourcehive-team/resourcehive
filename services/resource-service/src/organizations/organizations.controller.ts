@@ -161,7 +161,7 @@ export class OrganizationsController {
   ) {
     return this.orgsService.allocateSemesterPoints(
       id,
-      dto.targetOrganizationId,
+      dto.targetOrganizationIds,
       dto.amount,
       dto.semesterName,
     );

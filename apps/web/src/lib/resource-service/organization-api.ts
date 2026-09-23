@@ -37,7 +37,7 @@ export function getRootOrganizationDescendants(
 
 export function allocateSemesterPoints(
   rootOrganizationId: string,
-  targetOrganizationId: string,
+  targetOrganizationIds: string[],
   amount: number,
   semesterName: string,
 ): Promise<{ count: number }> {
@@ -46,7 +46,7 @@ export function allocateSemesterPoints(
   return apiRequest<{ count: number }>(`/organizations/${id}/semester-points`, {
     method: "POST",
     json: {
-      targetOrganizationId,
+      targetOrganizationIds,
       amount,
       semesterName,
     },
