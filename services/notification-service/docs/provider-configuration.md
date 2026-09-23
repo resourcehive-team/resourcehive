@@ -31,9 +31,10 @@ users and least-privilege ACLs are recommended before production hardening.
 Use separate development and production keys and a verified sending subdomain.
 Automatic retries use the delivery UUID as the provider idempotency key.
 
-Before setting `RESEND_ENABLED=true`, configure `RESEND_API_KEY`,
-and `RESEND_FROM_EMAIL`. Resend is used only for email verification. This
-version deliberately does not retain webhook event history.
+Before setting `RESEND_ENABLED=true`, configure `RESEND_API_KEY` and
+`RESEND_FROM_EMAIL` using a verified sending domain. Resend delivers
+verification, password-reset, and password-changed emails. This version
+deliberately does not retain webhook event history.
 
 ## Firebase Cloud Messaging
 

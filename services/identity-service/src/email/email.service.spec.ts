@@ -1,19 +1,14 @@
-import { InternalServerErrorException } from '@nestjs/common';
 import { NotificationClientService } from '@resourcehive/notification-client';
-import nodemailer from 'nodemailer';
 import { EmailService } from './email.service';
-
-jest.mock('nodemailer', () => ({
-  __esModule: true,
-  default: {
-    createTransport: jest.fn(),
-  },
-}));
 
 describe('EmailService', () => {
   const sendVerificationEmail = jest.fn();
+  const sendPasswordResetEmail = jest.fn();
+  const sendPasswordChangedEmail = jest.fn();
   const notifications = {
     sendVerificationEmail,
+    sendPasswordResetEmail,
+    sendPasswordChangedEmail,
   } as unknown as NotificationClientService;
   const service = new EmailService(notifications);
   const originalEnvironment = { ...process.env };
@@ -45,7 +40,6 @@ describe('EmailService', () => {
         'http://localhost:3000/verify-email?token=verification-token',
       correlationId: '11111111-1111-4111-8111-111111111111',
     });
-    expect(nodemailer.createTransport).not.toHaveBeenCalled();
   });
 
   it('does not expose the verification link in production', async () => {
@@ -60,53 +54,37 @@ describe('EmailService', () => {
         'verification-token',
       ),
     ).resolves.toEqual({});
-    expect(nodemailer.createTransport).not.toHaveBeenCalled();
   });
 
-  it('prints a trusted frontend password reset link for local development', async () => {
-    process.env.EMAIL_TRANSPORT = 'console';
+  it('publishes a password reset command with a trusted frontend link', async () => {
     process.env.APP_URL = 'http://localhost:3000';
 
     await expect(
-      service.sendPasswordResetEmail('alex@example.edu', 'reset-token'),
+      service.sendPasswordResetEmail(
+        '11111111-1111-4111-8111-111111111111',
+        'alex@example.edu',
+        'reset-token',
+      ),
     ).resolves.toBeUndefined();
-    expect(nodemailer.createTransport).not.toHaveBeenCalled();
+    expect(sendPasswordResetEmail).toHaveBeenCalledWith({
+      recipientUserId: '11111111-1111-4111-8111-111111111111',
+      email: 'alex@example.edu',
+      resetUrl: 'http://localhost:3000/reset-password?token=reset-token',
+      correlationId: '11111111-1111-4111-8111-111111111111',
+    });
   });
 
-  it('sends password reset and password changed messages through SMTP', async () => {
-    const sendMail = jest
-      .fn<
-        Promise<{ messageId: string }>,
-        [{ to: string; text: string; subject?: string; from?: string }]
-      >()
-      .mockResolvedValue({ messageId: 'message-id' });
-    (nodemailer.createTransport as jest.Mock).mockReturnValue({ sendMail });
-    process.env.EMAIL_TRANSPORT = 'smtp';
-    process.env.APP_URL = 'https://resourcehive.example';
-    process.env.SMTP_HOST = 'smtp.example';
-    process.env.SMTP_PORT = '587';
-
-    await service.sendPasswordResetEmail('alex@example.edu', 'reset-token');
-    await service.sendPasswordChangedEmail('alex@example.edu');
-
-    const resetMessage = sendMail.mock.calls[0][0];
-    expect(resetMessage.to).toBe('alex@example.edu');
-    expect(resetMessage.subject).toBe('Reset your ResourceHive password');
-    expect(resetMessage.text).toContain(
-      'https://resourcehive.example/reset-password?token=reset-token',
-    );
-    const changedMessage = sendMail.mock.calls[1][0];
-    expect(changedMessage.to).toBe('alex@example.edu');
-    expect(changedMessage.subject).toBe(
-      'Your ResourceHive password was changed',
-    );
-  });
-
-  it('rejects an unsupported transport for password emails', async () => {
-    process.env.EMAIL_TRANSPORT = 'unknown';
-
+  it('publishes password changed confirmation through Notification Service', async () => {
     await expect(
-      service.sendPasswordResetEmail('alex@example.edu', 'reset-token'),
-    ).rejects.toBeInstanceOf(InternalServerErrorException);
+      service.sendPasswordChangedEmail(
+        '11111111-1111-4111-8111-111111111111',
+        'alex@example.edu',
+      ),
+    ).resolves.toBeUndefined();
+    expect(sendPasswordChangedEmail).toHaveBeenCalledWith({
+      recipientUserId: '11111111-1111-4111-8111-111111111111',
+      email: 'alex@example.edu',
+      correlationId: '11111111-1111-4111-8111-111111111111',
+    });
   });
 });

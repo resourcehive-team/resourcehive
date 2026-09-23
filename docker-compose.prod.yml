@@ -59,14 +59,7 @@ services:
       BCRYPT_ROUNDS: ${BCRYPT_ROUNDS:-12}
       EMAIL_VERIFICATION_TOKEN_EXPIRES_IN: ${EMAIL_VERIFICATION_TOKEN_EXPIRES_IN:-24h}
       PASSWORD_RESET_TOKEN_EXPIRES_IN: ${PASSWORD_RESET_TOKEN_EXPIRES_IN:-1h}
-      EMAIL_TRANSPORT: ${EMAIL_TRANSPORT:-smtp}
-      EMAIL_FROM: ${EMAIL_FROM:?Set EMAIL_FROM in .env.production}
-      SMTP_HOST: ${SMTP_HOST:-}
-      SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_SECURE: ${SMTP_SECURE:-false}
-      SMTP_USER: ${SMTP_USER:-}
-      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
-      KAFKA_ENABLED: ${KAFKA_ENABLED:-false}
+      KAFKA_ENABLED: ${KAFKA_ENABLED:-true}
       KAFKA_BROKERS: ${KAFKA_BROKERS:-localhost:9092}
       KAFKA_SSL: ${KAFKA_SSL:-true}
       KAFKA_SASL_USERNAME: ${KAFKA_SASL_USERNAME:-}
@@ -84,7 +77,7 @@ services:
     environment:
       <<: *service-environment
       PORT: 3004
-      KAFKA_ENABLED: ${KAFKA_ENABLED:-false}
+      KAFKA_ENABLED: ${KAFKA_ENABLED:-true}
       KAFKA_BROKERS: ${KAFKA_BROKERS:-localhost:9092}
       KAFKA_SSL: ${KAFKA_SSL:-true}
       KAFKA_SASL_USERNAME: ${KAFKA_SASL_USERNAME:-}
@@ -102,7 +95,7 @@ services:
     environment:
       <<: *service-environment
       PORT: 3002
-      KAFKA_ENABLED: ${KAFKA_ENABLED:-false}
+      KAFKA_ENABLED: ${KAFKA_ENABLED:-true}
       KAFKA_BROKERS: ${KAFKA_BROKERS:-localhost:9092}
       KAFKA_SSL: ${KAFKA_SSL:-true}
       KAFKA_SASL_USERNAME: ${KAFKA_SASL_USERNAME:-}
@@ -115,16 +108,16 @@ services:
       <<: *service-environment
       PORT: 3003
       DELIVERY_POLL_INTERVAL_MS: ${DELIVERY_POLL_INTERVAL_MS:-5000}
-      KAFKA_ENABLED: ${KAFKA_ENABLED:-false}
+      KAFKA_ENABLED: ${KAFKA_ENABLED:-true}
       KAFKA_BROKERS: ${KAFKA_BROKERS:-localhost:9092}
       KAFKA_CLIENT_ID: ${KAFKA_CLIENT_ID:-notification-service}
       KAFKA_CONSUMER_GROUP: ${KAFKA_CONSUMER_GROUP:-notification-service-v1}
       KAFKA_SSL: ${KAFKA_SSL:-true}
       KAFKA_SASL_USERNAME: ${KAFKA_SASL_USERNAME:-}
       KAFKA_SASL_PASSWORD: ${KAFKA_SASL_PASSWORD:-}
-      RESEND_ENABLED: ${RESEND_ENABLED:-false}
-      RESEND_API_KEY: ${RESEND_API_KEY:-}
-      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-}
+      RESEND_ENABLED: "true"
+      RESEND_API_KEY: ${RESEND_API_KEY:?Set RESEND_API_KEY in .env.production}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:?Set RESEND_FROM_EMAIL in .env.production}
       FCM_ENABLED: ${FCM_ENABLED:-false}
       FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
       WEB_APP_URL: ${WEB_APP_URL:-}

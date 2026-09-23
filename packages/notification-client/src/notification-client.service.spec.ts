@@ -73,6 +73,61 @@ describe("NotificationClientService", () => {
     );
   });
 
+  it("publishes password reset email to the restricted identity topic", async () => {
+    const identityService = new NotificationClientService(
+      {
+        ...options,
+        clientId: "identity-service",
+        producer: "identity-service",
+      },
+      transport,
+    );
+    const command = await identityService.sendPasswordResetEmail({
+      commandId: "11111111-1111-4111-8111-111111111111",
+      recipientUserId: "22222222-2222-4222-8222-222222222222",
+      email: "user@example.edu",
+      resetUrl: "https://app.example/reset-password?token=x",
+      correlationId: "33333333-3333-4333-8333-333333333333",
+    });
+
+    expect(command.template).toEqual({
+      key: "identity.password-reset.v1",
+      version: 1,
+      variables: { resetUrl: "https://app.example/reset-password?token=x" },
+    });
+    expect(publish).toHaveBeenCalledWith(
+      NOTIFICATION_TOPICS.identityCommands,
+      "22222222-2222-4222-8222-222222222222",
+      command,
+    );
+  });
+
+  it("publishes password changed email to the restricted identity topic", async () => {
+    const identityService = new NotificationClientService(
+      {
+        ...options,
+        clientId: "identity-service",
+        producer: "identity-service",
+      },
+      transport,
+    );
+    const command = await identityService.sendPasswordChangedEmail({
+      recipientUserId: "22222222-2222-4222-8222-222222222222",
+      email: "user@example.edu",
+    });
+
+    expect(command.template).toEqual({
+      key: "identity.password-changed.v1",
+      version: 1,
+      variables: {},
+    });
+    expect(publish).toHaveBeenCalledWith(
+      NOTIFICATION_TOPICS.identityCommands,
+      "22222222-2222-4222-8222-222222222222",
+      command,
+    );
+  });
+
   it("propagates Kafka publishing failures", async () => {
     publish.mockRejectedValueOnce(new Error("broker unavailable"));
     await expect(

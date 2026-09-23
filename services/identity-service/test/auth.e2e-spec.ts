@@ -57,11 +57,9 @@ describe('Authentication Flow (e2e)', () => {
   const testEmail = process.env.DEMO_USER_EMAIL ?? 'demo@example.edu';
   const testPassword = process.env.DEMO_USER_PASSWORD ?? 'DemoPassword123!';
   const signupEmail = `signup-${Date.now()}@example.edu`;
-  const originalEmailTransport = process.env.EMAIL_TRANSPORT;
   const originalBcryptRounds = process.env.BCRYPT_ROUNDS;
 
   beforeAll(async () => {
-    process.env.EMAIL_TRANSPORT = 'console';
     process.env.BCRYPT_ROUNDS = '4';
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -70,6 +68,8 @@ describe('Authentication Flow (e2e)', () => {
       .overrideProvider(NotificationClientService)
       .useValue({
         sendVerificationEmail: jest.fn().mockResolvedValue({}),
+        sendPasswordResetEmail: jest.fn().mockResolvedValue({}),
+        sendPasswordChangedEmail: jest.fn().mockResolvedValue({}),
       })
       .compile();
 
@@ -469,11 +469,6 @@ describe('Authentication Flow (e2e)', () => {
     });
 
     await app.close();
-    if (originalEmailTransport === undefined) {
-      delete process.env.EMAIL_TRANSPORT;
-    } else {
-      process.env.EMAIL_TRANSPORT = originalEmailTransport;
-    }
     if (originalBcryptRounds === undefined) {
       delete process.env.BCRYPT_ROUNDS;
     } else {

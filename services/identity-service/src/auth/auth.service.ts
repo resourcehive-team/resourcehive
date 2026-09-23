@@ -673,7 +673,11 @@ export class AuthService {
     });
 
     try {
-      await this.emailService.sendPasswordResetEmail(user.email, token);
+      await this.emailService.sendPasswordResetEmail(
+        user.id,
+        user.email,
+        token,
+      );
     } catch (error) {
       this.logger.error(
         `Unable to send password reset email for user ${user.id}`,
@@ -768,6 +772,7 @@ export class AuthService {
 
     try {
       await this.emailService.sendPasswordChangedEmail(
+        passwordResetToken.user.id,
         passwordResetToken.user.email,
       );
     } catch (error) {

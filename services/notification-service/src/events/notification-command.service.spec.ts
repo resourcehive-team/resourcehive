@@ -81,6 +81,48 @@ describe("NotificationCommandService", () => {
     });
   });
 
+  it.each([
+    [
+      "identity.password-reset.v1",
+      { resetUrl: "https://app.example/reset-password?token=secret" },
+      "Reset your ResourceHive password",
+      "Reset your password by opening this link: https://app.example/reset-password?token=secret\n\nIf you did not request this change, you can ignore this email.",
+    ],
+    [
+      "identity.password-changed.v1",
+      {},
+      "Your ResourceHive password was changed",
+      "Your ResourceHive password was changed. If you did not make this change, contact your organization administrator.",
+    ],
+  ])(
+    "queues %s without creating notification history",
+    async (key, variables, subject, body) => {
+      await service.process({
+        kind: "notification.command",
+        commandId: "11111111-1111-4111-8111-111111111111",
+        producer: "identity-service",
+        recipient: { userId: user.id, email: user.email },
+        channels: ["EMAIL"],
+        template: { key, version: 1, variables },
+        correlationId: "33333333-3333-4333-8333-333333333333",
+        occurredAt: "2026-08-31T12:00:00.000Z",
+      });
+
+      expect(createNotification).not.toHaveBeenCalled();
+      expect(createDeliveries).toHaveBeenCalledWith({
+        data: [
+          expect.objectContaining({
+            userId: user.id,
+            channel: "EMAIL",
+            destination: user.email,
+            subject,
+            body,
+          }),
+        ],
+      });
+    },
+  );
+
   it("creates notification history and push work for booking events", async () => {
     await service.process({
       kind: "notification.command",
