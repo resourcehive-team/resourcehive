@@ -83,7 +83,12 @@ export class JwtAuthGuard implements CanActivate {
           userId: user.id,
           status: 'APPROVED',
         },
-        orderBy: { joinedAt: 'asc' },
+        // A user can hold several memberships (e.g. MEMBER of the tenant
+        // and ADMIN of a department). Prefer an ADMIN membership so that
+        // role-gated features (bookings/disputes/analytics review
+        // sections) see the user's administrative context instead of an
+        // arbitrary earlier-joined non-admin one.
+        orderBy: [{ role: 'asc' }, { joinedAt: 'asc' }],
       });
 
       request.user = {
