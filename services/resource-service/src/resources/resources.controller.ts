@@ -108,7 +108,10 @@ export class ResourcesController {
     @Param('organizationId') organizationId: string,
     @Param('resourceId') resourceId: string,
   ) {
-    const result = await this.resourcesService.remove(organizationId, resourceId);
+    const result = await this.resourcesService.remove(
+      organizationId,
+      resourceId,
+    );
     await this.cacheManager.clear();
     return result;
   }

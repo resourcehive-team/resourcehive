@@ -15,16 +15,14 @@ import { createKeyv } from '@keyv/redis';
         const host = process.env.REDIS_HOST || 'redis';
         const port = process.env.REDIS_PORT || 6379;
         return {
-          stores: [
-            createKeyv(`redis://${host}:${port}`),
-          ],
+          stores: [createKeyv(`redis://${host}:${port}`)],
           ttl: 600000,
         };
       },
     }),
-    PrismaModule, 
-    AuthModule, 
-    CloudinaryModule
+    PrismaModule,
+    AuthModule,
+    CloudinaryModule,
   ],
   controllers: [AppController],
   providers: [AppService],

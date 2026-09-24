@@ -42,7 +42,10 @@ export class SlotsController {
   @Post("slots")
   @ApiCreatedResponse({ description: "Slot created" })
   @ApiConflictResponse({ description: "Slot overlaps an existing slot" })
-  async create(@Body() dto: CreateSlotDto, @CurrentUser() user: AuthenticatedUser) {
+  async create(
+    @Body() dto: CreateSlotDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
     const result = await this.slots.create(dto, user);
     await this.cacheManager.clear();
     return result;
@@ -71,4 +74,3 @@ export class SlotsController {
     return this.slots.list(resourceId, query, user);
   }
 }
-

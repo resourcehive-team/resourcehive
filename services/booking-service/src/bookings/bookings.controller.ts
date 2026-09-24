@@ -13,7 +13,7 @@ import {
   UseInterceptors,
   Inject,
 } from "@nestjs/common";
-import { CacheInterceptor, CACHE_MANAGER } from "@nestjs/cache-manager";
+import { CACHE_MANAGER } from "@nestjs/cache-manager";
 import type { Cache } from "cache-manager";
 import { UserCacheInterceptor } from "../common/interceptors/user-cache.interceptor";
 import {
@@ -71,7 +71,10 @@ export class BookingsController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     try {
-      const result = await this.bookings.createBooking(dto.resourceSlotId, user);
+      const result = await this.bookings.createBooking(
+        dto.resourceSlotId,
+        user,
+      );
       await this.cacheManager.clear();
       return result;
     } catch (error) {
@@ -121,7 +124,10 @@ export class BookingsController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     try {
-      const result = await this.bookings.completeBooking(bookingId, user.userId);
+      const result = await this.bookings.completeBooking(
+        bookingId,
+        user.userId,
+      );
       await this.cacheManager.clear();
       return result;
     } catch (error) {
@@ -144,7 +150,11 @@ export class BookingsController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     try {
-      const result = await this.bookings.cancelBooking(bookingId, user.userId, dto);
+      const result = await this.bookings.cancelBooking(
+        bookingId,
+        user.userId,
+        dto,
+      );
       await this.cacheManager.clear();
       return result;
     } catch (error) {
