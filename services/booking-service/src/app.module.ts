@@ -11,7 +11,7 @@ import { createKeyv } from "@keyv/redis";
 
 @Module({
   imports: [
-    CacheModule.registerAsync<any>({
+    CacheModule.registerAsync({
       isGlobal: true,
       useFactory: () => {
         const host = process.env.REDIS_HOST || "redis";

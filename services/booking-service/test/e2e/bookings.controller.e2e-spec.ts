@@ -31,7 +31,12 @@ describe("BookingsController (e2e read and completion endpoints)", () => {
         },
         {
           provide: CACHE_MANAGER,
-          useValue: { get: jest.fn(), set: jest.fn(), del: jest.fn(), clear: jest.fn() },
+          useValue: {
+            get: jest.fn(),
+            set: jest.fn(),
+            del: jest.fn(),
+            clear: jest.fn(),
+          },
         },
       ],
     })

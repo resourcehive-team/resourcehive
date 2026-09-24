@@ -19,5 +19,5 @@
     "noFallthroughCasesInSwitch": false,
     "esModuleInterop": true
   },
-  "exclude": ["eslint.config.mjs"]
+  "exclude": ["node_modules", "dist", "eslint.config.mjs"]
 }
