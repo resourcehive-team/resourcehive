@@ -21,7 +21,19 @@ export interface Membership {
   role: string;
   status: string;
   joinedAt: string;
-  approvedBy: string | null;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  reviewNote: string | null;
+  latestAudit: MembershipAudit | null;
+}
+
+export interface MembershipAudit {
+  id: string;
+  membershipId: string;
+  actorUserId: string;
+  action: string;
+  note: string | null;
+  createdAt: string;
 }
 
 export interface MembershipWithOrganization extends Membership {
@@ -42,7 +54,23 @@ export interface OrganizationMember {
   role: string;
   status: string;
   joinedAt: string;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  reviewNote: string | null;
+  latestAudit: MembershipAudit | null;
   user: OrganizationMemberUser;
+}
+
+export interface ChildOrganizationAdministrators {
+  id: string;
+  name: string;
+  type: string;
+  status: string;
+  administrators: Array<{
+    userId: string;
+    organizationId: string;
+    user: OrganizationMemberUser;
+  }>;
 }
 
 export interface AllowedOrganization {

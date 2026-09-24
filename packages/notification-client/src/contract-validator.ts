@@ -103,6 +103,15 @@ export function parseNotificationCommand(
     );
   }
   if (
+    String(template.key).startsWith("membership.") &&
+    value.producer !== "resource-service"
+  ) {
+    throw new NotificationContractError(
+      "TEMPLATE_FORBIDDEN",
+      "Membership templates may only be requested by Resource Service",
+    );
+  }
+  if (
     template.key === NOTIFICATION_TEMPLATES.developmentTestPush &&
     value.producer !== "notification-service"
   ) {
@@ -128,6 +137,17 @@ export function parseNotificationCommand(
     throw new NotificationContractError(
       "CHANNEL_FORBIDDEN",
       "Identity email commands must use only the EMAIL channel",
+    );
+  }
+  if (
+    String(template.key).startsWith("membership.") &&
+    (value.channels.length !== 2 ||
+      !value.channels.includes("IN_APP") ||
+      !value.channels.includes("PUSH"))
+  ) {
+    throw new NotificationContractError(
+      "CHANNEL_FORBIDDEN",
+      "Membership notifications must use only IN_APP and PUSH channels",
     );
   }
   if (template.version !== 1) {
@@ -174,6 +194,19 @@ function validateTemplateVariables(
   if (key === NOTIFICATION_TEMPLATES.message) {
     requireText(variables.title, "template.variables.title", 120);
     requireText(variables.message, "template.variables.message", 500);
+  }
+  if (
+    key === NOTIFICATION_TEMPLATES.membershipApproved ||
+    key === NOTIFICATION_TEMPLATES.membershipRejected
+  ) {
+    requireText(
+      variables.organizationName,
+      "template.variables.organizationName",
+      200,
+    );
+    if (Object.keys(variables).some((name) => name !== "organizationName")) {
+      invalid("template.variables");
+    }
   }
 }
 

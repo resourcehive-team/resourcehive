@@ -49,6 +49,14 @@ export interface SendPasswordChangedEmailInput {
   correlationId?: string;
 }
 
+export interface SendMembershipDecisionInput {
+  commandId?: string;
+  recipientUserId: string;
+  organizationName: string;
+  decision: "APPROVED" | "REJECTED";
+  correlationId?: string;
+}
+
 export interface PublishBookingEventInput {
   eventId?: string;
   eventType: BookingEventType;
@@ -148,6 +156,42 @@ export class NotificationClientService {
         variables: {},
       },
     });
+  }
+
+  async sendMembershipDecision(
+    input: SendMembershipDecisionInput,
+  ): Promise<NotificationCommandV1> {
+    if (this.options.producer !== "resource-service") {
+      throw new Error(
+        "Only Resource Service may publish membership decision notifications",
+      );
+    }
+
+    const commandId = input.commandId ?? randomUUID();
+    const templateKey =
+      input.decision === "APPROVED"
+        ? NOTIFICATION_TEMPLATES.membershipApproved
+        : NOTIFICATION_TEMPLATES.membershipRejected;
+    const command = parseNotificationCommand({
+      kind: "notification.command",
+      commandId,
+      producer: this.options.producer,
+      recipient: { userId: input.recipientUserId },
+      channels: ["IN_APP", "PUSH"],
+      template: {
+        key: templateKey,
+        version: 1,
+        variables: { organizationName: input.organizationName },
+      },
+      correlationId: input.correlationId ?? commandId,
+      occurredAt: new Date().toISOString(),
+    });
+    await this.transport.publish(
+      NOTIFICATION_TOPICS.commands,
+      input.recipientUserId,
+      command,
+    );
+    return command;
   }
 
   private async sendIdentityEmail(input: {

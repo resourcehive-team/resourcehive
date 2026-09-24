@@ -1,28 +1,29 @@
 import {
-  Controller,
-  Get,
-  Post,
-  Param,
-  UseGuards,
-  Patch,
-  Delete,
   Body,
-  BadRequestException,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Put,
+  UseGuards,
 } from '@nestjs/common';
-import { MembershipsService } from './memberships.service';
 import {
-  ApiTags,
-  ApiOperation,
   ApiBearerAuth,
+  ApiConflictResponse,
   ApiCreatedResponse,
-  ApiOkResponse,
   ApiForbiddenResponse,
   ApiNotFoundResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
 } from '@nestjs/swagger';
 import { CurrentUser, JwtAuthGuard } from '@resourcehive/service-auth';
 import type { AuthenticatedUser } from '@resourcehive/service-auth';
-import { TenantGuard } from '../auth/tenant.guard';
-import { AdminGuard } from '../auth/admin.guard';
+import { AppointChildAdminDto } from './dto/appoint-child-admin.dto';
+import { RejectMembershipDto } from './dto/reject-membership.dto';
+import { MembershipsService } from './memberships.service';
 
 @ApiTags('Memberships')
 @ApiBearerAuth()
@@ -37,105 +38,190 @@ export class MembershipsController {
     description: 'Membership request submitted successfully.',
   })
   requestMembership(
-    @Param('organizationId') orgId: string,
+    @Param('organizationId') organizationId: string,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.membershipsService.requestMembership(user.userId, orgId);
+    return this.membershipsService.requestMembership(
+      user.userId,
+      organizationId,
+    );
   }
 
-  @UseGuards(TenantGuard, AdminGuard)
   @Patch('organization/:organizationId/users/:userId/approve')
-  @ApiOperation({ summary: 'Approve a membership request' })
+  @ApiOperation({ summary: 'Approve or reconsider a membership request' })
   @ApiOkResponse({ description: 'Membership approved successfully.' })
   @ApiForbiddenResponse({
-    description: 'Forbidden. Requires Admin privileges.',
+    description: 'Requires a direct organization administrator.',
+  })
+  @ApiConflictResponse({
+    description:
+      'Membership was already reviewed or the applicant is inactive.',
   })
   @ApiNotFoundResponse({ description: 'Membership request not found.' })
   approveMembership(
-    @Param('organizationId') orgId: string,
+    @Param('organizationId') organizationId: string,
     @Param('userId') targetUserId: string,
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.membershipsService.updateMembershipStatus(
       targetUserId,
-      orgId,
+      organizationId,
       'APPROVED',
       user.userId,
     );
   }
 
-  @UseGuards(TenantGuard, AdminGuard)
   @Patch('organization/:organizationId/users/:userId/reject')
-  @ApiOperation({ summary: 'Reject a membership request' })
+  @ApiOperation({ summary: 'Reject a pending membership request' })
   @ApiOkResponse({ description: 'Membership rejected successfully.' })
   @ApiForbiddenResponse({
-    description: 'Forbidden. Requires Admin privileges.',
+    description: 'Requires a direct organization administrator.',
+  })
+  @ApiConflictResponse({
+    description: 'Only pending memberships can be rejected.',
   })
   @ApiNotFoundResponse({ description: 'Membership request not found.' })
   rejectMembership(
-    @Param('organizationId') orgId: string,
+    @Param('organizationId') organizationId: string,
     @Param('userId') targetUserId: string,
+    @Body() body: RejectMembershipDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.membershipsService.updateMembershipStatus(
       targetUserId,
-      orgId,
+      organizationId,
       'REJECTED',
       user.userId,
+      body.reason,
     );
   }
 
   @Get('my-memberships')
   @ApiOperation({ summary: 'Get memberships for the current user' })
-  @ApiOkResponse({ description: "Returns a list of the user's memberships." })
+  @ApiOkResponse({
+    description: "Returns all of the user's membership statuses.",
+  })
   getMyMemberships(@CurrentUser() user: AuthenticatedUser) {
     return this.membershipsService.getUserMemberships(user.userId);
   }
 
-  @UseGuards(TenantGuard, AdminGuard)
-  @Get('organization/:organizationId')
-  @ApiOperation({ summary: 'Get all members of an organization' })
-  @ApiOkResponse({ description: 'Returns a list of approved members.' })
-  @ApiForbiddenResponse({
-    description: 'Forbidden. Requires Admin privileges.',
+  @Get('organization/:organizationId/child-administrators')
+  @ApiOperation({
+    summary: 'Get administrators for immediate child organizations',
   })
-  getOrganizationMembers(@Param('organizationId') orgId: string) {
-    return this.membershipsService.getOrganizationMembers(orgId);
+  @ApiOkResponse({
+    description:
+      'Returns immediate child organizations and their administrators.',
+  })
+  getChildAdministrators(
+    @Param('organizationId') organizationId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.membershipsService.getChildAdministrators(
+      organizationId,
+      user.userId,
+    );
   }
 
-  @UseGuards(TenantGuard, AdminGuard)
+  @Put(
+    'organization/:organizationId/children/:childOrganizationId/administrators',
+  )
+  @ApiOperation({
+    summary: 'Appoint an administrator for an immediate child organization',
+  })
+  @ApiOkResponse({ description: 'Child administrator appointed successfully.' })
+  @ApiForbiddenResponse({
+    description: 'Requires a direct administrator of the parent organization.',
+  })
+  appointChildAdministrator(
+    @Param('organizationId') parentOrganizationId: string,
+    @Param('childOrganizationId') childOrganizationId: string,
+    @Body() body: AppointChildAdminDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.membershipsService.appointChildAdministrator(
+      parentOrganizationId,
+      childOrganizationId,
+      body.email,
+      user.userId,
+    );
+  }
+
+  @Delete(
+    'organization/:organizationId/children/:childOrganizationId/administrators/:userId',
+  )
+  @ApiOperation({
+    summary: 'Revoke an administrator for an immediate child organization',
+  })
+  @ApiOkResponse({ description: 'Child administrator revoked successfully.' })
+  @ApiForbiddenResponse({
+    description: 'Requires a direct administrator of the parent organization.',
+  })
+  revokeChildAdministrator(
+    @Param('organizationId') parentOrganizationId: string,
+    @Param('childOrganizationId') childOrganizationId: string,
+    @Param('userId') targetUserId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.membershipsService.revokeChildAdministrator(
+      parentOrganizationId,
+      childOrganizationId,
+      targetUserId,
+      user.userId,
+    );
+  }
+
+  @Get('organization/:organizationId')
+  @ApiOperation({ summary: 'Get all members of an organization' })
+  @ApiOkResponse({ description: 'Returns members and membership requests.' })
+  @ApiForbiddenResponse({
+    description: 'Requires a direct organization administrator.',
+  })
+  getOrganizationMembers(
+    @Param('organizationId') organizationId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.membershipsService.getOrganizationMembers(
+      organizationId,
+      user.userId,
+    );
+  }
+
   @Delete('organization/:organizationId/users/:userId')
   @ApiOperation({ summary: 'Remove a user from the organization' })
   @ApiOkResponse({ description: 'User removed successfully.' })
   @ApiForbiddenResponse({
-    description: 'Forbidden. Requires Admin privileges.',
+    description: 'Requires a direct organization administrator.',
   })
   removeMembership(
-    @Param('organizationId') orgId: string,
+    @Param('organizationId') organizationId: string,
     @Param('userId') targetUserId: string,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.membershipsService.removeMembership(targetUserId, orgId);
+    return this.membershipsService.removeMembership(
+      targetUserId,
+      organizationId,
+      user.userId,
+    );
   }
 
-  @UseGuards(TenantGuard, AdminGuard)
   @Patch('organization/:organizationId/users/:userId/role')
   @ApiOperation({ summary: 'Update a user role' })
   @ApiOkResponse({ description: 'User role updated successfully.' })
   @ApiForbiddenResponse({
-    description: 'Forbidden. Requires Admin privileges.',
+    description: 'Requires a direct organization administrator.',
   })
   updateMembershipRole(
-    @Param('organizationId') orgId: string,
+    @Param('organizationId') organizationId: string,
     @Param('userId') targetUserId: string,
     @Body('role') role: string,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    if (role !== 'ADMIN' && role !== 'MEMBER') {
-      throw new BadRequestException('Role must be ADMIN or MEMBER');
-    }
     return this.membershipsService.updateMembershipRole(
       targetUserId,
-      orgId,
+      organizationId,
       role,
+      user.userId,
     );
   }
 }

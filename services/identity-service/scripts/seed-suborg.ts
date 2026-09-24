@@ -69,14 +69,14 @@ async function seedSubOrg() {
       update: {
         role: 'ADMIN',
         status: 'APPROVED',
-        approvedBy: user.id,
+        reviewedBy: user.id,
       },
       create: {
         userId: user.id,
         organizationId: newSubOrgId,
         role: 'ADMIN',
         status: 'APPROVED',
-        approvedBy: user.id,
+        reviewedBy: user.id,
       },
     });
   });
