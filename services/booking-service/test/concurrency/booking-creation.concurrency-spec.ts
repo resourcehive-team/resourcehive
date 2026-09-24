@@ -60,7 +60,7 @@ describe("Concurrent booking creation", () => {
         organizationId,
         role: "MEMBER",
         status: "APPROVED",
-                reviewedBy: userId,
+        reviewedBy: userId,
       },
     });
     await prisma.resource.create({
