@@ -125,6 +125,7 @@ const organizationBooking: OrganizationBooking = {
     firstName: "Alice",
     lastName: "Perera",
     email: "student.alice@demo.uni",
+    avatarUrl: null,
     status: "ACTIVE",
     emailVerifiedAt: "2026-07-01T00:00:00.000Z",
     createdAt: "2026-06-01T00:00:00.000Z",

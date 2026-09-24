@@ -6,7 +6,7 @@ import type {
   PaginatedResources,
   Resource,
   ResourceDetails,
-  ResourceRating,
+  ResourceRatingSubmission,
   ResourceRatingSummary,
 } from "@/lib/resource-service/types";
 
@@ -128,7 +128,7 @@ export function submitResourceRating(
   organizationId: string,
   resourceId: string,
   input: SubmitRatingInput,
-): Promise<ResourceRating> {
+): Promise<ResourceRatingSubmission> {
   const organization = apiPathSegment(organizationId, "Organization ID");
   const resource = apiPathSegment(resourceId, "Resource ID");
 
@@ -136,7 +136,7 @@ export function submitResourceRating(
     throw new Error("Rating must be an integer between 1 and 5.");
   }
 
-  return apiRequest<ResourceRating>(
+  return apiRequest<ResourceRatingSubmission>(
     `/resources/organization/${organization}/${resource}/ratings`,
     {
       method: "POST",

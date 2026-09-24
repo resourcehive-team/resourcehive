@@ -1,10 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
 
 import { AccountProfileCard } from "@/components/account-profile-card";
 import { AccountStatusCard } from "@/components/account-status-card";
+import { useDashboardCurrentUser } from "@/components/dashboard-current-user";
 import { SignInMethodsCard } from "@/components/sign-in-methods-card";
 import { RequestErrorCard } from "@/components/request-error-card";
 import {
@@ -13,57 +13,9 @@ import {
   CardHeader,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  AuthenticationRequiredError,
-  getCurrentUser,
-  logout,
-  type CurrentUserResponse,
-} from "@/lib/auth-api";
-
-type AccountState =
-  | { status: "loading" }
-  | { status: "loaded"; account: CurrentUserResponse }
-  | { status: "error"; error: unknown };
-
 export function AccountDetails() {
-  const router = useRouter();
-  const [state, setState] = React.useState<AccountState>({
-    status: "loading",
-  });
-  const [requestAttempt, setRequestAttempt] = React.useState(0);
-
-  React.useEffect(() => {
-    const controller = new AbortController();
-
-    getCurrentUser(controller.signal)
-      .then((account) => {
-        setState({ status: "loaded", account });
-      })
-      .catch((requestError: unknown) => {
-        if (controller.signal.aborted) {
-          return;
-        }
-
-        if (requestError instanceof AuthenticationRequiredError) {
-          void logout()
-            .catch(() => undefined)
-            .finally(() => {
-              router.replace("/login");
-              router.refresh();
-            });
-          return;
-        }
-
-        setState({ status: "error", error: requestError });
-      });
-
-    return () => controller.abort();
-  }, [requestAttempt, router]);
-
-  function retryRequest() {
-    setState({ status: "loading" });
-    setRequestAttempt((attempt) => attempt + 1);
-  }
+  const { state, retry, setAccount, updateAvatar } =
+    useDashboardCurrentUser();
 
   if (state.status === "loading") {
     return <AccountDetailsSkeleton />;
@@ -74,16 +26,19 @@ export function AccountDetails() {
       <RequestErrorCard
         error={state.error}
         subject="Account"
-        onRetry={retryRequest}
+        onRetry={retry}
       />
     );
   }
 
   return (
     <>
-      <AccountProfileCard user={state.account.user} />
+      <AccountProfileCard
+        user={state.account.user}
+        onAvatarChanged={updateAvatar}
+      />
       <AccountStatusCard account={state.account} />
-      <SignInMethodsCard account={state.account} onAccountUpdated={(account) => setState({ status: "loaded", account })} />
+      <SignInMethodsCard account={state.account} onAccountUpdated={setAccount} />
     </>
   );
 }

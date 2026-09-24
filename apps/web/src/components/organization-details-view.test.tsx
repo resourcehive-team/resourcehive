@@ -80,6 +80,7 @@ const account = (platformRole = "USER"): CurrentUserResponse => ({
     status: "ACTIVE",
     platformRole,
     createdAt: "2026-01-01T00:00:00.000Z",
+    avatarUrl: null,
     authenticationMethods: {
       password: true,
       google: {

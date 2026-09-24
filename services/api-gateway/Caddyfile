@@ -6,6 +6,10 @@
 	encode zstd gzip
 
 	@identity path /auth /auth/*
+	@avatarUpload {
+		method POST
+		path /auth/me/avatar
+	}
 	@resourceSlots path_regexp resourceSlots ^/resources/[^/]+/slots/?$
 	@resource path /organizations /organizations/* /memberships /memberships/* /resources /resources/*
 	@booking path /slots /slots/* /bookings /bookings/* /points /points/*
@@ -16,6 +20,9 @@
 
 	route {
 		respond /health "ok" 200
+		request_body @avatarUpload {
+			max_size 6MiB
+		}
 
 		route @resourceDocs {
 			uri strip_prefix /resource

@@ -1,14 +1,15 @@
+import { BadGatewayException, GatewayTimeoutException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { CloudinaryService } from './cloudinary.service';
 import { v2 as cloudinary } from 'cloudinary';
-import { BadRequestException } from '@nestjs/common';
 import * as streamifier from 'streamifier';
+import { AVATAR_MAX_DIMENSION, CloudinaryService } from './cloudinary.service';
 
 jest.mock('cloudinary', () => ({
   v2: {
     config: jest.fn(),
     uploader: {
       upload_stream: jest.fn(),
+      destroy: jest.fn(),
     },
   },
 }));
@@ -32,34 +33,58 @@ describe('CloudinaryService', () => {
     service = module.get<CloudinaryService>(CloudinaryService);
   });
 
-  it('should be defined', () => {
+  it('configures Cloudinary', () => {
     expect(service).toBeDefined();
     expect(cloudinary.config).toHaveBeenCalled();
   });
 
-  describe('uploadFile', () => {
-    it('should throw BadRequestException if file is not provided', async () => {
-      await expect(service.uploadFile(null, 'test-folder')).rejects.toThrow(
-        BadRequestException,
+  describe('uploadAvatar', () => {
+    it('rejects a missing file', async () => {
+      await expect(service.uploadAvatar(null, 'user-1')).rejects.toThrow(
+        'File is required',
       );
     });
 
-    it('should upload a file and return the result', async () => {
-      const mockFile = { buffer: Buffer.from('test') } as Express.Multer.File;
-      const mockResult = { secure_url: 'http://example.com/image.png' };
-
+    it('uploads a normalized avatar with deterministic storage options', async () => {
+      const mockFile = {
+        buffer: Buffer.from('image'),
+      } as Express.Multer.File;
+      const mockResult = {
+        secure_url: 'https://example.com/avatar.webp',
+        resource_type: 'image',
+        format: 'webp',
+        width: AVATAR_MAX_DIMENSION,
+        height: AVATAR_MAX_DIMENSION,
+      };
       const uploadStreamMock = cloudinary.uploader.upload_stream as jest.Mock;
       uploadStreamMock.mockImplementation(
         (
-          options: unknown,
+          options: Record<string, unknown>,
           callback: (error: Error | null, result: unknown) => void,
         ) => {
+          expect(options).toMatchObject({
+            resource_type: 'image',
+            public_id: 'avatars/user-1',
+            overwrite: true,
+            invalidate: true,
+            format: 'webp',
+            timeout: 20_000,
+            transformation: [
+              {
+                width: AVATAR_MAX_DIMENSION,
+                height: AVATAR_MAX_DIMENSION,
+                crop: 'fill',
+                gravity: 'center',
+                quality: 'auto:good',
+              },
+            ],
+          });
           callback(null, mockResult);
-          return { on: jest.fn() }; // Mock the returned stream object
+          return { on: jest.fn() };
         },
       );
 
-      const result = await service.uploadFile(mockFile, 'test-folder');
+      const result = await service.uploadAvatar(mockFile, 'user-1');
 
       expect(result).toEqual(mockResult);
       expect(streamifier.createReadStream).toHaveBeenCalledWith(
@@ -67,24 +92,89 @@ describe('CloudinaryService', () => {
       );
     });
 
-    it('should reject with an error if upload fails', async () => {
-      const mockFile = { buffer: Buffer.from('test') } as Express.Multer.File;
-      const mockError = new Error('Cloudinary error');
-
+    it('sanitizes provider failures', async () => {
+      const mockFile = {
+        buffer: Buffer.from('image'),
+      } as Express.Multer.File;
       const uploadStreamMock = cloudinary.uploader.upload_stream as jest.Mock;
       uploadStreamMock.mockImplementation(
         (
-          options: unknown,
+          _options: unknown,
           callback: (error: Error | null, result: unknown) => void,
         ) => {
-          callback(mockError, null);
+          callback(new Error('Cloudinary error'), null);
           return { on: jest.fn() };
         },
       );
 
-      await expect(service.uploadFile(mockFile, 'test-folder')).rejects.toThrow(
-        'Cloudinary error',
+      await expect(service.uploadAvatar(mockFile, 'user-1')).rejects.toThrow(
+        BadGatewayException,
       );
+    });
+
+    it('maps provider timeouts to gateway timeouts', async () => {
+      const mockFile = {
+        buffer: Buffer.from('image'),
+      } as Express.Multer.File;
+      const uploadStreamMock = cloudinary.uploader.upload_stream as jest.Mock;
+      uploadStreamMock.mockImplementation(
+        (
+          _options: unknown,
+          callback: (error: Error | null, result: unknown) => void,
+        ) => {
+          callback(new Error('Request Timeout'), null);
+          return { on: jest.fn() };
+        },
+      );
+
+      await expect(service.uploadAvatar(mockFile, 'user-1')).rejects.toThrow(
+        GatewayTimeoutException,
+      );
+    });
+
+    it('rejects an unnormalized Cloudinary result', async () => {
+      const mockFile = {
+        buffer: Buffer.from('image'),
+      } as Express.Multer.File;
+      const uploadStreamMock = cloudinary.uploader.upload_stream as jest.Mock;
+      uploadStreamMock.mockImplementation(
+        (
+          _options: unknown,
+          callback: (error: Error | null, result: unknown) => void,
+        ) => {
+          callback(null, {
+            secure_url: 'https://example.com/original.jpg',
+            resource_type: 'image',
+            format: 'jpg',
+            width: 1920,
+            height: 1080,
+          });
+          return { on: jest.fn() };
+        },
+      );
+
+      await expect(service.uploadAvatar(mockFile, 'user-1')).rejects.toThrow(
+        BadGatewayException,
+      );
+    });
+  });
+
+  describe('deleteAvatar', () => {
+    it('deletes the deterministic avatar and resolves provider failures', async () => {
+      const destroyMock = cloudinary.uploader.destroy as jest.Mock;
+      destroyMock.mockImplementation(
+        (
+          publicId: string,
+          options: Record<string, unknown>,
+          callback: (error: Error | null) => void,
+        ) => {
+          expect(publicId).toBe('avatars/user-1');
+          expect(options).toEqual({ resource_type: 'image', invalidate: true });
+          callback(new Error('Cloudinary unavailable'));
+        },
+      );
+
+      await expect(service.deleteAvatar('user-1')).resolves.toBeUndefined();
     });
   });
 });

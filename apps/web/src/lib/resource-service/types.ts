@@ -45,6 +45,7 @@ export interface OrganizationMemberUser {
   firstName: string;
   lastName: string;
   email: string;
+  avatarUrl: string | null;
   status: string;
 }
 
@@ -116,7 +117,16 @@ export interface ResourceRating {
   rating: number;
   comment: string | null;
   createdAt: string;
+  user: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    avatarUrl: string | null;
+  };
 }
+
+export type ResourceRatingSubmission = Omit<ResourceRating, "user">;
 
 export interface ResourceRatingSummary {
   average: number;

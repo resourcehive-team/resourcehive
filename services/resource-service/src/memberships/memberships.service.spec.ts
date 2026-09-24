@@ -147,4 +147,58 @@ describe('MembershipsService', () => {
       }),
     );
   });
+
+  it('returns member avatars for organization administration', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      status: 'ACTIVE',
+      platformRole: 'USER',
+    });
+    prisma.organization.findUnique.mockResolvedValue({ status: 'ACTIVE' });
+    prisma.organizationMembership.findUnique.mockResolvedValue({
+      role: 'ADMIN',
+      status: 'APPROVED',
+    });
+    prisma.organizationMembership.findMany.mockResolvedValue([
+      {
+        userId: 'member',
+        organizationId: 'org',
+        role: 'MEMBER',
+        status: 'APPROVED',
+        joinedAt: new Date(),
+        reviewedBy: 'admin',
+        reviewedAt: new Date(),
+        reviewNote: null,
+        auditEvents: [],
+        user: {
+          id: 'member',
+          firstName: 'Asha',
+          lastName: 'Perera',
+          email: 'asha@example.edu',
+          avatarUrl: 'https://example.com/asha.webp',
+          status: 'ACTIVE',
+        },
+      },
+    ]);
+
+    const result = await service.getOrganizationMembers('org', 'admin');
+
+    expect(result[0]?.user.avatarUrl).toBe('https://example.com/asha.webp');
+    expect(prisma.organizationMembership.findMany).toHaveBeenCalledWith({
+      where: { organizationId: 'org' },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            avatarUrl: true,
+            status: true,
+          },
+        },
+        auditEvents: { orderBy: { createdAt: 'desc' }, take: 1 },
+      },
+      orderBy: { joinedAt: 'asc' },
+    });
+  });
 });

@@ -8,7 +8,7 @@ import { toast } from "sonner";
 
 import { MembershipStatusBadge } from "@/components/membership-status-badge";
 import { RequestErrorCard } from "@/components/request-error-card";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/user-avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -235,9 +235,11 @@ function OrganizationMembersTable({
                         <TableRow key={`${member.organizationId}:${member.userId}`}>
                           <TableCell>
                             <div className="flex items-center gap-3">
-                              <Avatar>
-                                <AvatarFallback>{memberInitials(member.user)}</AvatarFallback>
-                              </Avatar>
+                              <UserAvatar
+                                name={memberName(member.user)}
+                                email={member.user.email}
+                                avatarUrl={member.user.avatarUrl}
+                              />
                               <div>
                                 <p className="font-medium">{memberName(member.user)}</p>
                                 <p className="text-muted-foreground">{member.user.email}</p>
@@ -500,11 +502,19 @@ function ChildAdministratorPanel({
                         key={administrator.userId}
                         className="flex flex-wrap items-center justify-between gap-2 text-sm"
                       >
-                        <span>
-                          {userName === administrator.user.email
-                            ? userName
-                            : `${userName} · ${administrator.user.email}`}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <UserAvatar
+                            name={userName}
+                            email={administrator.user.email}
+                            avatarUrl={administrator.user.avatarUrl}
+                            size="sm"
+                          />
+                          <span>
+                            {userName === administrator.user.email
+                              ? userName
+                              : `${userName} · ${administrator.user.email}`}
+                          </span>
+                        </div>
                         <Button
                           size="sm"
                           variant="ghost"
@@ -687,13 +697,6 @@ function OrganizationMemberListSkeleton() {
 function memberName(user: OrganizationMemberUser): string {
   const name = `${user.firstName} ${user.lastName}`.trim();
   return name || user.email;
-}
-
-function memberInitials(user: OrganizationMemberUser): string {
-  const initials = `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`
-    .trim()
-    .toUpperCase();
-  return initials || user.email.charAt(0).toUpperCase() || "?";
 }
 
 function accountStatusVariant(status: string): "success" | "destructive" | "outline" {

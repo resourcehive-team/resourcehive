@@ -40,6 +40,13 @@ const mockRatingsSummary = {
       rating: 5,
       comment: "Excellent resource!",
       createdAt: "2026-09-20T10:00:00.000Z",
+      user: {
+        id: "user-1",
+        firstName: "Asha",
+        lastName: "Perera",
+        email: "asha@example.edu",
+        avatarUrl: "https://example.com/asha.webp",
+      },
     },
     {
       id: "rating-2",
@@ -48,6 +55,13 @@ const mockRatingsSummary = {
       rating: 4,
       comment: null,
       createdAt: "2026-09-21T11:00:00.000Z",
+      user: {
+        id: "user-2",
+        firstName: "Nimal",
+        lastName: "Silva",
+        email: "nimal@example.edu",
+        avatarUrl: null,
+      },
     },
   ],
 };
@@ -70,6 +84,7 @@ describe("ResourceRatingsList", () => {
     );
 
     expect(await screen.findByText("4.5")).toBeDefined();
+    expect(screen.getByText("Asha Perera")).toBeDefined();
     expect(screen.getByText("(2 reviews)")).toBeDefined();
     expect(screen.getByText("Excellent resource!")).toBeDefined();
 

@@ -47,6 +47,7 @@ const organizationBookingInclude = {
       firstName: true,
       lastName: true,
       email: true,
+      avatarUrl: true,
       status: true,
       emailVerifiedAt: true,
       createdAt: true,

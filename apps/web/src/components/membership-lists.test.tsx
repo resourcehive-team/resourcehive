@@ -79,6 +79,7 @@ const organizationMember: OrganizationMember = {
     firstName: "Nimal",
     lastName: "Perera",
     email: "nimal@example.edu",
+    avatarUrl: null,
     status: "ACTIVE",
   },
 };
