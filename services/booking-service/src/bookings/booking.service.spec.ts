@@ -75,6 +75,7 @@ describe("BookingService", () => {
         ownerOrganizationId: "organization-id",
         pointCost: 25,
         cancellationNoticeMinutes: 15,
+        allowedOrganizations: [],
       },
       bookings: [],
     });

@@ -16,6 +16,7 @@ const resourceSelection = {
   ownerOrganizationId: true,
   pointCost: true,
   cancellationNoticeMinutes: true,
+  allowedOrganizations: { select: { organizationId: true } },
 } satisfies Prisma.ResourceSelect;
 
 const slotWithResource = {

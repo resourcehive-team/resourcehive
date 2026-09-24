@@ -30,6 +30,7 @@ interface SlotCreatedNotificationInput {
   startsAt: Date;
   endsAt: Date;
   ownerOrganizationId: string;
+  allowedOrganizationIds: string[];
 }
 
 @Injectable()
@@ -168,13 +169,17 @@ export class BookingNotificationService {
         input.actorUserId,
         "An administrator",
       );
-      await this.sendToAdministrators(
+      const organizationIds = [
         input.ownerOrganizationId,
+        ...input.allowedOrganizationIds,
+      ];
+      await this.sendToResourceMembers(
+        organizationIds,
         [input.actorUserId],
-        "Slot created",
+        "New slot available",
         `A slot for ${input.resourceName} from ${input.startsAt.toISOString()} to ${input.endsAt.toISOString()} was created by ${adminName}.`,
         input.slotId,
-        ["IN_APP"],
+        ["IN_APP", "PUSH"],
       );
     });
   }
@@ -207,6 +212,38 @@ export class BookingNotificationService {
     if (failures.length > 0) {
       throw new Error(
         `${failures.length} administrator notification(s) could not be published`,
+      );
+    }
+  }
+
+  private async sendToResourceMembers(
+    organizationIds: string[],
+    excludedUserIds: string[],
+    title: string,
+    message: string,
+    correlationId: string,
+    channels: Array<"IN_APP" | "PUSH">,
+  ): Promise<void> {
+    const members = await this.prisma.organizationMembership.findMany({
+      where: {
+        organizationId: { in: organizationIds },
+        status: "APPROVED",
+        ...(excludedUserIds.length > 0
+          ? { userId: { notIn: excludedUserIds } }
+          : {}),
+      },
+      select: { userId: true },
+      distinct: ["userId"],
+    });
+    const results = await Promise.allSettled(
+      members.map(({ userId }) =>
+        this.send(userId, title, message, correlationId, channels),
+      ),
+    );
+    const failures = results.filter(({ status }) => status === "rejected");
+    if (failures.length > 0) {
+      throw new Error(
+        `${failures.length} resource member notification(s) could not be published`,
       );
     }
   }
