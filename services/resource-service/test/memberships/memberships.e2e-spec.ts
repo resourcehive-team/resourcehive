@@ -267,7 +267,7 @@ describe('MembershipsController (e2e)', () => {
     });
   });
 
-  it('allows access via deep ancestor administrator inheritance', async () => {
+  it('denies access through a deep ancestor administrator without direct membership', async () => {
     const freshPrisma = new PrismaClient();
     await freshPrisma.$connect();
 
@@ -328,11 +328,11 @@ describe('MembershipsController (e2e)', () => {
       },
     });
 
-    // 3. Verify user can access Grandchild endpoint (inherited from Root -> Child -> Grandchild)
+    // 3. Exact-organization authorization does not inherit root authority.
     await request(app.getHttpServer())
       .get(`/memberships/organization/${deepGrandchildId}`)
       .set('Authorization', `Bearer ${jwtToken}`)
-      .expect(200);
+      .expect(403);
 
     // Cleanup
     await freshPrisma.organizationMembership.delete({

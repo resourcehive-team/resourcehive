@@ -99,6 +99,49 @@ describe("notification command contract", () => {
     expect(parseNotificationCommand(changed)).toEqual(changed);
   });
 
+  it("accepts Resource Service membership decisions only on both in-app channels", () => {
+    const decision = {
+      ...validCommand,
+      producer: "resource-service",
+      channels: ["IN_APP", "PUSH"],
+      template: {
+        key: "membership.approved.v1",
+        version: 1,
+        variables: { organizationName: "Engineering Faculty" },
+      },
+    };
+    expect(parseNotificationCommand(decision)).toEqual(decision);
+  });
+
+  it("rejects membership decisions from other producers or channels", () => {
+    expect(() =>
+      parseNotificationCommand({
+        ...validCommand,
+        producer: "booking-service",
+        template: {
+          key: "membership.rejected.v1",
+          version: 1,
+          variables: { organizationName: "Engineering Faculty" },
+        },
+      }),
+    ).toThrow("Membership templates may only be requested by Resource Service");
+
+    expect(() =>
+      parseNotificationCommand({
+        ...validCommand,
+        producer: "resource-service",
+        channels: ["IN_APP"],
+        template: {
+          key: "membership.approved.v1",
+          version: 1,
+          variables: { organizationName: "Engineering Faculty" },
+        },
+      }),
+    ).toThrow(
+      "Membership notifications must use only IN_APP and PUSH channels",
+    );
+  });
+
   it("rejects password reset commands without a reset URL", () => {
     expect(() =>
       parseNotificationCommand({

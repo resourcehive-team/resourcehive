@@ -950,7 +950,7 @@ export class AuthService {
           update: {
             role: 'MEMBER',
             status: 'APPROVED',
-            approvedBy: null,
+            reviewedBy: null,
           },
         });
       }

@@ -291,6 +291,21 @@ describe('ResourcesService', () => {
       expect(result.total).toBe(2);
       expect(result.average).toBe(4.5);
       expect(result.ratings).toEqual(mockRatings);
+      expect(mockPrismaService.resourceRating.findMany).toHaveBeenCalledWith({
+        where: { resourceId: 'res-1' },
+        orderBy: { createdAt: 'desc' },
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              avatarUrl: true,
+            },
+          },
+        },
+      });
     });
 
     it('should return 0 average if no ratings exist', async () => {

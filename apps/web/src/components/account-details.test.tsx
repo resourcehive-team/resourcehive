@@ -7,6 +7,7 @@ import {
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AccountDetails } from "@/components/account-details";
+import { DashboardCurrentUserProvider } from "@/components/dashboard-current-user";
 import {
   AuthenticationRequiredError,
   getCurrentUser,
@@ -36,6 +37,14 @@ vi.mock("@/lib/auth-api", async (importOriginal) => {
 const currentUserMock = vi.mocked(getCurrentUser);
 const logoutMock = vi.mocked(logout);
 
+function renderAccountDetails() {
+  return render(
+    <DashboardCurrentUserProvider>
+      <AccountDetails />
+    </DashboardCurrentUserProvider>,
+  );
+}
+
 const account: CurrentUserResponse = {
   user: {
     id: "user-1",
@@ -47,6 +56,7 @@ const account: CurrentUserResponse = {
     status: "ACTIVE",
     platformRole: "USER",
     createdAt: "2026-07-01T00:00:00.000Z",
+    avatarUrl: null,
     authenticationMethods: {
       password: true,
       google: {
@@ -72,7 +82,7 @@ describe("AccountDetails", () => {
   });
 
   it("loads and displays the current Identity account", async () => {
-    render(<AccountDetails />);
+    renderAccountDetails();
 
     expect(screen.getByLabelText("Loading account details")).toBeDefined();
 
@@ -96,7 +106,7 @@ describe("AccountDetails", () => {
       .mockRejectedValueOnce(new Error("Service unavailable"))
       .mockResolvedValueOnce(account);
 
-    render(<AccountDetails />);
+    renderAccountDetails();
 
     expect(await screen.findByText("Account could not be loaded")).toBeDefined();
 
@@ -111,7 +121,7 @@ describe("AccountDetails", () => {
       new AuthenticationRequiredError(),
     );
 
-    render(<AccountDetails />);
+    renderAccountDetails();
 
     await waitFor(() => {
       expect(logoutMock).toHaveBeenCalled();

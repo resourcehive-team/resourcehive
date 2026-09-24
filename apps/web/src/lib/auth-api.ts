@@ -52,7 +52,7 @@ export interface CurrentUserResponse {
     status: string;
     platformRole: string;
     createdAt: string;
-    avatarUrl?: string;
+    avatarUrl: string | null;
     authenticationMethods: AuthenticationMethods;
   };
   organizationContext: {
@@ -241,10 +241,24 @@ export async function logout(): Promise<void> {
   }
 }
 
-export async function getAuthProviders(signal?: AbortSignal): Promise<AuthProvidersResponse> {
-  const response = await fetch(`${apiUrl}/auth/providers`, { cache: "no-store", signal });
+export async function getAuthProviders(
+  signal?: AbortSignal,
+): Promise<AuthProvidersResponse> {
+  const response = await fetch(`${apiUrl}/auth/providers`, {
+    cache: "no-store",
+    signal,
+  });
   const data: unknown = await response.json().catch(() => null);
-  if (!response.ok || !data || typeof data !== "object" || !("google" in data) || !data.google || typeof data.google !== "object" || !("enabled" in data.google) || typeof data.google.enabled !== "boolean") {
+  if (
+    !response.ok ||
+    !data ||
+    typeof data !== "object" ||
+    !("google" in data) ||
+    !data.google ||
+    typeof data.google !== "object" ||
+    !("enabled" in data.google) ||
+    typeof data.google.enabled !== "boolean"
+  ) {
     throw new Error("Unable to load sign-in providers.");
   }
   return data as AuthProvidersResponse;
@@ -254,28 +268,58 @@ export function getGoogleLoginUrl(next = "/dashboard") {
   return `${apiUrl}/auth/google/login?next=${encodeURIComponent(next)}`;
 }
 
-export async function connectGoogle(password: string): Promise<{ authorizationUrl: string }> {
-  const response = await fetchWithSessionRefresh(`${apiUrl}/auth/google/connect`, {
-    method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password }),
-  });
+export async function connectGoogle(
+  password: string,
+): Promise<{ authorizationUrl: string }> {
+  const response = await fetchWithSessionRefresh(
+    `${apiUrl}/auth/google/connect`,
+    {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password }),
+    },
+  );
   const data: unknown = await response.json().catch(() => null);
-  if (!response.ok || !data || typeof data !== "object" || !("authorizationUrl" in data) || typeof data.authorizationUrl !== "string") throw new Error(getApiErrorMessage(data, "Unable to connect Google."));
+  if (
+    !response.ok ||
+    !data ||
+    typeof data !== "object" ||
+    !("authorizationUrl" in data) ||
+    typeof data.authorizationUrl !== "string"
+  )
+    throw new Error(getApiErrorMessage(data, "Unable to connect Google."));
   return data as { authorizationUrl: string };
 }
 
-export async function disconnectGoogle(password: string): Promise<{ message: string }> {
-  const response = await fetchWithSessionRefresh(`${apiUrl}/auth/google/connection`, {
-    method: "DELETE", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password }),
-  });
+export async function disconnectGoogle(
+  password: string,
+): Promise<{ message: string }> {
+  const response = await fetchWithSessionRefresh(
+    `${apiUrl}/auth/google/connection`,
+    {
+      method: "DELETE",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password }),
+    },
+  );
   const data: unknown = await response.json().catch(() => null);
-  if (!response.ok || !isMessageResponse(data)) throw new Error(getApiErrorMessage(data, "Unable to disconnect Google."));
+  if (!response.ok || !isMessageResponse(data))
+    throw new Error(getApiErrorMessage(data, "Unable to disconnect Google."));
   return data;
 }
 
 export async function requestPasswordSetup(): Promise<{ message: string }> {
-  const response = await fetchWithSessionRefresh(`${apiUrl}/auth/password/setup-request`, { method: "POST", credentials: "include" });
+  const response = await fetchWithSessionRefresh(
+    `${apiUrl}/auth/password/setup-request`,
+    { method: "POST", credentials: "include" },
+  );
   const data: unknown = await response.json().catch(() => null);
-  if (!response.ok || !isMessageResponse(data)) throw new Error(getApiErrorMessage(data, "Unable to send the password setup email."));
+  if (!response.ok || !isMessageResponse(data))
+    throw new Error(
+      getApiErrorMessage(data, "Unable to send the password setup email."),
+    );
   return data;
 }
 
@@ -566,7 +610,8 @@ function isCurrentUserResponse(data: unknown): data is CurrentUserResponse {
     typeof user.platformRole === "string" &&
     "createdAt" in user &&
     typeof user.createdAt === "string" &&
-    (!("avatarUrl" in user) || typeof user.avatarUrl === "string" || user.avatarUrl === null) &&
+    "avatarUrl" in user &&
+    (typeof user.avatarUrl === "string" || user.avatarUrl === null) &&
     "authenticationMethods" in user &&
     !!user.authenticationMethods &&
     "organizationId" in organizationContext &&
@@ -687,7 +732,7 @@ export async function uploadAvatar(file: File): Promise<AvatarUploadResponse> {
   const formData = new FormData();
   formData.append("file", file);
 
-  const response = await fetch(`${apiUrl}/auth/me/avatar`, {
+  const response = await fetchWithSessionRefresh(`${apiUrl}/auth/me/avatar`, {
     method: "POST",
     credentials: "include",
     body: formData,
@@ -697,7 +742,19 @@ export async function uploadAvatar(file: File): Promise<AvatarUploadResponse> {
     if (response.status === 401) {
       throw new AuthenticationRequiredError();
     }
-    throw new Error("Unable to upload avatar.");
+    const data: unknown = await response.json().catch(() => null);
+    throw new Error(
+      getApiErrorMessage(
+        data,
+        response.status === 413
+          ? "Choose an image smaller than 5 MB."
+          : response.status === 422
+            ? "Only valid JPEG, PNG, and WebP images are supported."
+            : response.status === 502 || response.status === 504
+              ? "The image service is temporarily unavailable. Please try again."
+              : "Unable to upload profile picture.",
+      ),
+    );
   }
 
   const data: unknown = await response.json().catch(() => null);

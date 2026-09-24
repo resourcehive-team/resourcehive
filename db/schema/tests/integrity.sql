@@ -131,6 +131,74 @@ VALUES
     );
 
 SELECT pg_temp.expect_error(
+    'platform administrator cannot receive an organization membership',
+    $statement$
+        INSERT INTO organization_memberships (
+            id, user_id, organization_id, role, status
+        )
+        VALUES (
+            '70000000-0000-0000-0000-000000000001',
+            '10000000-0000-0000-0000-000000000001',
+            '20000000-0000-0000-0000-000000000001',
+            'MEMBER', 'PENDING'
+        )
+    $statement$
+);
+
+INSERT INTO organization_memberships (
+    id, user_id, organization_id, role, status, review_note
+)
+VALUES (
+    '70000000-0000-0000-0000-000000000002',
+    '10000000-0000-0000-0000-000000000002',
+    '20000000-0000-0000-0000-000000000001',
+    'ADMIN', 'APPROVED', 'Approved during integrity test'
+);
+
+INSERT INTO organization_membership_audits (
+    id, membership_id, actor_user_id, action, note
+)
+VALUES (
+    '71000000-0000-0000-0000-000000000001',
+    '70000000-0000-0000-0000-000000000002',
+    '10000000-0000-0000-0000-000000000002',
+    'APPROVED', 'Integrity test decision'
+);
+
+SELECT pg_temp.expect_error(
+    'membership audit rows are immutable',
+    $statement$
+        UPDATE organization_membership_audits
+        SET note = 'tampered'
+        WHERE id = '71000000-0000-0000-0000-000000000001'
+    $statement$
+);
+
+SELECT pg_temp.expect_error(
+    'platform promotion requires memberships to be removed first',
+    $statement$
+        UPDATE users
+        SET platform_role = 'PLATFORM_ADMIN'
+        WHERE id = '10000000-0000-0000-0000-000000000002'
+    $statement$
+);
+
+DELETE FROM organization_memberships
+WHERE id = '70000000-0000-0000-0000-000000000002';
+
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM organization_membership_audits
+        WHERE id = '71000000-0000-0000-0000-000000000001'
+    ) THEN
+        RAISE EXCEPTION 'membership audit did not cascade with membership deletion';
+    END IF;
+END;
+$$;
+
+SELECT pg_temp.expect_error(
     'self-parenting organization during insert',
     $statement$
         INSERT INTO organizations (

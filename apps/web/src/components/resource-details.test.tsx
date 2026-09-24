@@ -99,7 +99,10 @@ const administratorMembership: MembershipWithOrganization = {
   role: "ADMIN",
   status: "APPROVED",
   joinedAt: "2026-01-01T00:00:00.000Z",
-  approvedBy: "admin-1",
+  reviewedBy: "admin-1",
+  reviewedAt: "2026-07-01T00:00:00.000Z",
+  reviewNote: null,
+  latestAudit: null,
   organization: resource.ownerOrganization,
 };
 
@@ -122,6 +125,7 @@ const organizationBooking: OrganizationBooking = {
     firstName: "Alice",
     lastName: "Perera",
     email: "student.alice@demo.uni",
+    avatarUrl: null,
     status: "ACTIVE",
     emailVerifiedAt: "2026-07-01T00:00:00.000Z",
     createdAt: "2026-06-01T00:00:00.000Z",

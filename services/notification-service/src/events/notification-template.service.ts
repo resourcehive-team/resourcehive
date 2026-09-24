@@ -45,6 +45,22 @@ export class NotificationTemplateService {
     if (command.template.key.startsWith("booking.")) {
       return renderBooking(command);
     }
+
+    if (command.template.key.startsWith("membership.")) {
+      const organizationName =
+        this.text(command.template.variables, "organizationName") ??
+        "your organization";
+      const approved = command.template.key === "membership.approved.v1";
+      return {
+        type: approved ? "MEMBERSHIP_APPROVED" : "MEMBERSHIP_REJECTED",
+        title: approved ? "Membership approved" : "Membership request rejected",
+        message: approved
+          ? `Your membership request for ${organizationName} was approved.`
+          : `Your membership request for ${organizationName} was rejected. Contact an organization administrator if you believe this was a mistake.`,
+        emailSubject: "",
+        emailText: "",
+      };
+    }
     const title = this.defaultTitle(command.template.key);
     const message = this.text(command.template.variables, "message") ?? title;
     return {

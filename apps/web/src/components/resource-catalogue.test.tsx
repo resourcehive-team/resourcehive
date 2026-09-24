@@ -45,7 +45,10 @@ const approvedMembership: MembershipWithOrganization = {
   role: "MEMBER",
   status: "APPROVED",
   joinedAt: "2026-07-01T00:00:00.000Z",
-  approvedBy: "admin-1",
+  reviewedBy: "admin-1",
+  reviewedAt: "2026-07-01T00:00:00.000Z",
+  reviewNote: null,
+  latestAudit: null,
   organization: {
     id: "organization-1",
     name: "Engineering Faculty",

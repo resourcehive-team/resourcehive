@@ -128,6 +128,25 @@ describe("NotificationClientService", () => {
     );
   });
 
+  it("publishes membership decisions to the general notification topic", async () => {
+    const command = await service.sendMembershipDecision({
+      recipientUserId: "22222222-2222-4222-8222-222222222222",
+      organizationName: "Engineering Faculty",
+      decision: "APPROVED",
+    });
+
+    expect(command.template).toEqual({
+      key: "membership.approved.v1",
+      version: 1,
+      variables: { organizationName: "Engineering Faculty" },
+    });
+    expect(publish).toHaveBeenCalledWith(
+      NOTIFICATION_TOPICS.commands,
+      "22222222-2222-4222-8222-222222222222",
+      command,
+    );
+  });
+
   it("propagates Kafka publishing failures", async () => {
     publish.mockRejectedValueOnce(new Error("broker unavailable"));
     await expect(

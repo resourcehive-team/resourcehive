@@ -1,5 +1,6 @@
 import {
   Body,
+  BadRequestException,
   ConflictException,
   Controller,
   Delete,
@@ -7,18 +8,23 @@ import {
   Header,
   HttpCode,
   HttpStatus,
+  ParseFilePipeBuilder,
   Post,
   Req,
   Res,
   UnauthorizedException,
   ServiceUnavailableException,
+  UnprocessableEntityException,
   UseGuards,
   UseInterceptors,
   UploadedFile,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Request, Response } from 'express';
-import { CloudinaryService } from '../cloudinary/cloudinary.service';
+import {
+  AVATAR_MAX_FILE_SIZE_BYTES,
+  CloudinaryService,
+} from '../cloudinary/cloudinary.service';
 import {
   clearAuthenticationCookies,
   extractRefreshToken,
@@ -283,19 +289,58 @@ export class AuthController {
 
   @Post('me/avatar')
   @UseGuards(JwtAuthGuard)
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: {
+        fileSize: AVATAR_MAX_FILE_SIZE_BYTES,
+        files: 1,
+      },
+      fileFilter: (_request, file, callback) => {
+        if (
+          file.mimetype === 'image/jpeg' ||
+          file.mimetype === 'image/png' ||
+          file.mimetype === 'image/webp'
+        ) {
+          callback(null, true);
+          return;
+        }
+
+        callback(
+          new UnprocessableEntityException(
+            'Only JPEG, PNG, and WebP images are supported.',
+          ),
+          false,
+        );
+      },
+    }),
+  )
   async uploadAvatar(
     @Req() request: AuthenticatedRequest,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile(
+      new ParseFilePipeBuilder()
+        .addMaxSizeValidator({ maxSize: AVATAR_MAX_FILE_SIZE_BYTES })
+        .addFileTypeValidator({
+          fileType: /^(image\/jpeg|image\/png|image\/webp)$/,
+        })
+        .build({
+          errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+          fileIsRequired: false,
+        }),
+    )
+    file: Express.Multer.File | undefined,
   ) {
     const user = request.user;
     if (!user) {
       throw new UnauthorizedException('Authentication is required');
     }
 
-    const uploadResult = await this.cloudinaryService.uploadFile(
+    if (!file) {
+      throw new BadRequestException('A profile picture file is required.');
+    }
+
+    const uploadResult = await this.cloudinaryService.uploadAvatar(
       file,
-      `avatars/${user.userId}`,
+      user.userId,
     );
 
     return this.authService.uploadAvatar(user.userId, uploadResult.secure_url);
@@ -310,7 +355,9 @@ export class AuthController {
       throw new UnauthorizedException('Authentication is required');
     }
 
-    return this.authService.uploadAvatar(user.userId, null);
+    const result = await this.authService.uploadAvatar(user.userId, null);
+    await this.cloudinaryService.deleteAvatar(user.userId);
+    return result;
   }
 
   @Get('me/points')
