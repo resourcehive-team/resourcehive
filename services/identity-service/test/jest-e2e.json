@@ -4,9 +4,9 @@
   "testEnvironment": "node",
   "testRegex": ".e2e-spec.ts$",
   "transform": {
-    "^.+\\.ts$": "ts-jest"
+    "^.+\\.[tj]s$": "ts-jest"
   },
   "transformIgnorePatterns": [
-    "node_modules/(?!(@nestjs/cache-manager|cache-manager)/)"
+    "/node_modules/(?!.*(@nestjs/cache-manager|cache-manager|keyv))"
   ]
 }
