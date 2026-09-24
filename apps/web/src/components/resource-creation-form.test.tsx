@@ -152,9 +152,12 @@ describe("ResourceCreationForm", () => {
       target: { value: "25" },
     });
     fireEvent.change(
-      screen.getByRole("spinbutton", { name: /Cancellation notice/ }),
-      { target: { value: "60" } },
+      screen.getByRole("spinbutton", { name: "Minutes" }),
+      { target: { value: "0" } },
     );
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Hours" }), {
+      target: { value: "1" },
+    });
     fireEvent.click(
       screen.getByRole("checkbox", {
         name: "Department of Computer Science",
