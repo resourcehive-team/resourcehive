@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { CacheModule } from '@nestjs/cache-manager';
+import KeyvRedis from '@keyv/redis';
 import { ServiceAuthModule } from '@resourcehive/service-auth';
 import { NotificationClientModule } from '@resourcehive/notification-client';
 import { AppController } from './app.controller';
@@ -14,6 +16,19 @@ import { CloudinaryModule } from './cloudinary/cloudinary.module';
   imports: [
     // Load environment variables globally
     ConfigModule.forRoot({ isGlobal: true }),
+    CacheModule.registerAsync({
+      isGlobal: true,
+      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => {
+        const host = configService.get<string>('REDIS_HOST') || 'localhost';
+        const port = configService.get<number>('REDIS_PORT') || 6379;
+        return {
+          stores: [new KeyvRedis(`redis://${host}:${port}`)],
+          ttl: 600 * 1000, // 10 minutes default TTL
+        };
+      },
+      inject: [ConfigService],
+    }),
     PrismaModule,
     ServiceAuthModule,
     NotificationClientModule.register({ producer: 'resource-service' }),

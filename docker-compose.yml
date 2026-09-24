@@ -80,6 +80,20 @@ services:
           --topic resourcehive.notification.dead-letter.v1 \
           --partitions 1 --replication-factor 1
 
+  redis:
+    image: redis:7-alpine
+    hostname: redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   api-gateway:
     image: caddy:2-alpine
     <<: *service-defaults
@@ -148,6 +162,8 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
       <<: *kafka-client-environment
       NODE_ENV: development
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
       CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
       CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
       CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
@@ -194,3 +210,4 @@ services:
 
 volumes:
   kafka_data:
+  redis_data:
