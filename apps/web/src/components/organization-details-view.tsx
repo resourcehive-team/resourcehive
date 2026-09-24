@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeftIcon } from "lucide-react";
 
 import { MembershipRequestCard } from "@/components/membership-request-card";
+import { MembershipStatusBadge } from "@/components/membership-status-badge";
 import { OrganizationSummaryCard } from "@/components/organization-summary-card";
 import { RequestErrorCard } from "@/components/request-error-card";
 import { AllocatePointsDialog } from "@/components/allocate-points-dialog";
@@ -16,18 +17,25 @@ import {
   CardAction,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ApiAuthenticationError, ApiError } from "@/lib/api-client";
 import {
+  AuthenticationRequiredError,
+  getCurrentUser,
+} from "@/lib/auth-api";
+import {
   formatOrganizationDate,
   formatOrganizationLabel,
   formatOrganizationPoints,
 } from "@/lib/resource-service/organization-format";
 import { getOrganizationDetails } from "@/lib/resource-service/organization-api";
+import { getCurrentUserMemberships } from "@/lib/resource-service/membership-api";
 import type {
+  Membership,
   Organization,
   OrganizationDetails,
 } from "@/lib/resource-service/types";
@@ -35,6 +43,11 @@ import type {
 type DetailsState =
   | { status: "loading" }
   | { status: "loaded"; organization: OrganizationDetails | null }
+  | { status: "error"; error: unknown };
+
+type ViewerState =
+  | { status: "loading" }
+  | { status: "loaded"; platformRole: string; membership: Membership | null }
   | { status: "error"; error: unknown };
 
 export function OrganizationDetailsView({
@@ -47,6 +60,10 @@ export function OrganizationDetailsView({
     status: "loading",
   });
   const [requestAttempt, setRequestAttempt] = React.useState(0);
+  const [viewerState, setViewerState] = React.useState<ViewerState>({
+    status: "loading",
+  });
+  const [viewerRequestAttempt, setViewerRequestAttempt] = React.useState(0);
 
   React.useEffect(() => {
     const controller = new AbortController();
@@ -76,9 +93,55 @@ export function OrganizationDetailsView({
     return () => controller.abort();
   }, [organizationId, requestAttempt, router]);
 
+  React.useEffect(() => {
+    const controller = new AbortController();
+
+    Promise.all([
+      getCurrentUser(controller.signal),
+      getCurrentUserMemberships(controller.signal),
+    ])
+      .then(([account, memberships]) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        setViewerState({
+          status: "loaded",
+          platformRole: account.user.platformRole,
+          membership:
+            memberships.find(
+              (membership) => membership.organizationId === organizationId,
+            ) ?? null,
+        });
+      })
+      .catch((requestError: unknown) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        if (
+          requestError instanceof AuthenticationRequiredError ||
+          requestError instanceof ApiAuthenticationError
+        ) {
+          router.replace("/login");
+          router.refresh();
+          return;
+        }
+
+        setViewerState({ status: "error", error: requestError });
+      });
+
+    return () => controller.abort();
+  }, [organizationId, router, viewerRequestAttempt]);
+
   function retryRequest() {
     setState({ status: "loading" });
     setRequestAttempt((attempt) => attempt + 1);
+  }
+
+  function retryViewerRequest() {
+    setViewerState({ status: "loading" });
+    setViewerRequestAttempt((attempt) => attempt + 1);
   }
 
   if (state.status === "loading") {
@@ -105,30 +168,138 @@ export function OrganizationDetailsView({
         <OrganizationOverview organization={state.organization} />
       </div>
       <div className="lg:col-span-4 lg:pt-20">
-        <MembershipRequestCard
-          organizationId={state.organization.id}
-          organizationName={state.organization.name}
+        <OrganizationActionPanel
+          organization={state.organization}
+          viewerState={viewerState}
+          onRetryViewer={retryViewerRequest}
+          onMembershipCreated={(membership) => {
+            setViewerState((currentState) =>
+              currentState.status === "loaded"
+                ? { ...currentState, membership }
+                : currentState,
+            );
+          }}
         />
-        {state.organization.parentId === null && (
-          <div className="mt-4 flex flex-col">
-            <Card>
-              <CardHeader>
-                <CardTitle>Semester Points</CardTitle>
-                <CardDescription>
-                  Allocate points to child organizations and their members.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <AllocatePointsDialog rootOrganizationId={state.organization.id} />
-              </CardContent>
-            </Card>
-          </div>
-        )}
       </div>
       <div className="lg:col-span-12">
         <ChildOrganizationList organizations={state.organization.children} />
       </div>
     </div>
+  );
+}
+
+function OrganizationActionPanel({
+  organization,
+  viewerState,
+  onRetryViewer,
+  onMembershipCreated,
+}: {
+  organization: OrganizationDetails;
+  viewerState: ViewerState;
+  onRetryViewer: () => void;
+  onMembershipCreated: (membership: Membership) => void;
+}) {
+  if (viewerState.status === "loading") {
+    return <OrganizationActionSkeleton />;
+  }
+
+  if (viewerState.status === "error") {
+    return (
+      <RequestErrorCard
+        error={viewerState.error}
+        subject="Membership status"
+        onRetry={onRetryViewer}
+      />
+    );
+  }
+
+  const membership = viewerState.membership;
+  const isPlatformAdmin = viewerState.platformRole.toUpperCase() === "PLATFORM_ADMIN";
+  const isApprovedRootAdmin =
+    organization.parentId === null &&
+    membership?.organizationId === organization.id &&
+    membership.status.toUpperCase() === "APPROVED" &&
+    membership.role.toUpperCase() === "ADMIN";
+
+  return (
+    <div className="flex flex-col gap-4">
+      {membership ? (
+        <OrganizationMembershipSummary
+          organizationName={organization.name}
+          membership={membership}
+        />
+      ) : isPlatformAdmin ? null : (
+        <MembershipRequestCard
+          organizationId={organization.id}
+          organizationName={organization.name}
+          onMembershipCreated={onMembershipCreated}
+        />
+      )}
+      {isApprovedRootAdmin ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Semester Points</CardTitle>
+            <CardDescription>
+              Allocate points to child organizations and their members.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <AllocatePointsDialog rootOrganizationId={organization.id} />
+          </CardContent>
+        </Card>
+      ) : null}
+    </div>
+  );
+}
+
+function OrganizationMembershipSummary({
+  organizationName,
+  membership,
+}: {
+  organizationName: string;
+  membership: Membership;
+}) {
+  const normalizedStatus = membership.status.toUpperCase();
+  const description =
+    normalizedStatus === "APPROVED"
+      ? `Your ${formatOrganizationLabel(membership.role)} membership gives you access to ${organizationName}.`
+      : normalizedStatus === "PENDING"
+        ? "Your request is waiting for an organization administrator to review it."
+        : normalizedStatus === "REJECTED"
+          ? "Self-service resubmission is closed. Contact an administrator if you want this decision reconsidered."
+          : "This membership is not currently active. Contact an organization administrator for help.";
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Your membership</CardTitle>
+        <CardDescription>{description}</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <MembershipStatusBadge status={membership.status} />
+          <Badge variant="secondary">
+            {formatOrganizationLabel(membership.role)}
+          </Badge>
+        </div>
+        {normalizedStatus === "REJECTED" && membership.reviewNote ? (
+          <div className="border border-destructive/30 bg-destructive/5 p-3 text-sm">
+            <p className="font-medium">Review reason</p>
+            <p className="mt-1 text-muted-foreground">
+              {membership.reviewNote}
+            </p>
+          </div>
+        ) : null}
+      </CardContent>
+      <CardFooter>
+        <Button
+          variant="outline"
+          render={<Link href="/dashboard/memberships" />}
+        >
+          View my memberships
+        </Button>
+      </CardFooter>
+    </Card>
   );
 }
 
@@ -304,5 +475,20 @@ function OrganizationDetailsSkeleton() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function OrganizationActionSkeleton() {
+  return (
+    <Card aria-busy="true" aria-label="Loading membership actions">
+      <CardHeader>
+        <Skeleton className="h-5 w-40" />
+        <Skeleton className="h-4 w-full" />
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <Skeleton className="h-6 w-28" />
+        <Skeleton className="h-9 w-40" />
+      </CardContent>
+    </Card>
   );
 }
