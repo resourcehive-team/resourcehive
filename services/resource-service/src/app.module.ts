@@ -22,7 +22,7 @@ import { CloudinaryModule } from './cloudinary/cloudinary.module';
       useFactory: (configService: ConfigService): any => {
         const host = configService.get<string>('REDIS_HOST') || 'localhost';
         const port = configService.get<number>('REDIS_PORT') || 6379;
-        
+
         if (process.env.NODE_ENV === 'test') {
           return { ttl: 600 * 1000 };
         }

@@ -14,7 +14,7 @@ import { createKeyv } from '@keyv/redis';
       useFactory: () => {
         const host = process.env.REDIS_HOST || 'redis';
         const port = process.env.REDIS_PORT || 6379;
-        
+
         if (process.env.NODE_ENV === 'test') {
           return { ttl: 600000 };
         }
