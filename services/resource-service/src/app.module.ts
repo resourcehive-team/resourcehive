@@ -19,9 +19,14 @@ import { CloudinaryModule } from './cloudinary/cloudinary.module';
     CacheModule.registerAsync({
       isGlobal: true,
       imports: [ConfigModule],
-      useFactory: (configService: ConfigService) => {
+      useFactory: (configService: ConfigService): any => {
         const host = configService.get<string>('REDIS_HOST') || 'localhost';
         const port = configService.get<number>('REDIS_PORT') || 6379;
+        
+        if (process.env.NODE_ENV === 'test') {
+          return { ttl: 600 * 1000 };
+        }
+
         return {
           stores: [new KeyvRedis(`redis://${host}:${port}`)],
           ttl: 600 * 1000, // 10 minutes default TTL

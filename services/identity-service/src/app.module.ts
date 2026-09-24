@@ -9,11 +9,16 @@ import { createKeyv } from '@keyv/redis';
 
 @Module({
   imports: [
-    CacheModule.registerAsync({
+    CacheModule.registerAsync<any>({
       isGlobal: true,
       useFactory: () => {
         const host = process.env.REDIS_HOST || 'redis';
         const port = process.env.REDIS_PORT || 6379;
+        
+        if (process.env.NODE_ENV === 'test') {
+          return { ttl: 600000 };
+        }
+
         return {
           stores: [createKeyv(`redis://${host}:${port}`)],
           ttl: 600000,
