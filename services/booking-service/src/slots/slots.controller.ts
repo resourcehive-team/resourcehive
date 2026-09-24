@@ -7,7 +7,12 @@ import {
   Post,
   Query,
   UseGuards,
+  UseInterceptors,
+  Inject,
 } from "@nestjs/common";
+import { CACHE_MANAGER } from "@nestjs/cache-manager";
+import type { Cache } from "cache-manager";
+import { UserCacheInterceptor } from "../common/interceptors/user-cache.interceptor";
 import {
   ApiBearerAuth,
   ApiConflictResponse,
@@ -29,18 +34,24 @@ import { SlotsService } from "./slots.service";
 @UseGuards(JwtAuthGuard)
 @Controller()
 export class SlotsController {
-  constructor(private readonly slots: SlotsService) {}
+  constructor(
+    private readonly slots: SlotsService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
+  ) {}
 
   @Post("slots")
   @ApiCreatedResponse({ description: "Slot created" })
   @ApiConflictResponse({ description: "Slot overlaps an existing slot" })
-  create(@Body() dto: CreateSlotDto, @CurrentUser() user: AuthenticatedUser) {
-    return this.slots.create(dto, user);
+  async create(@Body() dto: CreateSlotDto, @CurrentUser() user: AuthenticatedUser) {
+    const result = await this.slots.create(dto, user);
+    await this.cacheManager.clear();
+    return result;
   }
 
   @Get("slots/:slotId")
   @ApiOkResponse({ description: "Tenant-visible slot" })
   @ApiNotFoundResponse({ description: "Slot not found or inaccessible" })
+  @UseInterceptors(UserCacheInterceptor)
   findOne(
     @Param("slotId", ParseUUIDPipe) slotId: string,
     @CurrentUser() user: AuthenticatedUser,
@@ -51,6 +62,7 @@ export class SlotsController {
   @Get("resources/:resourceId/slots")
   @ApiOkResponse({ description: "Tenant-visible slot availability" })
   @ApiNotFoundResponse({ description: "Resource not found or inaccessible" })
+  @UseInterceptors(UserCacheInterceptor)
   list(
     @Param("resourceId", ParseUUIDPipe) resourceId: string,
     @Query() query: ListSlotsDto,
@@ -59,3 +71,4 @@ export class SlotsController {
     return this.slots.list(resourceId, query, user);
   }
 }
+

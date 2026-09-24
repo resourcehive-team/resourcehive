@@ -10,7 +10,12 @@ import {
   Post,
   Query,
   UseGuards,
+  UseInterceptors,
+  Inject,
 } from "@nestjs/common";
+import { CacheInterceptor, CACHE_MANAGER } from "@nestjs/cache-manager";
+import type { Cache } from "cache-manager";
+import { UserCacheInterceptor } from "../common/interceptors/user-cache.interceptor";
 import {
   ApiBearerAuth,
   ApiConflictResponse,
@@ -39,7 +44,10 @@ import {
 @UseGuards(JwtAuthGuard)
 @Controller("bookings")
 export class BookingsController {
-  constructor(private readonly bookings: BookingService) {}
+  constructor(
+    private readonly bookings: BookingService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
+  ) {}
 
   @Post()
   @ApiCreatedResponse({
@@ -63,13 +71,17 @@ export class BookingsController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     try {
-      return await this.bookings.createBooking(dto.resourceSlotId, user);
+      const result = await this.bookings.createBooking(dto.resourceSlotId, user);
+      await this.cacheManager.clear();
+      return result;
     } catch (error) {
       this.handleError(error);
     }
   }
+
   @Get("me")
   @ApiOkResponse({ description: "List of bookings for the current user" })
+  @UseInterceptors(UserCacheInterceptor)
   async getMyBookings(
     @Query() query: GetUserBookingsDto,
     @CurrentUser() user: AuthenticatedUser,
@@ -83,6 +95,7 @@ export class BookingsController {
 
   @Get("org")
   @ApiOkResponse({ description: "List of bookings for admin's organizations" })
+  @UseInterceptors(UserCacheInterceptor)
   async getOrgBookings(
     @Query() query: GetOrgBookingsDto,
     @CurrentUser() user: AuthenticatedUser,
@@ -108,7 +121,9 @@ export class BookingsController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     try {
-      return await this.bookings.completeBooking(bookingId, user.userId);
+      const result = await this.bookings.completeBooking(bookingId, user.userId);
+      await this.cacheManager.clear();
+      return result;
     } catch (error) {
       this.handleError(error);
     }
@@ -129,7 +144,9 @@ export class BookingsController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     try {
-      return await this.bookings.cancelBooking(bookingId, user.userId, dto);
+      const result = await this.bookings.cancelBooking(bookingId, user.userId, dto);
+      await this.cacheManager.clear();
+      return result;
     } catch (error) {
       this.handleError(error);
     }

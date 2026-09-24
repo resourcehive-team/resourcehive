@@ -274,6 +274,12 @@ importers:
 
   services/booking-service:
     dependencies:
+      '@keyv/redis':
+        specifier: ^4.6.0
+        version: 4.6.0(keyv@5.6.0)
+      '@nestjs/cache-manager':
+        specifier: ^12.0.0
+        version: 12.0.0(@nestjs/common@11.1.28(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28)(cache-manager@6.4.3)(keyv@5.6.0)(rxjs@7.8.2)
       '@nestjs/common':
         specifier: ^11.0.1
         version: 11.1.28(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -295,6 +301,12 @@ importers:
       '@resourcehive/service-auth':
         specifier: workspace:*
         version: link:../../packages/service-auth
+      cache-manager:
+        specifier: ^6.4.3
+        version: 6.4.3
+      cacheable:
+        specifier: ^1.10.4
+        version: 1.10.4
       class-transformer:
         specifier: ^0.5.1
         version: 0.5.1
@@ -371,6 +383,12 @@ importers:
 
   services/identity-service:
     dependencies:
+      '@keyv/redis':
+        specifier: ^4.6.0
+        version: 4.6.0(keyv@5.6.0)
+      '@nestjs/cache-manager':
+        specifier: ^12.0.0
+        version: 12.0.0(@nestjs/common@11.1.28(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28)(cache-manager@6.4.3)(keyv@5.6.0)(rxjs@7.8.2)
       '@nestjs/common':
         specifier: ^11.0.1
         version: 11.1.28(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -395,6 +413,12 @@ importers:
       bcrypt:
         specifier: ^6.0.0
         version: 6.0.0
+      cache-manager:
+        specifier: ^6.4.3
+        version: 6.4.3
+      cacheable:
+        specifier: ^1.10.4
+        version: 1.10.4
       class-transformer:
         specifier: ^0.5.1
         version: 0.5.1
