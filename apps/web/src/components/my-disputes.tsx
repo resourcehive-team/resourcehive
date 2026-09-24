@@ -89,8 +89,8 @@ export function MyDisputes() {
           </CardAction>
           <CardDescription>
             If a resource you booked was unavailable, broken, or didn&apos;t
-            match the description, enter its booking ID to open a dispute so
-            the resource&apos;s administrators can review it.
+            match the description, choose the completed booking to open a
+            dispute so the resource&apos;s administrators can review it.
           </CardDescription>
         </CardHeader>
       </Card>

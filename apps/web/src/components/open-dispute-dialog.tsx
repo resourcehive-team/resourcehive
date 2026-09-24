@@ -15,7 +15,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -25,8 +24,18 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { ApiAuthenticationError } from "@/lib/api-client";
+import { getMyBookings } from "@/lib/booking-service/booking-api";
 import { openDispute } from "@/lib/booking-service/dispute-api";
-import type { Dispute, DisputeReason } from "@/lib/booking-service/types";
+import type {
+  Dispute,
+  DisputeReason,
+  UserBooking,
+} from "@/lib/booking-service/types";
+
+type BookingOptionsState =
+  | { status: "loading" }
+  | { status: "loaded"; bookings: UserBooking[] }
+  | { status: "error" };
 
 const reasonLabels: Record<DisputeReason, string> = {
   UNAVAILABLE: "Resource was unavailable",
@@ -46,6 +55,8 @@ export function OpenDisputeDialog({
   const [description, setDescription] = React.useState("");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [error, setError] = React.useState("");
+  const [bookingOptions, setBookingOptions] =
+    React.useState<BookingOptionsState>({ status: "loading" });
 
   function changeOpen(nextOpen: boolean) {
     setOpen(nextOpen);
@@ -55,8 +66,45 @@ export function OpenDisputeDialog({
       setReason("UNAVAILABLE");
       setDescription("");
       setError("");
+      setBookingOptions({ status: "loading" });
     }
   }
+
+  React.useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const controller = new AbortController();
+
+    getMyBookings(controller.signal)
+      .then((bookings) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        setBookingOptions({
+          status: "loaded",
+          bookings: bookings.filter(
+            (booking) => booking.status.toUpperCase() === "COMPLETED",
+          ),
+        });
+      })
+      .catch((requestError: unknown) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        if (requestError instanceof ApiAuthenticationError) {
+          window.location.assign("/login");
+          return;
+        }
+
+        setBookingOptions({ status: "error" });
+      });
+
+    return () => controller.abort();
+  }, [open]);
 
   async function submitDispute(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -88,6 +136,16 @@ export function OpenDisputeDialog({
     }
   }
 
+  const bookingLabels: Record<string, string> =
+    bookingOptions.status === "loaded"
+      ? Object.fromEntries(
+          bookingOptions.bookings.map((booking) => [
+            booking.id,
+            formatBookingOptionLabel(booking),
+          ]),
+        )
+      : {};
+
   return (
     <Dialog open={open} onOpenChange={changeOpen}>
       <DialogTrigger render={<Button variant="outline" />}>
@@ -113,21 +171,41 @@ export function OpenDisputeDialog({
         >
           <Field>
             <FieldLabel htmlFor="dispute-booking-id">
-              Booking ID
+              Booking
               <span className="text-destructive" aria-hidden="true">
                 *
               </span>
             </FieldLabel>
-            <Input
-              id="dispute-booking-id"
+            <Select
+              items={bookingLabels}
               value={bookingId}
-              placeholder="e.g. 3fa85f64-5717-4562-b3fc-2c963f66afa6"
-              onChange={(event) => setBookingId(event.target.value)}
-              required
-            />
+              disabled={
+                bookingOptions.status !== "loaded" ||
+                bookingOptions.bookings.length === 0
+              }
+              onValueChange={(value) => {
+                if (typeof value === "string") {
+                  setBookingId(value);
+                }
+              }}
+            >
+              <SelectTrigger id="dispute-booking-id" className="w-full">
+                <SelectValue
+                  placeholder={bookingSelectPlaceholder(bookingOptions)}
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(bookingLabels).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <FieldDescription>
-              Find this on your completed booking under &quot;My
-              bookings&quot;.
+              {bookingOptions.status === "error"
+                ? "Your completed bookings could not be loaded. Close and reopen this dialog to try again."
+                : "Choose the completed booking you found an issue with."}
             </FieldDescription>
           </Field>
 
@@ -186,7 +264,7 @@ export function OpenDisputeDialog({
             <DialogClose render={<Button variant="outline" />}>
               Cancel
             </DialogClose>
-            <Button type="submit" disabled={isSubmitting}>
+            <Button type="submit" disabled={isSubmitting || !bookingId}>
               {isSubmitting ? "Submitting..." : "Submit dispute"}
             </Button>
           </DialogFooter>
@@ -194,4 +272,29 @@ export function OpenDisputeDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+function bookingSelectPlaceholder(state: BookingOptionsState): string {
+  if (state.status === "loading") {
+    return "Loading your completed bookings...";
+  }
+
+  if (state.status === "error") {
+    return "Unable to load your bookings";
+  }
+
+  return state.bookings.length === 0
+    ? "You have no completed bookings yet"
+    : "Select a booking";
+}
+
+function formatBookingOptionLabel(booking: UserBooking): string {
+  const startsAt = new Date(booking.resourceSlot.startsAt);
+  const date = Number.isNaN(startsAt.getTime())
+    ? "Unknown date"
+    : new Intl.DateTimeFormat("en-US", {
+        dateStyle: "medium",
+      }).format(startsAt);
+
+  return `${booking.resourceSlot.resource.name} — ${date}`;
 }
