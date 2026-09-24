@@ -60,7 +60,7 @@ const data = {
       icon: <UsersIcon />,
     },
     {
-      title: "My bookings",
+      title: "Bookings",
       url: "/dashboard/bookings",
       icon: <CalendarDaysIcon />,
     },
