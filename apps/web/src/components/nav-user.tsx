@@ -70,7 +70,6 @@ export function NavUser({
               name={user.name}
               email={user.email}
               avatarUrl={user.avatar}
-              className="grayscale"
             />
             <div className="grid flex-1 text-left text-sm leading-tight">
               <span className="truncate font-medium">{user.name}</span>
@@ -105,9 +104,7 @@ export function NavUser({
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem
-                render={<Link href="/dashboard/account" />}
-              >
+              <DropdownMenuItem render={<Link href="/dashboard/account" />}>
                 <CircleUserRoundIcon />
                 Account
               </DropdownMenuItem>
@@ -121,10 +118,7 @@ export function NavUser({
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem
-              disabled={isLoggingOut}
-              onClick={handleLogout}
-            >
+            <DropdownMenuItem disabled={isLoggingOut} onClick={handleLogout}>
               <LogOutIcon />
               {isLoggingOut ? "Logging out..." : "Log out"}
             </DropdownMenuItem>
