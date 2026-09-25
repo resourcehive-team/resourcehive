@@ -57,7 +57,7 @@ const adminMembership: MembershipWithOrganization = {
   role: "ADMIN",
   status: "APPROVED",
   joinedAt: "2026-07-01T00:00:00.000Z",
-  approvedBy: "admin-2",
+  reviewedBy: "admin-2",
   organization,
 };
 

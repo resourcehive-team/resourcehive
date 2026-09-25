@@ -21,7 +21,7 @@ export interface Membership {
   role: string;
   status: string;
   joinedAt: string;
-  approvedBy: string | null;
+  reviewedBy: string | null;
 }
 
 export interface MembershipWithOrganization extends Membership {

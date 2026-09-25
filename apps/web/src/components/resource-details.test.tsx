@@ -94,7 +94,7 @@ const administratorMembership: MembershipWithOrganization = {
   role: "ADMIN",
   status: "APPROVED",
   joinedAt: "2026-01-01T00:00:00.000Z",
-  approvedBy: "admin-1",
+  reviewedBy: "admin-1",
   organization: resource.ownerOrganization,
 };
 

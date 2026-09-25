@@ -108,11 +108,11 @@ model OrganizationMembership {
   role           String   @default("MEMBER")
   status         String   @default("PENDING")
   joinedAt       DateTime @default(now()) @map("joined_at") @db.Timestamptz
-  approvedBy     String?  @map("approved_by") @db.Uuid
+  reviewedBy     String?  @map("reviewed_by") @db.Uuid
 
   user         User         @relation("MembershipUser", fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  approver     User?        @relation("MembershipApprover", fields: [approvedBy], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  approver     User?        @relation("MembershipApprover", fields: [reviewedBy], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@unique([userId, organizationId], map: "organization_memberships_user_org_unique")
   @@index([organizationId, status], map: "organization_memberships_organization_status_idx")

@@ -80,7 +80,7 @@ describe('MembershipsService', () => {
       mockPrismaService.organizationMembership.findUnique.mockResolvedValue({
         id: 'existing',
       });
-      const expectedResult = { status: 'APPROVED', approvedBy: 'admin' };
+      const expectedResult = { status: 'APPROVED', reviewedBy: 'admin' };
       mockPrismaService.organizationMembership.update.mockResolvedValue(
         expectedResult,
       );
@@ -99,7 +99,7 @@ describe('MembershipsService', () => {
         where: {
           userId_organizationId: { userId: 'u1', organizationId: 'o1' },
         },
-        data: { status: 'APPROVED', approvedBy: 'admin' },
+        data: { status: 'APPROVED', reviewedBy: 'admin' },
       });
     });
 

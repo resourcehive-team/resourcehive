@@ -44,7 +44,7 @@ export class MembershipsService {
     }
     return this.prisma.organizationMembership.update({
       where: { userId_organizationId: { userId, organizationId } },
-      data: { status, approvedBy: approvedByUserId },
+      data: { status, reviewedBy: approvedByUserId },
     });
   }
 
