@@ -168,7 +168,10 @@ describe("NotificationClientService", () => {
       eventType: "booking.cancelled",
       bookingId: "22222222-2222-4222-8222-222222222222",
       userId: "33333333-3333-4333-8333-333333333333",
+      resourceId: "44444444-4444-4444-8444-444444444444",
+      organizationId: "55555555-5555-4555-8555-555555555555",
       resourceName: "Robotics Lab",
+      startsAt: "2026-01-01T10:00:00.000Z",
       refundPoints: 10,
     });
 
@@ -186,7 +189,10 @@ describe("NotificationClientService", () => {
         eventType: "booking.confirmed",
         bookingId: "22222222-2222-4222-8222-222222222222",
         userId: "33333333-3333-4333-8333-333333333333",
+        resourceId: "44444444-4444-4444-8444-444444444444",
+        organizationId: "55555555-5555-4555-8555-555555555555",
         resourceName: "Robotics Lab",
+        startsAt: "2026-01-01T10:00:00.000Z",
       }),
     ).rejects.toThrow("Only Booking Service");
   });
