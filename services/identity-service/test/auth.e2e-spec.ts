@@ -6,6 +6,7 @@ import { createHash } from 'node:crypto';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
+import { setupIdentitySwagger } from './../src/swagger';
 
 interface LoginResponse {
   message: string;
@@ -81,6 +82,7 @@ describe('Authentication Flow (e2e)', () => {
         forbidNonWhitelisted: true,
       }),
     );
+    setupIdentitySwagger(app);
     await app.init();
     prisma = app.get(PrismaService);
   });
@@ -90,6 +92,25 @@ describe('Authentication Flow (e2e)', () => {
       .get('/')
       .expect(200)
       .expect('Identity Service is running');
+  });
+
+  it('serves the identity OpenAPI document and raw YAML document', async () => {
+    const json = await request(app.getHttpServer())
+      .get('/docs/identity/openapi.json')
+      .expect(200);
+
+    const document = json.body as {
+      openapi?: string;
+      paths?: Record<string, unknown>;
+    };
+    expect(document.openapi).toBeDefined();
+    expect(document.paths).toHaveProperty('/auth/login');
+    expect(document.paths).toHaveProperty('/auth/me');
+
+    const yaml = await request(app.getHttpServer())
+      .get('/docs/identity/openapi.yaml')
+      .expect(200);
+    expect(yaml.text).toContain('openapi:');
   });
 
   it('rejects an incorrect password', async () => {

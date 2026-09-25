@@ -29,7 +29,8 @@ Firebase web setup and the development-only push smoke test are documented in
 
 - Internal port: `3003`
 - Readiness: `GET /health`
-- Swagger UI: `GET /docs`
+- Swagger UI through the gateway: `GET http://localhost:8088/docs/notification`
+- Raw documents: `/docs/notification/openapi.json` and `/docs/notification/openapi.yaml`
 
 Run persistence integration tests only against a migrated disposable database:
 

@@ -1,4 +1,4 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import {
   IsBoolean,
   IsEnum,
@@ -18,27 +18,32 @@ export class CreateBookingDto {
 }
 
 export class CancelBookingDto {
+  @ApiPropertyOptional({ maxLength: 500, example: "No longer needed" })
   @IsOptional()
   @IsString()
   @MaxLength(500)
   reason?: string;
 
+  @ApiPropertyOptional({ default: false })
   @IsOptional()
   @IsBoolean()
   makeSlotAvailable?: boolean;
 }
 
 class BookingQueryDto {
+  @ApiPropertyOptional({ minimum: 0, default: 0 })
   @IsOptional()
   @IsInt()
   @Min(0)
   skip?: number;
 
+  @ApiPropertyOptional({ minimum: 1, default: 50 })
   @IsOptional()
   @IsInt()
   @Min(1)
   take?: number;
 
+  @ApiPropertyOptional({ enum: BookingStatus })
   @IsOptional()
   @IsEnum(BookingStatus)
   status?: BookingStatus;

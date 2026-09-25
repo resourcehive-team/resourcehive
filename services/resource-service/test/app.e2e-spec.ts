@@ -5,6 +5,7 @@ import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { setupResourceSwagger } from './../src/swagger';
 
 describe('AppController (e2e)', () => {
   let app: INestApplication<App>;
@@ -19,6 +20,7 @@ describe('AppController (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    setupResourceSwagger(app);
     await app.init();
 
     // Generate a valid token for testing so we can access protected routes
@@ -45,6 +47,25 @@ describe('AppController (e2e)', () => {
 
   it('/health (GET) health check', () => {
     return request(app.getHttpServer()).get('/health').expect(200);
+  });
+
+  it('serves the resource OpenAPI document and raw YAML document', async () => {
+    const json = await request(app.getHttpServer())
+      .get('/docs/resource/openapi.json')
+      .expect(200);
+
+    const document = json.body as {
+      openapi?: string;
+      paths?: Record<string, unknown>;
+    };
+    expect(document.openapi).toBeDefined();
+    expect(document.paths).toHaveProperty('/organizations/roots');
+    expect(document.paths).toHaveProperty('/memberships/my-memberships');
+
+    const yaml = await request(app.getHttpServer())
+      .get('/docs/resource/openapi.yaml')
+      .expect(200);
+    expect(yaml.text).toContain('openapi:');
   });
 
   it('/organizations/roots accepts the shared authentication cookie', () => {

@@ -42,3 +42,6 @@ redis/
 # internal documentation/context
 .internal-documentation/
 internal-documentation/
+
+# temporary codex output files
+tmp/

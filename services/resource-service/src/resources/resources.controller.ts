@@ -23,19 +23,31 @@ import {
   ApiTags,
   ApiOperation,
   ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
+  ApiCookieAuth,
   ApiCreatedResponse,
   ApiBadRequestResponse,
   ApiForbiddenResponse,
   ApiOkResponse,
   ApiNotFoundResponse,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { CurrentUser, JwtAuthGuard } from '@resourcehive/service-auth';
 import type { AuthenticatedUser } from '@resourcehive/service-auth';
 import { TenantGuard } from '../auth/tenant.guard';
 import { AdminGuard } from '../auth/admin.guard';
+import {
+  PaginatedResourcesResponseDto,
+  ResourceAccessResponseDto,
+  ResourceRatingSummaryResponseDto,
+  ResourceRatingSubmissionResponseDto,
+  ResourceResponseDto,
+} from '../docs/resource-responses.dto';
 
 @ApiTags('Resources')
 @ApiBearerAuth()
+@ApiCookieAuth('resourcehive_access_token')
 @UseGuards(JwtAuthGuard)
 @Controller('resources')
 export class ResourcesController {
@@ -49,6 +61,7 @@ export class ResourcesController {
   @ApiOperation({ summary: 'Create a new resource' })
   @ApiCreatedResponse({
     description: 'The resource has been created successfully.',
+    type: ResourceResponseDto,
   })
   @ApiBadRequestResponse({ description: 'Invalid request data.' })
   @ApiForbiddenResponse({
@@ -69,7 +82,10 @@ export class ResourcesController {
   @UseGuards(TenantGuard, AdminGuard)
   @Patch('organization/:organizationId/:resourceId')
   @ApiOperation({ summary: 'Update a resource' })
-  @ApiOkResponse({ description: 'The resource has been updated successfully.' })
+  @ApiOkResponse({
+    description: 'The resource has been updated successfully.',
+    type: ResourceResponseDto,
+  })
   @ApiNotFoundResponse({ description: 'Resource not found.' })
   @ApiForbiddenResponse({
     description: 'Forbidden. Requires Admin privileges.',
@@ -91,6 +107,7 @@ export class ResourcesController {
   @ApiOperation({ summary: 'Archive/Delete a resource' })
   @ApiOkResponse({
     description: 'The resource has been archived/deleted successfully.',
+    type: ResourceResponseDto,
   })
   @ApiNotFoundResponse({ description: 'Resource not found.' })
   @ApiForbiddenResponse({
@@ -104,18 +121,21 @@ export class ResourcesController {
   }
 
   @UseGuards(TenantGuard)
-  @Post('organization/:organizationId/:id/ratings')
+  @Post('organization/:organizationId/:resourceId/ratings')
   @ApiOperation({ summary: 'Submit a rating for a resource' })
-  @ApiCreatedResponse({ description: 'Rating submitted successfully.' })
+  @ApiCreatedResponse({
+    description: 'Rating submitted successfully.',
+    type: ResourceRatingSubmissionResponseDto,
+  })
   submitRating(
     @Param('organizationId') organizationId: string,
-    @Param('id') id: string,
+    @Param('resourceId') resourceId: string,
     @Body() dto: CreateRatingDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.resourcesService.upsertRating(
       organizationId,
-      id,
+      resourceId,
       user.userId,
       dto.rating,
       dto.comment,
@@ -125,7 +145,18 @@ export class ResourcesController {
   @UseGuards(TenantGuard, AdminGuard)
   @Post('organization/:organizationId/:resourceId/image')
   @ApiOperation({ summary: 'Upload an image for a resource' })
-  @ApiCreatedResponse({ description: 'Image uploaded successfully.' })
+  @ApiCreatedResponse({
+    description: 'Image uploaded successfully.',
+    type: ResourceResponseDto,
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['file'],
+      properties: { file: { type: 'string', format: 'binary' } },
+    },
+  })
   @UseInterceptors(FileInterceptor('file'))
   async uploadImage(
     @Param('organizationId') organizationId: string,
@@ -144,14 +175,17 @@ export class ResourcesController {
   }
 
   @UseGuards(TenantGuard)
-  @Get('organization/:organizationId/:id/ratings')
+  @Get('organization/:organizationId/:resourceId/ratings')
   @ApiOperation({ summary: 'Get ratings for a resource' })
-  @ApiOkResponse({ description: 'Returns ratings and average.' })
+  @ApiOkResponse({
+    description: 'Returns ratings and average.',
+    type: ResourceRatingSummaryResponseDto,
+  })
   getRatings(
     @Param('organizationId') organizationId: string,
-    @Param('id') id: string,
+    @Param('resourceId') resourceId: string,
   ) {
-    return this.resourcesService.getRatings(organizationId, id);
+    return this.resourcesService.getRatings(organizationId, resourceId);
   }
 
   @UseGuards(TenantGuard)
@@ -161,7 +195,23 @@ export class ResourcesController {
   })
   @ApiOkResponse({
     description: 'The resources have been listed successfully.',
+    type: PaginatedResourcesResponseDto,
   })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    minimum: 1,
+    default: 1,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    minimum: 1,
+    default: 10,
+  })
+  @ApiQuery({ name: 'search', required: false, type: String })
   @ApiForbiddenResponse({
     description: 'Forbidden. You do not have access to this organization.',
   })
@@ -179,6 +229,7 @@ export class ResourcesController {
   @ApiOperation({ summary: 'Get details of a specific resource' })
   @ApiOkResponse({
     description: 'The resource has been retrieved successfully.',
+    type: ResourceResponseDto,
   })
   @ApiNotFoundResponse({ description: 'Resource not found.' })
   @ApiForbiddenResponse({
@@ -199,6 +250,7 @@ export class ResourcesController {
   @ApiOkResponse({
     description:
       'Returns bookable true if access is allowed and resource is active.',
+    type: ResourceAccessResponseDto,
   })
   @ApiForbiddenResponse({
     description: 'Forbidden. Resource is inactive or user lacks access.',
