@@ -22,8 +22,9 @@ pnpm --filter booking-service run start:dev
 ```
 
 - Internal port: `3002`
-- Readiness: `GET /health`
-- Swagger UI: `GET /docs`
+- Readiness: `GET /health/ready` (liveness: `GET /health/live`)
+- Swagger UI through the gateway: `GET http://localhost:8088/docs/booking`
+- Raw documents: `/docs/booking/openapi.json` and `/docs/booking/openapi.yaml`
 
 Run repository integration tests only against a migrated disposable database:
 

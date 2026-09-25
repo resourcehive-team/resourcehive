@@ -24,7 +24,7 @@
     "@nestjs/common": "^11.0.1",
     "@nestjs/core": "^11.0.1",
     "@nestjs/platform-express": "^11.0.1",
-    "@nestjs/swagger": "^11.2.0",
+    "@nestjs/swagger": "^11.4.6",
     "@resourcehive/database": "workspace:*",
     "@resourcehive/notification-client": "workspace:*",
     "@resourcehive/service-auth": "workspace:*",

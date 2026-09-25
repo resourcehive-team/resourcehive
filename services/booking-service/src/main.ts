@@ -1,7 +1,7 @@
 import { ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
-import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { AppModule } from "./app.module";
+import { setupBookingSwagger } from "./swagger";
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
@@ -23,23 +23,13 @@ async function bootstrap(): Promise<void> {
     }),
   );
 
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle("ResourceHive Booking Service")
-    .setDescription(
-      "Booking, slot availability, and booking-related points APIs",
-    )
-    .setVersion("0.1")
-    .addBearerAuth()
-    .build();
-  SwaggerModule.setup(
-    "docs",
-    app,
-    SwaggerModule.createDocument(app, swaggerConfig),
-  );
+  setupBookingSwagger(app);
 
   await app.listen(Number(process.env.PORT ?? 3002), "0.0.0.0");
   console.log(`Booking service is running on: ${await app.getUrl()}`);
-  console.log(`Swagger docs are available on: ${await app.getUrl()}/docs`);
+  console.log(
+    `Swagger docs are available on: ${await app.getUrl()}/docs/booking`,
+  );
 }
 
 void bootstrap();

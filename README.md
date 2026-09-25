@@ -11,6 +11,24 @@ place.
 - Application: <https://app.resourcehive.thisismalindu.com>
 - API health: <https://api.resourcehive.thisismalindu.com/health>
 
+## Swagger / OpenAPI
+
+The API gateway exposes interactive Swagger UI for each private NestJS service
+under a consistent public path. The service API paths themselves are unchanged:
+
+| Service | Interactive docs | JSON | YAML |
+| --- | --- | --- | --- |
+| Identity | `/docs/identity` | `/docs/identity/openapi.json` | `/docs/identity/openapi.yaml` |
+| Resource | `/docs/resource` | `/docs/resource/openapi.json` | `/docs/resource/openapi.yaml` |
+| Booking | `/docs/booking` | `/docs/booking/openapi.json` | `/docs/booking/openapi.yaml` |
+| Notification | `/docs/notification` | `/docs/notification/openapi.json` | `/docs/notification/openapi.yaml` |
+
+Locally, replace the path with `http://localhost:8088`. In production, use the
+same paths under the API hostname, for example
+`https://api.resourcehive.thisismalindu.com/docs/booking`. The pages are
+interactive and support the existing HttpOnly cookie session or a bearer token;
+the gateway remains the only public backend entry point.
+
 ## Architecture
 
 ResourceHive is a pnpm monorepo with a Next.js frontend and four NestJS backend
