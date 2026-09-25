@@ -1,4 +1,5 @@
 import { INestApplication, ValidationPipe } from "@nestjs/common";
+import { CACHE_MANAGER, CacheModule } from "@nestjs/cache-manager";
 import { Test } from "@nestjs/testing";
 import { JwtAuthGuard } from "@resourcehive/service-auth";
 import request from "supertest";
@@ -15,6 +16,7 @@ describe("BookingsController (e2e read and completion endpoints)", () => {
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
+      imports: [CacheModule.register()],
       controllers: [BookingsController],
       providers: [
         {
@@ -25,6 +27,15 @@ describe("BookingsController (e2e read and completion endpoints)", () => {
             completeBooking,
             cancelBooking,
             createBooking,
+          },
+        },
+        {
+          provide: CACHE_MANAGER,
+          useValue: {
+            get: jest.fn(),
+            set: jest.fn(),
+            del: jest.fn(),
+            clear: jest.fn(),
           },
         },
       ],

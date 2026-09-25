@@ -12,7 +12,10 @@ import {
   ParseIntPipe,
   UseInterceptors,
   UploadedFile,
+  Inject,
 } from '@nestjs/common';
+import { CacheInterceptor, CACHE_MANAGER } from '@nestjs/cache-manager';
+import type { Cache } from 'cache-manager';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ResourcesService } from './resources.service';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
@@ -54,6 +57,7 @@ export class ResourcesController {
   constructor(
     private readonly resourcesService: ResourcesService,
     private readonly cloudinaryService: CloudinaryService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
   @UseGuards(TenantGuard, AdminGuard)
@@ -67,16 +71,18 @@ export class ResourcesController {
   @ApiForbiddenResponse({
     description: 'Forbidden. Requires Admin privileges.',
   })
-  create(
+  async create(
     @Param('organizationId') organizationId: string,
     @Body() createResourceDto: CreateResourceDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.resourcesService.create(
+    const result = await this.resourcesService.create(
       organizationId,
       user.userId,
       createResourceDto,
     );
+    await this.cacheManager.clear();
+    return result;
   }
 
   @UseGuards(TenantGuard, AdminGuard)
@@ -90,16 +96,18 @@ export class ResourcesController {
   @ApiForbiddenResponse({
     description: 'Forbidden. Requires Admin privileges.',
   })
-  update(
+  async update(
     @Param('organizationId') organizationId: string,
     @Param('resourceId') resourceId: string,
     @Body() updateResourceDto: UpdateResourceDto,
   ) {
-    return this.resourcesService.update(
+    const result = await this.resourcesService.update(
       organizationId,
       resourceId,
       updateResourceDto,
     );
+    await this.cacheManager.clear();
+    return result;
   }
 
   @UseGuards(TenantGuard, AdminGuard)
@@ -113,11 +121,16 @@ export class ResourcesController {
   @ApiForbiddenResponse({
     description: 'Forbidden. Requires Admin privileges.',
   })
-  remove(
+  async remove(
     @Param('organizationId') organizationId: string,
     @Param('resourceId') resourceId: string,
   ) {
-    return this.resourcesService.remove(organizationId, resourceId);
+    const result = await this.resourcesService.remove(
+      organizationId,
+      resourceId,
+    );
+    await this.cacheManager.clear();
+    return result;
   }
 
   @UseGuards(TenantGuard)
@@ -167,11 +180,13 @@ export class ResourcesController {
       file,
       `resources/${organizationId}/${resourceId}`,
     );
-    return this.resourcesService.uploadImage(
+    const result = await this.resourcesService.uploadImage(
       organizationId,
       resourceId,
       uploadResult.secure_url,
     );
+    await this.cacheManager.clear();
+    return result;
   }
 
   @UseGuards(TenantGuard)
@@ -215,6 +230,7 @@ export class ResourcesController {
   @ApiForbiddenResponse({
     description: 'Forbidden. You do not have access to this organization.',
   })
+  @UseInterceptors(CacheInterceptor)
   findAll(
     @Param('organizationId') organizationId: string,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
@@ -235,6 +251,7 @@ export class ResourcesController {
   @ApiForbiddenResponse({
     description: 'Forbidden. User is not part of the organization.',
   })
+  @UseInterceptors(CacheInterceptor)
   findOne(
     @Param('organizationId') organizationId: string,
     @Param('resourceId') resourceId: string,
