@@ -249,7 +249,13 @@ export class ResourcesService {
       orderBy: { createdAt: 'desc' },
       include: {
         user: {
-          select: { id: true, email: true, firstName: true, lastName: true },
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            avatarUrl: true,
+          },
         },
       },
     });

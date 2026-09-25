@@ -80,4 +80,48 @@ describe("NotificationTemplateService", () => {
       emailText: "",
     });
   });
+
+  it("renders membership approval and rejection without exposing rejection notes", () => {
+    const service = new NotificationTemplateService();
+    const base: NotificationCommandV1 = {
+      kind: "notification.command",
+      commandId: "11111111-1111-4111-8111-111111111111",
+      producer: "resource-service",
+      recipient: { userId: "22222222-2222-4222-8222-222222222222" },
+      channels: ["IN_APP", "PUSH"],
+      template: {
+        key: "membership.approved.v1",
+        version: 1,
+        variables: { organizationName: "Engineering Faculty" },
+      },
+      correlationId: "33333333-3333-4333-8333-333333333333",
+      occurredAt: "2026-08-31T12:00:00.000Z",
+    };
+
+    expect(service.render(base)).toEqual({
+      type: "MEMBERSHIP_APPROVED",
+      title: "Membership approved",
+      message: "Your membership request for Engineering Faculty was approved.",
+      emailSubject: "",
+      emailText: "",
+    });
+
+    expect(
+      service.render({
+        ...base,
+        template: {
+          key: "membership.rejected.v1",
+          version: 1,
+          variables: { organizationName: "Engineering Faculty" },
+        },
+      }),
+    ).toEqual({
+      type: "MEMBERSHIP_REJECTED",
+      title: "Membership request rejected",
+      message:
+        "Your membership request for Engineering Faculty was rejected. Contact an organization administrator if you believe this was a mistake.",
+      emailSubject: "",
+      emailText: "",
+    });
+  });
 });

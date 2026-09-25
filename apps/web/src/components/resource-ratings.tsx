@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { StarIcon } from "lucide-react";
 
 import { RequestErrorCard } from "@/components/request-error-card";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/user-avatar";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -150,10 +150,23 @@ export function ResourceRatingsList({
           summary.ratings.map((rating) => (
             <article key={rating.id} className="p-5 lg:p-7">
               <div className="flex items-center gap-4">
-                <Avatar className="size-10">
-                  <AvatarFallback className="bg-line">U</AvatarFallback>
-                </Avatar>
+                <UserAvatar
+                  name={
+                    rating.user
+                      ? `${rating.user.firstName} ${rating.user.lastName}`
+                      : "ResourceHive user"
+                  }
+                  email={rating.user?.email}
+                  avatarUrl={rating.user?.avatarUrl}
+                  className="size-10"
+                />
                 <div>
+                  <p className="font-medium">
+                    {rating.user
+                      ? `${rating.user.firstName} ${rating.user.lastName}`.trim() ||
+                        rating.user.email
+                      : "ResourceHive user"}
+                  </p>
                   <div className="flex items-center gap-2">
                     <div className="flex text-ochre">
                       {Array.from({ length: 5 }).map((_, index) => (

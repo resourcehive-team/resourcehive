@@ -11,6 +11,24 @@ place.
 - Application: <https://app.resourcehive.thisismalindu.com>
 - API health: <https://api.resourcehive.thisismalindu.com/health>
 
+## Swagger / OpenAPI
+
+The API gateway exposes interactive Swagger UI for each private NestJS service
+under a consistent public path. The service API paths themselves are unchanged:
+
+| Service | Interactive docs | JSON | YAML |
+| --- | --- | --- | --- |
+| Identity | `/docs/identity` | `/docs/identity/openapi.json` | `/docs/identity/openapi.yaml` |
+| Resource | `/docs/resource` | `/docs/resource/openapi.json` | `/docs/resource/openapi.yaml` |
+| Booking | `/docs/booking` | `/docs/booking/openapi.json` | `/docs/booking/openapi.yaml` |
+| Notification | `/docs/notification` | `/docs/notification/openapi.json` | `/docs/notification/openapi.yaml` |
+
+Locally, replace the path with `http://localhost:8088`. In production, use the
+same paths under the API hostname, for example
+`https://api.resourcehive.thisismalindu.com/docs/booking`. The pages are
+interactive and support the existing HttpOnly cookie session or a bearer token;
+the gateway remains the only public backend entry point.
+
 ## Architecture
 
 ResourceHive is a pnpm monorepo with a Next.js frontend and four NestJS backend
@@ -213,19 +231,38 @@ the Firebase values empty.
 
 ### Run the application
 
-Build and start the backend without Firebase:
+The normal local stack uses the base Compose file. It starts the API gateway,
+all four Nest services, the local Kafka broker, and the Kafka topic initializer:
 
 ```bash
 docker compose up --build -d
 ```
 
-To enable Firebase browser notifications, include the FCM override instead:
+To start the same stack with Firebase Cloud Messaging/browser notifications,
+include the FCM override:
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.fcm.yml up --build -d
 ```
 
-For later starts, omit `--build` from the command you selected.
+Google OAuth does not use a separate Compose file. Configure its variables in
+the root `.env`; they are passed to Identity Service by the base Compose file.
+The `docker-compose.fcm.yml` override is only for Firebase browser-push
+credentials and the Notification Service service-account mount.
+
+For later starts, use the same command without `--build`:
+
+```bash
+docker compose up -d
+# or, with Firebase browser notifications:
+docker compose -f docker-compose.yml -f docker-compose.fcm.yml up -d
+```
+
+Start the frontend separately:
+
+```bash
+pnpm run dev:web
+```
 
 The first build can take several minutes. The Dockerfiles cache dependency
 installation separately from the source code, so later builds reuse that work
@@ -269,12 +306,6 @@ Confirm that the containers are running:
 docker compose ps
 ```
 
-Start the frontend in a separate terminal:
-
-```bash
-pnpm run dev:web
-```
-
 Open <http://localhost:3000> and sign in with:
 
 ```text
@@ -299,7 +330,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8088
 `API_PORT` is the host port. The service ports inside Docker do not need to be
 changed.
 
-### Logs, rebuilds, and shutdown
+### Logs, targeted rebuilds, and shutdown
 
 Follow all backend logs:
 
@@ -313,20 +344,54 @@ Follow selected services:
 docker compose logs -f api-gateway notification-service kafka
 ```
 
-Rebuild only the backend service you changed:
+When the stack is already running, rebuild and recreate only the service you
+changed:
 
 ```bash
-docker compose up --build --no-deps -d notification-service
+docker compose up -d --build --no-deps identity-service
+docker compose up -d --build --no-deps resource-service
+docker compose up -d --build --no-deps booking-service
+docker compose up -d --build --no-deps notification-service
 ```
 
-Include the FCM override when rebuilding Notification Service with Firebase:
+If Firebase browser notifications are enabled, use the FCM override for the
+Notification Service command:
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.fcm.yml up --build --no-deps -d notification-service
 ```
 
-Replace `notification-service` with another service name when needed. Run a
-full build only after shared dependency or Compose changes.
+The targeted command has three separate operations available:
+
+```bash
+# Build an image without replacing its running container.
+docker compose build identity-service
+
+# Restart the existing container/image without rebuilding source code.
+docker compose restart identity-service
+
+# Rebuild and recreate the changed service in one step.
+docker compose up -d --build --no-deps identity-service
+```
+
+Replace `identity-service` with `resource-service`, `booking-service`, or
+`notification-service` as needed. The `--no-deps` form assumes Kafka and the
+service dependencies are already running. For a cold stack, omit `--no-deps`
+or use one of the full startup commands above. The API gateway uses the pulled
+Caddy image rather than a local Dockerfile; restart it after changing its
+configuration:
+
+```bash
+docker compose restart api-gateway
+```
+
+`docker compose up --build` evaluates every application service with a
+`build` section. BuildKit normally reuses cached layers for unchanged services,
+so a source-only Identity change rebuilds and recreates Identity while the
+other service images and containers remain unchanged. Changes to the lockfile,
+database package, shared authentication package, notification client, Compose
+configuration, or another shared build input can invalidate more than one
+service image.
 
 Stop and remove the local containers:
 

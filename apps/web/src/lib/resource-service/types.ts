@@ -21,7 +21,19 @@ export interface Membership {
   role: string;
   status: string;
   joinedAt: string;
-  approvedBy: string | null;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  reviewNote: string | null;
+  latestAudit: MembershipAudit | null;
+}
+
+export interface MembershipAudit {
+  id: string;
+  membershipId: string;
+  actorUserId: string;
+  action: string;
+  note: string | null;
+  createdAt: string;
 }
 
 export interface MembershipWithOrganization extends Membership {
@@ -33,6 +45,7 @@ export interface OrganizationMemberUser {
   firstName: string;
   lastName: string;
   email: string;
+  avatarUrl: string | null;
   status: string;
 }
 
@@ -42,7 +55,23 @@ export interface OrganizationMember {
   role: string;
   status: string;
   joinedAt: string;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  reviewNote: string | null;
+  latestAudit: MembershipAudit | null;
   user: OrganizationMemberUser;
+}
+
+export interface ChildOrganizationAdministrators {
+  id: string;
+  name: string;
+  type: string;
+  status: string;
+  administrators: Array<{
+    userId: string;
+    organizationId: string;
+    user: OrganizationMemberUser;
+  }>;
 }
 
 export interface AllowedOrganization {
@@ -88,7 +117,16 @@ export interface ResourceRating {
   rating: number;
   comment: string | null;
   createdAt: string;
+  user: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    avatarUrl: string | null;
+  };
 }
+
+export type ResourceRatingSubmission = Omit<ResourceRating, "user">;
 
 export interface ResourceRatingSummary {
   average: number;

@@ -56,7 +56,7 @@ describeWithDatabase("Atomic booking creation integration", () => {
               organizationId,
               role: "MEMBER",
               status: "APPROVED",
-              approvedBy: userId,
+              reviewedBy: userId,
             },
           });
           await transaction.resource.create({

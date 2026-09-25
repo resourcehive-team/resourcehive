@@ -1,9 +1,9 @@
 import { ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { MicroserviceOptions } from "@nestjs/microservices";
-import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { AppModule } from "./app.module";
 import { getNotificationKafkaConfig } from "./kafka/kafka.config";
+import { setupNotificationSwagger } from "./swagger";
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
@@ -25,17 +25,7 @@ async function bootstrap(): Promise<void> {
     }),
   );
 
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle("ResourceHive Notification Service")
-    .setDescription("Persistent, real-time, and fallback notification APIs")
-    .setVersion("0.1")
-    .addBearerAuth()
-    .build();
-  SwaggerModule.setup(
-    "docs",
-    app,
-    SwaggerModule.createDocument(app, swaggerConfig),
-  );
+  setupNotificationSwagger(app);
 
   const kafka = getNotificationKafkaConfig();
   if (kafka.enabled) {
