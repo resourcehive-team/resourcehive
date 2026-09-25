@@ -10,8 +10,13 @@ import { NotificationCommandService } from "./notification-command.service";
 @Injectable()
 export class BookingEventService {
   constructor(private readonly commands: NotificationCommandService) {}
-  handle(input: unknown) {
+  async handle(input: unknown) {
     const event = parseBookingEvent(input);
+    if (event.eventType === "slot.created") {
+      // Slot creation drives live calendar sync only; it has no
+      // recipient user and is not a push/in-app notification.
+      return undefined;
+    }
     return this.commands.process(this.toCommand(event));
   }
   toCommand(event: BookingEventV1): NotificationCommandV1 {
