@@ -2,7 +2,16 @@ import { isISO8601, isUUID } from "class-validator";
 import { NotificationContractError } from "./contract-validator";
 
 export type BookingEventType =
-  "booking.confirmed" | "booking.cancelled" | "booking.completed";
+  | "booking.confirmed"
+  | "booking.cancelled"
+  | "booking.completed"
+  | "slot.created";
+
+const BOOKING_LIFECYCLE_EVENT_TYPES: BookingEventType[] = [
+  "booking.confirmed",
+  "booking.cancelled",
+  "booking.completed",
+];
 
 export interface BookingEventV1 {
   kind: "booking.event";
@@ -13,10 +22,15 @@ export interface BookingEventV1 {
   correlationId: string;
   occurredAt: string;
   payload: {
-    bookingId: string;
-    userId: string;
-    email?: string;
+    bookingId?: string;
+    slotId?: string;
+    resourceId: string;
     resourceName: string;
+    organizationId: string;
+    userId?: string;
+    email?: string;
+    startsAt: string;
+    endsAt?: string;
     refundPoints?: number;
   };
 }
@@ -42,20 +56,37 @@ export function parseBookingEvent(input: unknown): BookingEventV1 {
   }
   if (
     !event.eventType ||
-    !["booking.confirmed", "booking.cancelled", "booking.completed"].includes(
+    !["booking.confirmed", "booking.cancelled", "booking.completed", "slot.created"].includes(
       event.eventType,
     )
   ) {
     reject("Unsupported booking event type");
   }
+
+  const payload = event.payload;
   if (
-    !event.payload ||
-    !isUUID(event.payload.bookingId) ||
-    !isUUID(event.payload.userId) ||
-    !event.payload.resourceName?.trim()
+    !payload ||
+    !isUUID(payload.resourceId) ||
+    !isUUID(payload.organizationId) ||
+    !payload.resourceName?.trim() ||
+    !payload.startsAt ||
+    !isISO8601(payload.startsAt)
   ) {
     reject("Invalid booking event payload");
   }
+  if (payload.endsAt !== undefined && !isISO8601(payload.endsAt)) {
+    reject("Invalid booking event payload");
+  }
+
+  if (BOOKING_LIFECYCLE_EVENT_TYPES.includes(event.eventType)) {
+    if (!isUUID(payload.bookingId) || !isUUID(payload.userId)) {
+      reject("Booking lifecycle events require bookingId and userId");
+    }
+  }
+  if (event.eventType === "slot.created" && !isUUID(payload.slotId)) {
+    reject("Slot creation events require slotId");
+  }
+
   return event as BookingEventV1;
 }
 
