@@ -44,6 +44,7 @@ export interface BookingMember {
   firstName: string;
   lastName: string;
   email: string;
+  avatarUrl: string | null;
   status: string;
   emailVerifiedAt: string | null;
   createdAt: string;

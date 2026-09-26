@@ -18,9 +18,9 @@ Booking Service uses `publishBookingEvent(...)` after confirmed, cancelled, and
 completed state changes. Notification Service maps those events to booking-
 specific in-app and browser-push messages for the booking user.
 
-Identity Service alone may call `sendVerificationEmail`. Provider credentials,
-rendering, persistence, retries, Resend, and Firebase remain owned by
-Notification Service.
+Identity Service alone may call the identity email methods. Provider
+credentials, rendering, persistence, retries, Resend, and Firebase remain
+owned by Notification Service.
 
 The client uses `KAFKA_ENABLED`, `KAFKA_BROKERS`, `KAFKA_SSL`,
 `KAFKA_SASL_USERNAME`, and `KAFKA_SASL_PASSWORD`. It derives a distinct Kafka

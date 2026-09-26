@@ -46,6 +46,9 @@ const approvedMembership: MembershipWithOrganization = {
   status: "APPROVED",
   joinedAt: "2026-07-01T00:00:00.000Z",
   reviewedBy: "admin-1",
+  reviewedAt: "2026-07-01T00:00:00.000Z",
+  reviewNote: null,
+  latestAudit: null,
   organization: {
     id: "organization-1",
     name: "Engineering Faculty",
@@ -72,6 +75,7 @@ const firstPage: PaginatedResources = {
       pointCost: 25,
       cancellationNoticeMinutes: 0,
       createdAt: "2026-07-10T00:00:00.000Z",
+      imageUrl: null,
       allowedOrganizations: [],
     },
   ],

@@ -97,6 +97,9 @@ const adminMembership: MembershipWithOrganization = {
   status: "APPROVED",
   joinedAt: "2026-07-01T00:00:00.000Z",
   reviewedBy: "root-admin",
+  reviewedAt: "2026-07-01T00:00:00.000Z",
+  reviewNote: null,
+  latestAudit: null,
   organization: engineeringOrganization,
 };
 
@@ -111,7 +114,8 @@ const createdResource: Resource = {
   pointCost: 25,
   cancellationNoticeMinutes: 0,
   createdAt: "2026-08-04T00:00:00.000Z",
-  allowedOrganizations: [],
+  imageUrl: null,
+      allowedOrganizations: [],
 };
 
 describe("ResourceCreationForm", () => {

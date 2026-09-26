@@ -1,11 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
 
 import { NavMain } from "@/components/nav-main";
 import { NavSecondary } from "@/components/nav-secondary";
 import { NavUser } from "@/components/nav-user";
+import { useDashboardCurrentUser } from "@/components/dashboard-current-user";
 import { Brand } from "@/components/brand";
 import {
   Sidebar,
@@ -26,17 +26,12 @@ import {
   LayoutDashboardIcon,
   UsersIcon,
 } from "lucide-react";
-import {
-  AuthenticationRequiredError,
-  getCurrentUser,
-  logout,
-} from "@/lib/auth-api";
 
 const data = {
   user: {
     name: "Loading user",
     email: "",
-    avatar: "",
+    avatar: null,
   },
   navMain: [
     {
@@ -89,37 +84,15 @@ const data = {
   ],
 };
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const router = useRouter();
-  const [user, setUser] = React.useState(data.user);
-
-  React.useEffect(() => {
-    const controller = new AbortController();
-
-    getCurrentUser(controller.signal)
-      .then((currentUser) => {
-        setUser({
-          name: currentUser.user.displayName,
-          email: currentUser.user.email,
-          avatar: "",
-        });
-      })
-      .catch((error: unknown) => {
-        if (controller.signal.aborted) {
-          return;
+  const { state } = useDashboardCurrentUser();
+  const user =
+    state.status === "loaded"
+      ? {
+          name: state.account.user.displayName,
+          email: state.account.user.email,
+          avatar: state.account.user.avatarUrl,
         }
-
-        if (error instanceof AuthenticationRequiredError) {
-          void logout()
-            .catch(() => undefined)
-            .finally(() => {
-              router.replace("/login");
-              router.refresh();
-            });
-        }
-      });
-
-    return () => controller.abort();
-  }, [router]);
+      : data.user;
 
   return (
     <Sidebar collapsible="offcanvas" {...props}>

@@ -37,6 +37,9 @@ const pendingMembership: Membership = {
   status: "PENDING",
   joinedAt: "2026-07-30T00:00:00.000Z",
   reviewedBy: null,
+  reviewedAt: null,
+  reviewNote: null,
+  latestAudit: null,
 };
 
 describe("MembershipRequestCard", () => {

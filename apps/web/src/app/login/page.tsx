@@ -5,6 +5,7 @@ interface LoginPageProps {
   searchParams: Promise<{
     next?: string | string[];
     passwordReset?: string | string[];
+    oauthError?: string | string[];
   }>;
 }
 
@@ -35,7 +36,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
   return (
     <AuthShell>
-      <LoginForm redirectTo={redirectTo} passwordReset={passwordReset} />
+      <LoginForm redirectTo={redirectTo} passwordReset={passwordReset} oauthError={typeof query.oauthError === "string" ? query.oauthError : ""} />
     </AuthShell>
   );
 }

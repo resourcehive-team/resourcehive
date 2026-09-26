@@ -10,14 +10,21 @@ import {
   Post,
   Query,
   UseGuards,
+  UseInterceptors,
+  Inject,
 } from "@nestjs/common";
+import { CACHE_MANAGER } from "@nestjs/cache-manager";
+import type { Cache } from "cache-manager";
+import { UserCacheInterceptor } from "../common/interceptors/user-cache.interceptor";
 import {
   ApiBearerAuth,
+  ApiCookieAuth,
   ApiConflictResponse,
   ApiCreatedResponse,
   ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiTags,
+  ApiOperation,
   ApiUnauthorizedResponse,
   ApiOkResponse,
 } from "@nestjs/swagger";
@@ -33,17 +40,29 @@ import {
   GetOrgBookingsDto,
   GetUserBookingsDto,
 } from "./bookings.dto";
+import {
+  CancelledBookingResponseDto,
+  CreatedBookingResponseDto,
+  OrganizationBookingResponseDto,
+  BookingResponseDto,
+} from "../docs/booking-responses.dto";
 
 @ApiTags("bookings")
 @ApiBearerAuth()
+@ApiCookieAuth("resourcehive_access_token")
 @UseGuards(JwtAuthGuard)
 @Controller("bookings")
 export class BookingsController {
-  constructor(private readonly bookings: BookingService) {}
+  constructor(
+    private readonly bookings: BookingService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
+  ) {}
 
   @Post()
+  @ApiOperation({ summary: "Create a booking for an available resource slot" })
   @ApiCreatedResponse({
     description: "Booking confirmed and points deducted atomically",
+    type: CreatedBookingResponseDto,
   })
   @ApiUnauthorizedResponse({
     description: "Authentication or active membership is missing",
@@ -63,13 +82,24 @@ export class BookingsController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     try {
-      return await this.bookings.createBooking(dto.resourceSlotId, user);
+      const result = await this.bookings.createBooking(
+        dto.resourceSlotId,
+        user,
+      );
+      await this.cacheManager.clear();
+      return result;
     } catch (error) {
       this.handleError(error);
     }
   }
+
   @Get("me")
-  @ApiOkResponse({ description: "List of bookings for the current user" })
+  @ApiOperation({ summary: "List bookings for the current user" })
+  @ApiOkResponse({
+    description: "List of bookings for the current user",
+    type: [BookingResponseDto],
+  })
+  @UseInterceptors(UserCacheInterceptor)
   async getMyBookings(
     @Query() query: GetUserBookingsDto,
     @CurrentUser() user: AuthenticatedUser,
@@ -82,7 +112,14 @@ export class BookingsController {
   }
 
   @Get("org")
-  @ApiOkResponse({ description: "List of bookings for admin's organizations" })
+  @ApiOperation({
+    summary: "List bookings for organizations administered by the current user",
+  })
+  @ApiOkResponse({
+    description: "List of bookings for admin's organizations",
+    type: [OrganizationBookingResponseDto],
+  })
+  @UseInterceptors(UserCacheInterceptor)
   async getOrgBookings(
     @Query() query: GetOrgBookingsDto,
     @CurrentUser() user: AuthenticatedUser,
@@ -95,7 +132,11 @@ export class BookingsController {
   }
 
   @Patch(":bookingId/complete")
-  @ApiOkResponse({ description: "Booking marked as completed" })
+  @ApiOperation({ summary: "Mark a booking as completed" })
+  @ApiOkResponse({
+    description: "Booking marked as completed",
+    type: OrganizationBookingResponseDto,
+  })
   @ApiForbiddenResponse({
     description: "The user does not administer the resource's organization",
   })
@@ -108,14 +149,25 @@ export class BookingsController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     try {
-      return await this.bookings.completeBooking(bookingId, user.userId);
+      const result = await this.bookings.completeBooking(
+        bookingId,
+        user.userId,
+      );
+      await this.cacheManager.clear();
+      return result;
     } catch (error) {
       this.handleError(error);
     }
   }
 
   @Patch(":bookingId/cancel")
-  @ApiOkResponse({ description: "Booking cancelled and points refunded" })
+  @ApiOperation({
+    summary: "Cancel a booking and refund points when applicable",
+  })
+  @ApiOkResponse({
+    description: "Booking cancelled and points refunded",
+    type: CancelledBookingResponseDto,
+  })
   @ApiForbiddenResponse({
     description: "The user cannot cancel this booking",
   })
@@ -129,7 +181,13 @@ export class BookingsController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     try {
-      return await this.bookings.cancelBooking(bookingId, user.userId, dto);
+      const result = await this.bookings.cancelBooking(
+        bookingId,
+        user.userId,
+        dto,
+      );
+      await this.cacheManager.clear();
+      return result;
     } catch (error) {
       this.handleError(error);
     }

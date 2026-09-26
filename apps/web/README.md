@@ -24,7 +24,7 @@ needs backend data.
 The example environment contains one public backend URL:
 
 ```env
-NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_API_URL=http://localhost:8088
 ```
 
 `NEXT_PUBLIC_API_URL` is the Caddy API gateway. It is used for Identity,

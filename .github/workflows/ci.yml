@@ -48,7 +48,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: pnpm
 
       - name: Install dependencies
@@ -94,7 +94,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: pnpm
 
       - name: Install dependencies
@@ -134,7 +134,7 @@ jobs:
         run: pnpm --filter frontend run build
         env:
           JWT_SECRET: ${{ env.CI_JWT_SECRET }}
-          NEXT_PUBLIC_API_URL: http://localhost:8000
+          NEXT_PUBLIC_API_URL: http://localhost:8088
 
   services:
     name: ${{ matrix.label }} quality
@@ -167,7 +167,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: pnpm
 
       - name: Install dependencies
@@ -227,7 +227,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: pnpm
 
       - name: Install dependencies
@@ -300,6 +300,25 @@ jobs:
           --env ACME_EMAIL=admin@example.com
           --volume "$PWD/services/api-gateway/Caddyfile:/etc/caddy/Caddyfile:ro"
           caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile
+
+      - name: Smoke-test local Kafka broker and topics
+        env:
+          DATABASE_URL: ${{ env.CI_DATABASE_URL }}
+          DATABASE_URL_UNPOOLED: ${{ env.CI_DATABASE_URL }}
+          JWT_SECRET: ${{ env.CI_JWT_SECRET }}
+        run: |
+          set -euo pipefail
+          trap 'docker compose down --volumes --remove-orphans' EXIT
+          docker compose up -d kafka
+          docker compose run --rm kafka-init
+          topics="$(docker compose exec -T kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list)"
+          for topic in \
+            resourcehive.notification.commands.v1 \
+            resourcehive.identity.notification-commands.v1 \
+            resourcehive.booking.events.v1 \
+            resourcehive.notification.dead-letter.v1; do
+            grep -qx "$topic" <<<"$topics"
+          done
 
   containers:
     name: Build ${{ matrix.label }} image

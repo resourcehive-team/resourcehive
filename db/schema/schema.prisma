@@ -12,10 +12,11 @@ datasource db {
 model User {
   id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   email           String    @unique(map: "users_email_unique")
-  passwordHash    String    @map("password_hash")
+  passwordHash    String?   @map("password_hash")
   firstName       String    @map("first_name")
   lastName        String    @map("last_name")
   emailVerifiedAt DateTime? @map("email_verified_at") @db.Timestamptz
+  avatarUrl       String?   @map("avatar_url")
   status          String    @default("ACTIVE")
   platformRole    String    @default("USER") @map("platform_role")
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
@@ -23,7 +24,8 @@ model User {
   createdOrganizations    Organization[]               @relation("OrganizationCreatedBy")
   allowlistEntriesAdded   OrganizationEmailAllowlist[] @relation("AllowlistAddedBy")
   memberships             OrganizationMembership[]     @relation("MembershipUser")
-  membershipsApproved     OrganizationMembership[]     @relation("MembershipApprover")
+  membershipsReviewed     OrganizationMembership[]     @relation("MembershipReviewer")
+  membershipAuditEvents   OrganizationMembershipAudit[] @relation("MembershipAuditActor")
   createdResources        Resource[]                   @relation("ResourceCreatedBy")
   bookings                Booking[]                    @relation("BookingUser")
   bookingsCancelled       Booking[]                    @relation("BookingCancelledBy")
@@ -38,8 +40,27 @@ model User {
   notifications           Notification[]
   webPushSubscriptions    WebPushSubscription[]
   notificationDeliveries  NotificationDelivery[]
+  ratings                 ResourceRating[]
+  externalIdentities      ExternalIdentity[]
 
   @@map("users")
+}
+
+model ExternalIdentity {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId          String    @map("user_id") @db.Uuid
+  provider        String
+  providerSubject String    @map("provider_subject")
+  providerEmail   String    @map("provider_email")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  lastUsedAt      DateTime? @map("last_used_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([provider, providerSubject], map: "external_identities_provider_subject_unique")
+  @@unique([userId, provider], map: "external_identities_user_provider_unique")
+  @@index([userId], map: "external_identities_user_id_idx")
+  @@map("external_identities")
 }
 
 model Organization {
@@ -113,11 +134,31 @@ model OrganizationMembership {
   user         User         @relation("MembershipUser", fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   approver     User?        @relation("MembershipApprover", fields: [reviewedBy], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  reviewedAt     DateTime? @map("reviewed_at") @db.Timestamptz
+  reviewNote     String?  @map("review_note")
+  reviewer     User?                           @relation("MembershipReviewer", fields: [reviewedBy], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  auditEvents  OrganizationMembershipAudit[]
 
   @@unique([userId, organizationId], map: "organization_memberships_user_org_unique")
   @@index([organizationId, status], map: "organization_memberships_organization_status_idx")
   @@index([userId, status], map: "organization_memberships_user_status_idx")
   @@map("organization_memberships")
+}
+
+model OrganizationMembershipAudit {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  membershipId String   @map("membership_id") @db.Uuid
+  actorUserId  String   @map("actor_user_id") @db.Uuid
+  action       String
+  note         String?
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  membership OrganizationMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  actor      User                    @relation("MembershipAuditActor", fields: [actorUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([membershipId, createdAt], map: "organization_membership_audits_membership_created_idx")
+  @@index([actorUserId, createdAt], map: "organization_membership_audits_actor_created_idx")
+  @@map("organization_membership_audits")
 }
 
 model Resource {
@@ -132,12 +173,14 @@ model Resource {
   cancellationNoticeMinutes Int      @default(0) @map("cancellation_notice_minutes")
   unavailableDisputeId      String?  @unique @map("unavailable_dispute_id") @db.Uuid
   createdAt                 DateTime @default(now()) @map("created_at") @db.Timestamptz
+  imageUrl            String?  @map("image_url")
 
   ownerOrganization    Organization                  @relation("ResourceOwner", fields: [ownerOrganizationId, rootOrganizationId], references: [id, rootOrganizationId], onDelete: NoAction, onUpdate: NoAction)
   createdByUser        User                          @relation("ResourceCreatedBy", fields: [createdByUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   unavailableDispute   BookingDispute?               @relation("ResourceUnavailableDispute", fields: [unavailableDisputeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   allowedOrganizations ResourceAllowedOrganization[]
   slots                ResourceSlot[]
+  ratings              ResourceRating[]
 
   @@unique([id, rootOrganizationId], map: "resources_id_root_unique")
   @@index([ownerOrganizationId, status], map: "resources_owner_status_idx")
@@ -394,4 +437,20 @@ model ProcessedEvent {
 
   @@unique([eventId, consumerName], map: "processed_events_event_consumer_unique")
   @@map("processed_events")
+}
+
+model ResourceRating {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  resourceId String   @map("resource_id") @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  rating     Int
+  comment    String?
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  resource   Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: NoAction)
+
+  @@unique([resourceId, userId], map: "resource_ratings_resource_user_unique")
+  @@index([resourceId], map: "resource_ratings_resource_idx")
+  @@map("resource_ratings")
 }

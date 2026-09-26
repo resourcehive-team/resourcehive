@@ -5,14 +5,14 @@
 This document records the Resource Service HTTP contract that currently exists
 for the Week 4 frontend work.
 
-It is based on the merged Resource Service controllers, services, DTOs, tests,
-database schema, and Caddy routes. It does not propose new endpoints or change
-Person A's service.
+It is based on the Resource Service controllers, services, DTOs, tests,
+database schema, and Caddy routes, including the organization membership-review
+and immediate-child administrator endpoints.
 
 The frontend must use the public API gateway:
 
 ```text
-Browser → http://localhost:8000 → Caddy → Resource Service
+Browser → http://localhost:8088 → Caddy → Resource Service
 ```
 
 The frontend must not call the private Resource Service container or port
@@ -73,6 +73,18 @@ interface Membership {
   status: string;
   joinedAt: string;
   reviewedBy: string | null;
+  reviewedAt: string | null;
+  reviewNote: string | null;
+  latestAudit: MembershipAudit | null;
+}
+
+interface MembershipAudit {
+  id: string;
+  membershipId: string;
+  actorUserId: string;
+  action: 'APPROVED' | 'REJECTED' | 'ADMIN_GRANTED' | 'ADMIN_REVOKED';
+  note: string | null;
+  createdAt: string;
 }
 ```
 
@@ -237,6 +249,10 @@ interface OrganizationMember {
   role: string;
   status: string;
   joinedAt: string;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  reviewNote: string | null;
+  latestAudit: MembershipAudit | null;
   user: {
     id: string;
     firstName: string;
@@ -249,11 +265,49 @@ interface OrganizationMember {
 
 Current behavior:
 
-- Requires administrator access through `TenantGuard` and `AdminGuard`.
+- Requires an active `USER` with a direct, approved `ADMIN` membership in the
+  exact organization. Platform administrators and inherited ancestor admins do
+  not receive membership-management authority.
 - Returns membership records for the requested organization.
 - Includes only the safe user fields shown above.
 - Never returns password hashes.
 - Has no pagination, filtering, or guaranteed ordering.
+
+### Review a membership request
+
+```http
+PATCH /memberships/organization/:organizationId/users/:userId/approve
+PATCH /memberships/organization/:organizationId/users/:userId/reject
+```
+
+Approval accepts no body. Rejection may include:
+
+```json
+{ "reason": "Optional explanation shown to the applicant" }
+```
+
+Requests transition from `PENDING` to `APPROVED` or `REJECTED`. An exact
+organization administrator may explicitly reconsider a rejected request with
+the approval endpoint. Applicants cannot resubmit a rejected request. Decisions
+are conditional and transactional, so only one concurrent administrator action
+can succeed. Successful decisions publish `IN_APP` and browser-push commands
+after the database transaction; Kafka delivery failure does not undo the
+decision.
+
+### Manage immediate-child administrators
+
+```http
+GET /memberships/organization/:organizationId/child-administrators
+PUT /memberships/organization/:organizationId/children/:childOrganizationId/administrators
+DELETE /memberships/organization/:organizationId/children/:childOrganizationId/administrators/:userId
+```
+
+The `PUT` body is `{ "email": "verified-user@example.edu" }`. A parent
+organization administrator may appoint or revoke administrators only for an
+immediate child organization. The candidate must already have a pending or
+approved membership in that child; pending memberships become approved admins,
+while approved members are promoted. Revocation demotes to `MEMBER` and cannot
+remove the final approved administrator.
 
 ## Resource catalogue endpoints
 
@@ -317,17 +371,11 @@ Current behavior:
 - Returns `403 Forbidden` when the organization cannot access the resource.
 - Returns `404 Not Found` when the resource does not exist.
 
-## Admin endpoints outside the current frontend scope
+## Other administration endpoints
 
-The service also contains endpoints for:
-
-- approving and rejecting memberships;
-- creating, updating, and archiving resources;
-- managing root-organization email domains;
-- managing organization email allowlists.
-
-Those operations are not required by the current Week 4 regular-member
-frontend. They should not be added to the UI as part of issue #32.
+The service also contains endpoints for creating, updating, and archiving
+resources and managing root-organization email domains and email allowlists.
+Those remain separate from the organization membership-review surface.
 
 ## Integration readiness
 
@@ -354,7 +402,7 @@ The current frontend and gateway use different local origins:
 
 ```text
 Frontend: http://localhost:3000
-Gateway:  http://localhost:8000
+Gateway:  http://localhost:8088
 ```
 
 NestJS services own CORS and use the explicit `CORS_ORIGINS` allowlist with
@@ -370,9 +418,9 @@ returned.
 
 ### 4. Organization member authorization is resolved
 
-The endpoint now uses both `TenantGuard` and `AdminGuard`. The frontend still
-handles `403 Forbidden`, and it does not treat a hidden or visible navigation
-link as an authorization decision.
+The endpoint now performs exact-organization authorization in the membership
+service. The frontend still handles `403 Forbidden`, and it does not treat a
+hidden or visible navigation link as an authorization decision.
 
 ### 5. Request validation is not active
 

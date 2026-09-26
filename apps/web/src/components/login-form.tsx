@@ -4,7 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-import { login, LoginError } from "@/lib/auth-api";
+import { getAuthProviders, getGoogleLoginUrl, login, LoginError } from "@/lib/auth-api";
 import {
   hasPendingSignupForEmail,
   markSignupEmailVerified,
@@ -33,16 +33,19 @@ import { refreshSession } from "@/lib/session-api";
 export function LoginForm({
   redirectTo = "/dashboard",
   passwordReset = false,
+  oauthError = "",
   className,
   ...props
 }: React.ComponentProps<"div"> & {
   redirectTo?: string;
   passwordReset?: boolean;
+  oauthError?: string;
 }) {
   const router = useRouter();
   const [isRestoringSession, setIsRestoringSession] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [googleEnabled, setGoogleEnabled] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -61,6 +64,23 @@ export function LoginForm({
       active = false;
     };
   }, [redirectTo, router]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void getAuthProviders(controller.signal)
+      .then((providers) => setGoogleEnabled(providers.google.enabled))
+      .catch(() => setGoogleEnabled(false));
+    return () => controller.abort();
+  }, []);
+
+  const oauthMessage: Record<string, string> = {
+    ACCOUNT_EMAIL_EXISTS: "An account already uses that email. Sign in with email and password, then connect Google from Account Settings.",
+    GOOGLE_NOT_CONNECTED: "Google sign-in could not be completed. The account may be unavailable or the sign-in expired.",
+    GOOGLE_UNAVAILABLE: "Google sign-in is temporarily unavailable. Use email and password instead.",
+    GOOGLE_CANCELLED: "Google sign-in was cancelled. You can try again or use email and password.",
+    ACCOUNT_SUSPENDED: "This ResourceHive account is unavailable. Contact an administrator if you believe this is a mistake.",
+    OAUTH_FAILED: "Google sign-in could not be completed. Please try again.",
+  };
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -110,7 +130,7 @@ export function LoginForm({
         <CardHeader>
           <CardTitle className="auth-form-title">Welcome back</CardTitle>
           <CardDescription>
-            Enter your institutional email to continue to ResourceHive.
+            Continue with Google, or enter your ResourceHive email and password.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -125,6 +145,26 @@ export function LoginForm({
             </span>{" "}
             Required fields
           </p>
+          {oauthError && oauthMessage[oauthError] && (
+            <p className="mb-4 text-sm text-destructive" role="alert">{oauthMessage[oauthError]}</p>
+          )}
+          {googleEnabled && (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                className="mb-4 w-full"
+                disabled={isRestoringSession || isSubmitting}
+                onClick={() => { window.location.assign(getGoogleLoginUrl(redirectTo)); }}
+              >
+                <span aria-hidden="true" className="mr-2 font-semibold">G</span>
+                Continue with Google
+              </Button>
+              <div className="mb-4 flex items-center gap-3 text-xs text-muted-foreground" aria-hidden="true">
+                <span className="h-px flex-1 bg-border" /><span>or</span><span className="h-px flex-1 bg-border" />
+              </div>
+            </>
+          )}
           <form onSubmit={handleSubmit} aria-busy={isSubmitting}>
             <FieldGroup>
               <Field data-invalid={error ? "true" : undefined}>

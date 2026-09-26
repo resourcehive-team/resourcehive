@@ -51,6 +51,7 @@ export interface OrganizationBookingRecord extends BookingRecord {
     firstName: string;
     lastName: string;
     email: string;
+    avatarUrl: string | null;
     status: string;
     emailVerifiedAt: Date | null;
     createdAt: Date;

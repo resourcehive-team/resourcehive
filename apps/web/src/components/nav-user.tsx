@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/user-avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,20 +35,12 @@ export function NavUser({
   user: {
     name: string;
     email: string;
-    avatar: string;
+    avatar: string | null;
   };
 }) {
   const { isMobile } = useSidebar();
   const router = useRouter();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const initials =
-    user.name
-      .split(/\s+/)
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((namePart) => namePart[0]?.toUpperCase())
-      .join("") || "RU";
-
   async function handleLogout() {
     if (isLoggingOut) {
       return;
@@ -74,12 +66,11 @@ export function NavUser({
               <SidebarMenuButton size="lg" className="aria-expanded:bg-muted" />
             }
           >
-            <Avatar className="size-8 grayscale">
-              <AvatarImage src={user.avatar} alt={user.name} />
-              <AvatarFallback>
-                {initials}
-              </AvatarFallback>
-            </Avatar>
+            <UserAvatar
+              name={user.name}
+              email={user.email}
+              avatarUrl={user.avatar}
+            />
             <div className="grid flex-1 text-left text-sm leading-tight">
               <span className="truncate font-medium">{user.name}</span>
               <span className="truncate text-xs text-foreground/70">
@@ -97,12 +88,11 @@ export function NavUser({
             <DropdownMenuGroup>
               <DropdownMenuLabel className="p-0 font-normal">
                 <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-                  <Avatar className="size-8">
-                    <AvatarImage src={user.avatar} alt={user.name} />
-                    <AvatarFallback>
-                      {initials}
-                    </AvatarFallback>
-                  </Avatar>
+                  <UserAvatar
+                    name={user.name}
+                    email={user.email}
+                    avatarUrl={user.avatar}
+                  />
                   <div className="grid flex-1 text-left text-sm leading-tight">
                     <span className="truncate font-medium">{user.name}</span>
                     <span className="truncate text-xs text-muted-foreground">
@@ -114,9 +104,7 @@ export function NavUser({
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem
-                render={<Link href="/dashboard/account" />}
-              >
+              <DropdownMenuItem render={<Link href="/dashboard/account" />}>
                 <CircleUserRoundIcon />
                 Account
               </DropdownMenuItem>
@@ -130,10 +118,7 @@ export function NavUser({
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem
-              disabled={isLoggingOut}
-              onClick={handleLogout}
-            >
+            <DropdownMenuItem disabled={isLoggingOut} onClick={handleLogout}>
               <LogOutIcon />
               {isLoggingOut ? "Logging out..." : "Log out"}
             </DropdownMenuItem>

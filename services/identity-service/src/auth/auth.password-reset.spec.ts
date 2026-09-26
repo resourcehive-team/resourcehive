@@ -75,8 +75,11 @@ describe('AuthService password reset', () => {
     passwordResetToken,
     $transaction: runTransaction,
   } as unknown as PrismaService;
-  const sendPasswordResetEmail = jest.fn<Promise<void>, [string, string]>();
-  const sendPasswordChangedEmail = jest.fn<Promise<void>, [string]>();
+  const sendPasswordResetEmail = jest.fn<
+    Promise<void>,
+    [string, string, string]
+  >();
+  const sendPasswordChangedEmail = jest.fn<Promise<void>, [string, string]>();
   const emailService = {
     sendPasswordResetEmail,
     sendPasswordChangedEmail,
@@ -129,7 +132,7 @@ describe('AuthService password reset', () => {
       expect.objectContaining({ where: { email: 'alex@example.edu' } }),
     );
     const createRequest = transactionPasswordResetToken.create.mock.calls[0][0];
-    const emailedToken = sendPasswordResetEmail.mock.calls[0][1];
+    const emailedToken = sendPasswordResetEmail.mock.calls[0][2];
     expect(emailedToken.length).toBeGreaterThanOrEqual(40);
     expect(createRequest.data.tokenHash).toBe(
       createHash('sha256').update(emailedToken).digest('hex'),
@@ -191,7 +194,10 @@ describe('AuthService password reset', () => {
     await expect(
       bcrypt.compare('NewPassword123!', passwordUpdate.data.passwordHash),
     ).resolves.toBe(true);
-    expect(sendPasswordChangedEmail).toHaveBeenCalledWith('alex@example.edu');
+    expect(sendPasswordChangedEmail).toHaveBeenCalledWith(
+      'user-id',
+      'alex@example.edu',
+    );
     const refreshRevocation =
       transactionRefreshToken.updateMany.mock.calls[0][0];
     expect(refreshRevocation.where).toEqual({

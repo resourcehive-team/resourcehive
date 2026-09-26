@@ -1,77 +1,55 @@
+import { ConflictException, ForbiddenException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { MembershipsService } from './memberships.service';
 import { PrismaService } from '@resourcehive/database';
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { NotificationClientService } from '@resourcehive/notification-client';
+import { MembershipsService } from './memberships.service';
 
 describe('MembershipsService', () => {
   let service: MembershipsService;
 
-  const mockPrismaService = {
+  const prisma = {
+    user: { findUnique: jest.fn() },
+    organization: { findUnique: jest.fn(), findMany: jest.fn() },
     organizationMembership: {
       findUnique: jest.fn(),
       findMany: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn(),
       delete: jest.fn(),
+      count: jest.fn(),
     },
+    organizationMembershipAudit: { create: jest.fn() },
+    $transaction: jest.fn(),
   };
+  const notifications = { sendMembershipDecision: jest.fn() };
 
   beforeEach(async () => {
+    jest.clearAllMocks();
+    prisma.$transaction.mockImplementation(
+      (callback: (transaction: typeof prisma) => Promise<unknown>) =>
+        callback(prisma),
+    );
+    notifications.sendMembershipDecision.mockResolvedValue(undefined);
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MembershipsService,
-        { provide: PrismaService, useValue: mockPrismaService },
+        { provide: PrismaService, useValue: prisma },
+        { provide: NotificationClientService, useValue: notifications },
       ],
     }).compile();
-
     service = module.get<MembershipsService>(MembershipsService);
   });
 
-  afterEach(() => {
-    jest.clearAllMocks();
-  });
-
-  it('should be defined', () => {
-    expect(service).toBeDefined();
-  });
-
-  describe('requestMembership', () => {
-    it('should create a pending membership request', async () => {
-      mockPrismaService.organizationMembership.findUnique.mockResolvedValue(
-        null,
-      );
-      const expectedResult = {
-        userId: 'u1',
-        organizationId: 'o1',
-        status: 'PENDING',
-      };
-      mockPrismaService.organizationMembership.create.mockResolvedValue(
-        expectedResult,
-      );
-
-      const result = await service.requestMembership('u1', 'o1');
-
-      expect(result).toEqual(expectedResult);
-      expect(
-        mockPrismaService.organizationMembership.create,
-      ).toHaveBeenCalledWith({
-        data: {
-          userId: 'u1',
-          organizationId: 'o1',
-          status: 'PENDING',
-          role: 'MEMBER',
-        },
-      });
+  it('creates a pending membership request for an active regular user', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      status: 'ACTIVE',
+      platformRole: 'USER',
     });
-
-    it('should throw ConflictException if membership already exists', async () => {
-      mockPrismaService.organizationMembership.findUnique.mockResolvedValue({
-        id: 'existing',
-      });
-
-      await expect(service.requestMembership('u1', 'o1')).rejects.toThrow(
-        ConflictException,
-      );
+    prisma.organization.findUnique.mockResolvedValue({
+      id: 'org',
+      status: 'ACTIVE',
     });
   });
 
@@ -101,71 +79,154 @@ describe('MembershipsService', () => {
         },
         data: { status: 'APPROVED', reviewedBy: 'admin' },
       });
+    prisma.organizationMembership.findUnique.mockResolvedValue(null);
+    prisma.organizationMembership.create.mockResolvedValue({
+      status: 'PENDING',
     });
 
-    it('should throw NotFoundException if membership does not exist', async () => {
-      mockPrismaService.organizationMembership.findUnique.mockResolvedValue(
-        null,
-      );
-
-      await expect(
-        service.updateMembershipStatus('u1', 'o1', 'APPROVED', 'admin'),
-      ).rejects.toThrow(NotFoundException);
+    await expect(service.requestMembership('user', 'org')).resolves.toEqual({
+      status: 'PENDING',
     });
-  });
-
-  describe('removeMembership', () => {
-    it('should delete membership', async () => {
-      mockPrismaService.organizationMembership.findUnique.mockResolvedValue({
-        id: 'membershipId',
-      });
-      const expectedResult = { id: 'membershipId' };
-      mockPrismaService.organizationMembership.delete.mockResolvedValue(
-        expectedResult,
-      );
-
-      const result = await service.removeMembership('u1', 'o1');
-
-      expect(result).toEqual(expectedResult);
-      expect(
-        mockPrismaService.organizationMembership.delete,
-      ).toHaveBeenCalledWith({
-        where: {
-          userId_organizationId: {
-            userId: 'u1',
-            organizationId: 'o1',
-          },
-        },
-      });
+    expect(prisma.organizationMembership.create).toHaveBeenCalledWith({
+      data: {
+        userId: 'user',
+        organizationId: 'org',
+        status: 'PENDING',
+        role: 'MEMBER',
+      },
     });
   });
 
-  describe('updateMembershipRole', () => {
-    it('should update membership role', async () => {
-      mockPrismaService.organizationMembership.findUnique.mockResolvedValue({
-        id: 'membershipId',
+  it('blocks platform administrators and resubmission after rejection', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      status: 'ACTIVE',
+      platformRole: 'PLATFORM_ADMIN',
+    });
+    await expect(service.requestMembership('platform', 'org')).rejects.toThrow(
+      ForbiddenException,
+    );
+
+    prisma.user.findUnique.mockResolvedValue({
+      status: 'ACTIVE',
+      platformRole: 'USER',
+    });
+    prisma.organization.findUnique.mockResolvedValue({
+      id: 'org',
+      status: 'ACTIVE',
+    });
+    prisma.organizationMembership.findUnique.mockResolvedValue({
+      status: 'REJECTED',
+    });
+    await expect(service.requestMembership('user', 'org')).rejects.toThrow(
+      ConflictException,
+    );
+  });
+
+  it('approves a pending request, records an audit event, and publishes a notification', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      status: 'ACTIVE',
+      platformRole: 'USER',
+    });
+    prisma.organization.findUnique.mockResolvedValue({ status: 'ACTIVE' });
+    prisma.organizationMembership.findUnique
+      .mockResolvedValueOnce({ role: 'ADMIN', status: 'APPROVED' })
+      .mockResolvedValueOnce({
+        id: 'membership',
+        userId: 'target',
+        organizationId: 'org',
+        role: 'MEMBER',
+        status: 'PENDING',
+        reviewedBy: null,
+        reviewedAt: null,
+        reviewNote: null,
+        user: { id: 'target', status: 'ACTIVE' },
+        organization: { name: 'Engineering' },
       });
-      const expectedResult = { id: 'membershipId', role: 'ADMIN' };
-      mockPrismaService.organizationMembership.update.mockResolvedValue(
-        expectedResult,
-      );
+    prisma.organizationMembership.updateMany.mockResolvedValue({ count: 1 });
+    prisma.organizationMembershipAudit.create.mockResolvedValue({});
 
-      const result = await service.updateMembershipRole('u1', 'o1', 'ADMIN');
+    const result = await service.updateMembershipStatus(
+      'target',
+      'org',
+      'APPROVED',
+      'admin',
+    );
 
-      expect(result).toEqual(expectedResult);
-      expect(
-        mockPrismaService.organizationMembership.update,
-      ).toHaveBeenCalledWith({
-        where: {
-          userId_organizationId: {
-            userId: 'u1',
-            organizationId: 'o1',
+    expect(result.status).toBe('APPROVED');
+    const auditCall = (
+      prisma.organizationMembershipAudit.create as unknown as {
+        mock: { calls: Array<[unknown]> };
+      }
+    ).mock.calls[0]?.[0] as {
+      data: { membershipId: string; actorUserId: string; action: string };
+    };
+    expect(auditCall.data).toEqual(
+      expect.objectContaining({
+        membershipId: 'membership',
+        actorUserId: 'admin',
+        action: 'APPROVED',
+      }),
+    );
+    expect(notifications.sendMembershipDecision).toHaveBeenCalledWith(
+      expect.objectContaining({
+        recipientUserId: 'target',
+        organizationName: 'Engineering',
+        decision: 'APPROVED',
+      }),
+    );
+  });
+
+  it('returns member avatars for organization administration', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      status: 'ACTIVE',
+      platformRole: 'USER',
+    });
+    prisma.organization.findUnique.mockResolvedValue({ status: 'ACTIVE' });
+    prisma.organizationMembership.findUnique.mockResolvedValue({
+      role: 'ADMIN',
+      status: 'APPROVED',
+    });
+    prisma.organizationMembership.findMany.mockResolvedValue([
+      {
+        userId: 'member',
+        organizationId: 'org',
+        role: 'MEMBER',
+        status: 'APPROVED',
+        joinedAt: new Date(),
+        reviewedBy: 'admin',
+        reviewedAt: new Date(),
+        reviewNote: null,
+        auditEvents: [],
+        user: {
+          id: 'member',
+          firstName: 'Asha',
+          lastName: 'Perera',
+          email: 'asha@example.edu',
+          avatarUrl: 'https://example.com/asha.webp',
+          status: 'ACTIVE',
+        },
+      },
+    ]);
+
+    const result = await service.getOrganizationMembers('org', 'admin');
+
+    expect(result[0]?.user.avatarUrl).toBe('https://example.com/asha.webp');
+    expect(prisma.organizationMembership.findMany).toHaveBeenCalledWith({
+      where: { organizationId: 'org' },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            avatarUrl: true,
+            status: true,
           },
         },
-        data: {
-          role: 'ADMIN',
-        },
-      });
+        auditEvents: { orderBy: { createdAt: 'desc' }, take: 1 },
+      },
+      orderBy: { joinedAt: 'asc' },
     });
   });
 });

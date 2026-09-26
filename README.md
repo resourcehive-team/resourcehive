@@ -11,6 +11,24 @@ place.
 - Application: <https://app.resourcehive.thisismalindu.com>
 - API health: <https://api.resourcehive.thisismalindu.com/health>
 
+## Swagger / OpenAPI
+
+The API gateway exposes interactive Swagger UI for each private NestJS service
+under a consistent public path. The service API paths themselves are unchanged:
+
+| Service | Interactive docs | JSON | YAML |
+| --- | --- | --- | --- |
+| Identity | `/docs/identity` | `/docs/identity/openapi.json` | `/docs/identity/openapi.yaml` |
+| Resource | `/docs/resource` | `/docs/resource/openapi.json` | `/docs/resource/openapi.yaml` |
+| Booking | `/docs/booking` | `/docs/booking/openapi.json` | `/docs/booking/openapi.yaml` |
+| Notification | `/docs/notification` | `/docs/notification/openapi.json` | `/docs/notification/openapi.yaml` |
+
+Locally, replace the path with `http://localhost:8088`. In production, use the
+same paths under the API hostname, for example
+`https://api.resourcehive.thisismalindu.com/docs/booking`. The pages are
+interactive and support the existing HttpOnly cookie session or a bearer token;
+the gateway remains the only public backend entry point.
+
 ## Architecture
 
 ResourceHive is a pnpm monorepo with a Next.js frontend and four NestJS backend
@@ -46,7 +64,7 @@ db/                             Prisma schema, migrations, and tests
 
 ### Requirements
 
-- Node.js 20 or newer
+- Node.js 22 or newer
 - pnpm 10.34.5
 - Docker with Docker Compose
 - Access to a PostgreSQL 15 database
@@ -83,7 +101,7 @@ when the provider does not offer separate connections.
 Set these values in `apps/web/.env.local`:
 
 ```env
-NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_API_URL=http://localhost:8088
 JWT_SECRET=replace-with-the-same-secret-used-in-the-root-env
 ```
 
@@ -97,21 +115,69 @@ pnpm run dev:setup
 
 ### Local email
 
-Local development uses the console email transport by default:
+Local development keeps Resend disabled by default. Email commands still travel
+through Kafka, and Notification Service acknowledges them with its console
+provider:
 
 ```env
-EMAIL_TRANSPORT=console
+KAFKA_ENABLED=true
+RESEND_ENABLED=false
 ```
 
-Verification and password-reset links are printed in the Identity Service
-logs instead of being emailed. Follow them with:
+For real local delivery, set `RESEND_ENABLED=true`, provide
+`RESEND_API_KEY`, and use a verified sender in `RESEND_FROM_EMAIL`. Start the
+Kafka broker and all services before testing email flows. The Resend key is
+passed only to Notification Service.
+
+Inspect queued email status with:
 
 ```bash
-docker compose logs -f identity-service
+docker compose logs -f notification-service
 ```
 
-To test real email locally, change `EMAIL_TRANSPORT` to `smtp` and configure
-the SMTP variables described in the production section.
+### Google sign-in (OAuth/OIDC)
+
+Google sign-in is disabled by default. It is implemented as a server-side
+OAuth 2.0 Authorization Code flow with PKCE and OpenID Connect nonce/state;
+Google tokens are verified by Identity Service and are never stored. A new
+Google account is created without a password or organization membership and is
+sent to the membership-request onboarding flow. Organization access still
+requires administrator approval. Existing password users can connect Google
+from **Account → Sign-in methods** after confirming their password.
+
+To enable it locally:
+
+1. In [Google Cloud Console](https://console.cloud.google.com/), create or
+   select a project, configure the OAuth consent screen, and create an OAuth
+   client of type **Web application**.
+2. Add `http://localhost:8088/auth/google/callback` as an authorized redirect
+   URI. Keep the URI exact; path, scheme, host, and port must match.
+3. Put the client values in the root `.env` (Identity Service only reads these
+   variables):
+
+   ```env
+   GOOGLE_OAUTH_ENABLED=true
+   GOOGLE_OAUTH_CLIENT_ID=your-client-id.apps.googleusercontent.com
+   GOOGLE_OAUTH_CLIENT_SECRET=your-client-secret
+   GOOGLE_OAUTH_CALLBACK_URL=http://localhost:8088/auth/google/callback
+   ```
+
+4. Apply the migration and regenerate the shared Prisma client, then rebuild
+   Identity Service:
+
+   ```bash
+   pnpm db:migrate
+   pnpm db:generate
+   docker compose up --build -d identity-service api-gateway
+   ```
+
+The frontend discovers availability through `GET /auth/providers`, so email
+and password login remains usable if discovery fails or Google is disabled.
+For production, register the exact HTTPS callback URL used by the deployment
+and set the equivalent values in `.env.production`; never commit the client
+secret. See Google’s [web-server flow](https://developers.google.com/identity/protocols/oauth2/web-server)
+and [OIDC reference](https://developers.google.com/identity/openid-connect/reference)
+for provider-console details.
 
 ### Local browser notifications
 
@@ -165,28 +231,66 @@ the Firebase values empty.
 
 ### Run the application
 
-Build and start the backend without Firebase:
+The normal local stack uses the base Compose file. It starts the API gateway,
+all four Nest services, the local Kafka broker, and the Kafka topic initializer:
 
 ```bash
 docker compose up --build -d
 ```
 
-To enable Firebase browser notifications, include the FCM override instead:
+To start the same stack with Firebase Cloud Messaging/browser notifications,
+include the FCM override:
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.fcm.yml up --build -d
 ```
 
-For later starts, omit `--build` from the command you selected.
+Google OAuth does not use a separate Compose file. Configure its variables in
+the root `.env`; they are passed to Identity Service by the base Compose file.
+The `docker-compose.fcm.yml` override is only for Firebase browser-push
+credentials and the Notification Service service-account mount.
+
+For later starts, use the same command without `--build`:
+
+```bash
+docker compose up -d
+# or, with Firebase browser notifications:
+docker compose -f docker-compose.yml -f docker-compose.fcm.yml up -d
+```
+
+Start the frontend separately:
+
+```bash
+pnpm run dev:web
+```
 
 The first build can take several minutes. The Dockerfiles cache dependency
 installation separately from the source code, so later builds reuse that work
 unless a package file or lockfile changed. The final service images contain
 only the compiled application and its production dependencies.
 
-Local Compose starts Kafka and creates the required topics automatically. The
-local broker does not need a username, password, or TLS configuration. Kafka
-is also not involved in the **Send test** browser-push action.
+The base Compose stack provisions a single-node local Kafka KRaft broker and
+creates the four required topics before the application services start. Inside
+Docker, `localhost` means the current container, so Compose services use
+`kafka:19092`; services started directly with pnpm use the host listener at
+`localhost:9092`. TLS and SASL remain disabled only for this local broker.
+
+Inspect the broker and topics with:
+
+```bash
+docker compose ps
+docker compose logs -f kafka
+docker compose exec kafka /opt/kafka/bin/kafka-topics.sh \
+  --bootstrap-server localhost:9092 --list
+```
+
+Kafka data survives `docker compose down` because it is stored in the
+`kafka_data` volume. To intentionally reset local Kafka data and recreate all
+topics, use `docker compose down --volumes`.
+
+Email commands still require Kafka even when `RESEND_ENABLED=false`; the
+console provider is selected only after Notification Service consumes the
+command. Kafka is not involved in the **Send test** browser-push action.
 
 When using Docker Compose, Identity Service applies committed database
 migrations automatically before it starts. For development without Docker,
@@ -202,12 +306,6 @@ Confirm that the containers are running:
 docker compose ps
 ```
 
-Start the frontend in a separate terminal:
-
-```bash
-pnpm run dev:web
-```
-
 Open <http://localhost:3000> and sign in with:
 
 ```text
@@ -218,7 +316,7 @@ Password: DemoPassword123!
 The demo seed creates a user, an approved membership, and a demo organization.
 It does not create resources.
 
-The API gateway runs at <http://localhost:8000>. If port 8000 is unavailable,
+The API gateway runs at <http://localhost:8088>. If port 8088 is unavailable,
 change both values:
 
 ```env
@@ -232,7 +330,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8088
 `API_PORT` is the host port. The service ports inside Docker do not need to be
 changed.
 
-### Logs, rebuilds, and shutdown
+### Logs, targeted rebuilds, and shutdown
 
 Follow all backend logs:
 
@@ -246,20 +344,54 @@ Follow selected services:
 docker compose logs -f api-gateway notification-service kafka
 ```
 
-Rebuild only the backend service you changed:
+When the stack is already running, rebuild and recreate only the service you
+changed:
 
 ```bash
-docker compose up --build --no-deps -d notification-service
+docker compose up -d --build --no-deps identity-service
+docker compose up -d --build --no-deps resource-service
+docker compose up -d --build --no-deps booking-service
+docker compose up -d --build --no-deps notification-service
 ```
 
-Include the FCM override when rebuilding Notification Service with Firebase:
+If Firebase browser notifications are enabled, use the FCM override for the
+Notification Service command:
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.fcm.yml up --build --no-deps -d notification-service
 ```
 
-Replace `notification-service` with another service name when needed. Run a
-full build only after shared dependency or Compose changes.
+The targeted command has three separate operations available:
+
+```bash
+# Build an image without replacing its running container.
+docker compose build identity-service
+
+# Restart the existing container/image without rebuilding source code.
+docker compose restart identity-service
+
+# Rebuild and recreate the changed service in one step.
+docker compose up -d --build --no-deps identity-service
+```
+
+Replace `identity-service` with `resource-service`, `booking-service`, or
+`notification-service` as needed. The `--no-deps` form assumes Kafka and the
+service dependencies are already running. For a cold stack, omit `--no-deps`
+or use one of the full startup commands above. The API gateway uses the pulled
+Caddy image rather than a local Dockerfile; restart it after changing its
+configuration:
+
+```bash
+docker compose restart api-gateway
+```
+
+`docker compose up --build` evaluates every application service with a
+`build` section. BuildKit normally reuses cached layers for unchanged services,
+so a source-only Identity change rebuilds and recreates Identity while the
+other service images and containers remain unchanged. Changes to the lockfile,
+database package, shared authentication package, notification client, Compose
+configuration, or another shared build input can invalidate more than one
+service image.
 
 Stop and remove the local containers:
 
@@ -418,26 +550,16 @@ APP_URL=https://app.resourcehive.thisismalindu.com
 EMAIL_VERIFICATION_TOKEN_EXPIRES_IN=24h
 PASSWORD_RESET_TOKEN_EXPIRES_IN=1h
 
-EMAIL_TRANSPORT=smtp
-EMAIL_FROM="ResourceHive <no-reply@thisismalindu.com>"
-SMTP_HOST=smtp.example.com
-SMTP_PORT=587
-SMTP_SECURE=false
-SMTP_USER=replace_with_smtp_username
-SMTP_PASSWORD=replace_with_smtp_password
-
-# Notification providers. Kafka and Resend can remain disabled until their
-# production services have been provisioned.
+# Notification providers. Kafka must be reachable for queued email delivery.
 DELIVERY_POLL_INTERVAL_MS=5000
-KAFKA_ENABLED=false
+KAFKA_ENABLED=true
 KAFKA_BROKERS=kafka.example.com:9093
 KAFKA_CLIENT_ID=notification-service
 KAFKA_CONSUMER_GROUP=notification-service-v1-production
 KAFKA_SSL=true
-KAFKA_SASL_USERNAME=
-KAFKA_SASL_PASSWORD=
+KAFKA_SASL_USERNAME=replace_with_managed_kafka_username
+KAFKA_SASL_PASSWORD=replace_with_managed_kafka_password
 
-RESEND_ENABLED=false
 RESEND_API_KEY=
 RESEND_FROM_EMAIL="ResourceHive <notifications@thisismalindu.com>"
 
@@ -452,16 +574,16 @@ Generate a production JWT secret with:
 openssl rand -base64 48
 ```
 
-For email, use credentials from any SMTP provider. Use port 587 with
-`SMTP_SECURE=false` for STARTTLS, or port 465 with `SMTP_SECURE=true`. The
-address in `EMAIL_FROM` must be accepted by the provider, which usually means
-verifying the sender address or domain.
+For email, create a Resend API key and verify the sending domain used by
+`RESEND_FROM_EMAIL`. Production Compose enables Resend and requires both
+values in `.env.production`. Identity Service publishes email commands to
+Kafka; Notification Service persists, retries, and sends them through Resend.
 
-`DELIVERY_POLL_INTERVAL_MS=5000` is suitable for normal use. If Kafka is
-enabled, create the four topics listed in the
+`DELIVERY_POLL_INTERVAL_MS=5000` is suitable for normal use. Provision the four
+Kafka topics listed in the
 [notification event contracts](services/notification-service/docs/event-contracts.md)
-and configure the broker address, TLS, and SASL credentials. If Resend is
-enabled, use a Resend API key and an address on a verified sending domain.
+on the managed broker and configure its broker address, TLS, and SASL credentials. Use a Resend API
+key and an address on a verified sending domain.
 
 Do not set `GOOGLE_APPLICATION_CREDENTIALS` in `.env.production`. The
 deployment workflow installs and mounts the Firebase service-account JSON.

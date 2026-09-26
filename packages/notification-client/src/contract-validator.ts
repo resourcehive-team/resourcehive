@@ -103,6 +103,15 @@ export function parseNotificationCommand(
     );
   }
   if (
+    String(template.key).startsWith("membership.") &&
+    value.producer !== "resource-service"
+  ) {
+    throw new NotificationContractError(
+      "TEMPLATE_FORBIDDEN",
+      "Membership templates may only be requested by Resource Service",
+    );
+  }
+  if (
     template.key === NOTIFICATION_TEMPLATES.developmentTestPush &&
     value.producer !== "notification-service"
   ) {
@@ -112,23 +121,33 @@ export function parseNotificationCommand(
     );
   }
   const usesEmail = value.channels.includes("EMAIL");
-  const isVerification =
-    template.key === NOTIFICATION_TEMPLATES.identityVerifyEmail;
-  if (usesEmail && !isVerification) {
+  const isIdentityEmail = String(template.key).startsWith("identity.");
+  if (usesEmail && !isIdentityEmail) {
     throw new NotificationContractError(
       "CHANNEL_FORBIDDEN",
-      "Email is reserved for Identity Service verification commands",
+      "Email is reserved for Identity Service email commands",
     );
   }
   if (
-    isVerification &&
+    isIdentityEmail &&
     (value.producer !== "identity-service" ||
       value.channels.length !== 1 ||
       value.channels[0] !== "EMAIL")
   ) {
     throw new NotificationContractError(
       "CHANNEL_FORBIDDEN",
-      "Email verification commands must use only the EMAIL channel",
+      "Identity email commands must use only the EMAIL channel",
+    );
+  }
+  if (
+    String(template.key).startsWith("membership.") &&
+    (value.channels.length !== 2 ||
+      !value.channels.includes("IN_APP") ||
+      !value.channels.includes("PUSH"))
+  ) {
+    throw new NotificationContractError(
+      "CHANNEL_FORBIDDEN",
+      "Membership notifications must use only IN_APP and PUSH channels",
     );
   }
   if (template.version !== 1) {
@@ -157,12 +176,37 @@ function validateTemplateVariables(
       2_000,
     );
   }
+  if (key === NOTIFICATION_TEMPLATES.identityPasswordReset) {
+    requireText(variables.resetUrl, "template.variables.resetUrl", 2_000);
+    if (Object.keys(variables).some((name) => name !== "resetUrl")) {
+      invalid("template.variables");
+    }
+  }
+  if (
+    key === NOTIFICATION_TEMPLATES.identityPasswordChanged &&
+    Object.keys(variables).length > 0
+  ) {
+    invalid("template.variables");
+  }
   if (String(key).startsWith("booking.")) {
     requireText(variables.resourceName, "template.variables.resourceName", 200);
   }
   if (key === NOTIFICATION_TEMPLATES.message) {
     requireText(variables.title, "template.variables.title", 120);
     requireText(variables.message, "template.variables.message", 500);
+  }
+  if (
+    key === NOTIFICATION_TEMPLATES.membershipApproved ||
+    key === NOTIFICATION_TEMPLATES.membershipRejected
+  ) {
+    requireText(
+      variables.organizationName,
+      "template.variables.organizationName",
+      200,
+    );
+    if (Object.keys(variables).some((name) => name !== "organizationName")) {
+      invalid("template.variables");
+    }
   }
 }
 

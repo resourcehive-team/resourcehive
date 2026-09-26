@@ -17,12 +17,14 @@ Application services should create these envelopes through
 Approved initial templates:
 
 - `identity.verify-email.v1`
+- `identity.password-reset.v1`
+- `identity.password-changed.v1`
 - `booking.confirmed.v1`
 - `booking.cancelled.v1`
 - `booking.completed.v1`
 - `notification.message.v1`
 
-Only `identity.verify-email.v1` may request `EMAIL`, and it must request no
+Only Identity Service templates may request `EMAIL`, and they must request no
 other channel. Booking templates use `IN_APP` and `PUSH`.
 `notification.message.v1` lets Identity, Booking, and Resource services send
 plain-text in-app and browser push messages. It requires `title` and `message`
@@ -61,10 +63,12 @@ so Kafka redelivery cannot create duplicate notifications or deliveries.
 
 ## Verification email command
 
-Identity Service publishes `identity.verify-email.v1` to
-`resourcehive.identity.notification-commands.v1`. The command must contain a
-ResourceHive `userId`, may contain the destination `email`, must use only the
-`EMAIL` channel, and requires a `verificationUrl` string.
+Identity Service publishes identity email templates to
+`resourcehive.identity.notification-commands.v1`. Each command must contain a
+ResourceHive `userId`, may contain the destination `email`, and must use only
+the `EMAIL` channel. Verification commands require `verificationUrl`; password
+reset commands require `resetUrl`; password-changed commands contain no token
+or URL variables.
 
 ## Rejections and retries
 

@@ -3,8 +3,10 @@
 ## Kafka
 
 Configure brokers, client ID, consumer group, TLS, and SASL through environment
-variables. Development uses a local KRaft broker. Production must use encrypted
-transport and topic ACLs.
+variables. The base development Compose file provisions a single-node KRaft
+broker and creates the required topics automatically. Containers connect to
+`kafka:19092`; processes started directly on the host use `localhost:9092`.
+Production must use encrypted transport and topic ACLs.
 
 Before setting `KAFKA_ENABLED=true`:
 
@@ -31,9 +33,10 @@ users and least-privilege ACLs are recommended before production hardening.
 Use separate development and production keys and a verified sending subdomain.
 Automatic retries use the delivery UUID as the provider idempotency key.
 
-Before setting `RESEND_ENABLED=true`, configure `RESEND_API_KEY`,
-and `RESEND_FROM_EMAIL`. Resend is used only for email verification. This
-version deliberately does not retain webhook event history.
+Before setting `RESEND_ENABLED=true`, configure `RESEND_API_KEY` and
+`RESEND_FROM_EMAIL` using a verified sending domain. Resend delivers
+verification, password-reset, and password-changed emails. This version
+deliberately does not retain webhook event history.
 
 ## Firebase Cloud Messaging
 

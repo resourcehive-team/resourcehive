@@ -1,9 +1,11 @@
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { setupIdentitySwagger } from './swagger';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  app.enableShutdownHooks();
   const allowedOrigins = (process.env.CORS_ORIGINS ?? 'http://localhost:3000')
     .split(',')
     .map((origin) => origin.trim())
@@ -20,6 +22,7 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
     }),
   );
+  setupIdentitySwagger(app);
   await app.listen(process.env.PORT ?? 3000);
 }
 void bootstrap();

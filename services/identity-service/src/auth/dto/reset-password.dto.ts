@@ -1,4 +1,5 @@
 import { Transform } from 'class-transformer';
+import { ApiProperty } from '@nestjs/swagger';
 import {
   IsString,
   Length,
@@ -8,9 +9,17 @@ import {
 } from 'class-validator';
 
 export class ResetPasswordDto {
+  @ApiProperty({ minLength: 20, maxLength: 512, writeOnly: true })
   @Transform(({ value }: { value: unknown }) =>
     typeof value === 'string' ? value.trim() : value,
   )
+  @ApiProperty({
+    format: 'password',
+    writeOnly: true,
+    minLength: 8,
+    maxLength: 72,
+    example: 'NewPassword123!',
+  })
   @IsString()
   @Length(20, 512)
   token!: string;

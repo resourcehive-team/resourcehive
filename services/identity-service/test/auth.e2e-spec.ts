@@ -6,6 +6,7 @@ import { createHash } from 'node:crypto';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
+import { setupIdentitySwagger } from './../src/swagger';
 
 interface LoginResponse {
   message: string;
@@ -57,11 +58,9 @@ describe('Authentication Flow (e2e)', () => {
   const testEmail = process.env.DEMO_USER_EMAIL ?? 'demo@example.edu';
   const testPassword = process.env.DEMO_USER_PASSWORD ?? 'DemoPassword123!';
   const signupEmail = `signup-${Date.now()}@example.edu`;
-  const originalEmailTransport = process.env.EMAIL_TRANSPORT;
   const originalBcryptRounds = process.env.BCRYPT_ROUNDS;
 
   beforeAll(async () => {
-    process.env.EMAIL_TRANSPORT = 'console';
     process.env.BCRYPT_ROUNDS = '4';
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -70,6 +69,8 @@ describe('Authentication Flow (e2e)', () => {
       .overrideProvider(NotificationClientService)
       .useValue({
         sendVerificationEmail: jest.fn().mockResolvedValue({}),
+        sendPasswordResetEmail: jest.fn().mockResolvedValue({}),
+        sendPasswordChangedEmail: jest.fn().mockResolvedValue({}),
       })
       .compile();
 
@@ -81,6 +82,7 @@ describe('Authentication Flow (e2e)', () => {
         forbidNonWhitelisted: true,
       }),
     );
+    setupIdentitySwagger(app);
     await app.init();
     prisma = app.get(PrismaService);
   });
@@ -90,6 +92,25 @@ describe('Authentication Flow (e2e)', () => {
       .get('/')
       .expect(200)
       .expect('Identity Service is running');
+  });
+
+  it('serves the identity OpenAPI document and raw YAML document', async () => {
+    const json = await request(app.getHttpServer())
+      .get('/docs/identity/openapi.json')
+      .expect(200);
+
+    const document = json.body as {
+      openapi?: string;
+      paths?: Record<string, unknown>;
+    };
+    expect(document.openapi).toBeDefined();
+    expect(document.paths).toHaveProperty('/auth/login');
+    expect(document.paths).toHaveProperty('/auth/me');
+
+    const yaml = await request(app.getHttpServer())
+      .get('/docs/identity/openapi.yaml')
+      .expect(200);
+    expect(yaml.text).toContain('openapi:');
   });
 
   it('rejects an incorrect password', async () => {
@@ -469,11 +490,6 @@ describe('Authentication Flow (e2e)', () => {
     });
 
     await app.close();
-    if (originalEmailTransport === undefined) {
-      delete process.env.EMAIL_TRANSPORT;
-    } else {
-      process.env.EMAIL_TRANSPORT = originalEmailTransport;
-    }
     if (originalBcryptRounds === undefined) {
       delete process.env.BCRYPT_ROUNDS;
     } else {

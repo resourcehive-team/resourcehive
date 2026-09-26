@@ -10,6 +10,20 @@ export interface LoginResponse {
   message: "user login successfully";
 }
 
+export interface AuthProvidersResponse {
+  google: { enabled: boolean };
+}
+
+export interface AuthenticationMethods {
+  password: boolean;
+  google: {
+    enabled: boolean;
+    connected: boolean;
+    email: string | null;
+    connectedAt: string | null;
+  };
+}
+
 export interface ForgotPasswordRequest {
   email: string;
 }
@@ -38,6 +52,8 @@ export interface CurrentUserResponse {
     status: string;
     platformRole: string;
     createdAt: string;
+    avatarUrl: string | null;
+    authenticationMethods: AuthenticationMethods;
   };
   organizationContext: {
     organizationId: string | null;
@@ -223,6 +239,88 @@ export async function logout(): Promise<void> {
   if (!response.ok) {
     throw new Error("Unable to log out. Please try again.");
   }
+}
+
+export async function getAuthProviders(
+  signal?: AbortSignal,
+): Promise<AuthProvidersResponse> {
+  const response = await fetch(`${apiUrl}/auth/providers`, {
+    cache: "no-store",
+    signal,
+  });
+  const data: unknown = await response.json().catch(() => null);
+  if (
+    !response.ok ||
+    !data ||
+    typeof data !== "object" ||
+    !("google" in data) ||
+    !data.google ||
+    typeof data.google !== "object" ||
+    !("enabled" in data.google) ||
+    typeof data.google.enabled !== "boolean"
+  ) {
+    throw new Error("Unable to load sign-in providers.");
+  }
+  return data as AuthProvidersResponse;
+}
+
+export function getGoogleLoginUrl(next = "/dashboard") {
+  return `${apiUrl}/auth/google/login?next=${encodeURIComponent(next)}`;
+}
+
+export async function connectGoogle(
+  password: string,
+): Promise<{ authorizationUrl: string }> {
+  const response = await fetchWithSessionRefresh(
+    `${apiUrl}/auth/google/connect`,
+    {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password }),
+    },
+  );
+  const data: unknown = await response.json().catch(() => null);
+  if (
+    !response.ok ||
+    !data ||
+    typeof data !== "object" ||
+    !("authorizationUrl" in data) ||
+    typeof data.authorizationUrl !== "string"
+  )
+    throw new Error(getApiErrorMessage(data, "Unable to connect Google."));
+  return data as { authorizationUrl: string };
+}
+
+export async function disconnectGoogle(
+  password: string,
+): Promise<{ message: string }> {
+  const response = await fetchWithSessionRefresh(
+    `${apiUrl}/auth/google/connection`,
+    {
+      method: "DELETE",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password }),
+    },
+  );
+  const data: unknown = await response.json().catch(() => null);
+  if (!response.ok || !isMessageResponse(data))
+    throw new Error(getApiErrorMessage(data, "Unable to disconnect Google."));
+  return data;
+}
+
+export async function requestPasswordSetup(): Promise<{ message: string }> {
+  const response = await fetchWithSessionRefresh(
+    `${apiUrl}/auth/password/setup-request`,
+    { method: "POST", credentials: "include" },
+  );
+  const data: unknown = await response.json().catch(() => null);
+  if (!response.ok || !isMessageResponse(data))
+    throw new Error(
+      getApiErrorMessage(data, "Unable to send the password setup email."),
+    );
+  return data;
 }
 
 export async function requestPasswordReset(
@@ -512,6 +610,10 @@ function isCurrentUserResponse(data: unknown): data is CurrentUserResponse {
     typeof user.platformRole === "string" &&
     "createdAt" in user &&
     typeof user.createdAt === "string" &&
+    "avatarUrl" in user &&
+    (typeof user.avatarUrl === "string" || user.avatarUrl === null) &&
+    "authenticationMethods" in user &&
+    !!user.authenticationMethods &&
     "organizationId" in organizationContext &&
     (typeof organizationContext.organizationId === "string" ||
       organizationContext.organizationId === null) &&
@@ -619,5 +721,70 @@ function isMessageResponse(data: unknown): data is { message: string } {
     typeof data === "object" &&
     "message" in data &&
     typeof data.message === "string"
+  );
+}
+
+export interface AvatarUploadResponse {
+  avatarUrl: string | null;
+}
+
+export async function uploadAvatar(file: File): Promise<AvatarUploadResponse> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await fetchWithSessionRefresh(`${apiUrl}/auth/me/avatar`, {
+    method: "POST",
+    credentials: "include",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new AuthenticationRequiredError();
+    }
+    const data: unknown = await response.json().catch(() => null);
+    throw new Error(
+      getApiErrorMessage(
+        data,
+        response.status === 413
+          ? "Choose an image smaller than 5 MB."
+          : response.status === 422
+            ? "Only valid JPEG, PNG, and WebP images are supported."
+            : response.status === 502 || response.status === 504
+              ? "The image service is temporarily unavailable. Please try again."
+              : "Unable to upload profile picture.",
+      ),
+    );
+  }
+
+  const data: unknown = await response.json().catch(() => null);
+
+  if (!isAvatarUploadResponse(data)) {
+    throw new Error("The identity service returned an invalid response.");
+  }
+
+  return data;
+}
+
+export async function removeAvatar(): Promise<void> {
+  const response = await fetch(`${apiUrl}/auth/me/avatar`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new AuthenticationRequiredError();
+    }
+    throw new Error("Unable to remove avatar.");
+  }
+}
+
+function isAvatarUploadResponse(data: unknown): data is AvatarUploadResponse {
+  return (
+    !!data &&
+    typeof data === "object" &&
+    "avatarUrl" in data &&
+    (typeof data.avatarUrl === "string" || data.avatarUrl === null)
   );
 }
