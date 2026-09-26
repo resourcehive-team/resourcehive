@@ -170,15 +170,17 @@ describe("BookingNotificationService", () => {
       allowedOrganizationIds: ["allowed-organization-id"],
     });
 
-    expect(findAdministrators).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          organizationId: { in: ["organization-id", "allowed-organization-id"] },
-          status: "APPROVED",
-          userId: { notIn: ["admin-id"] },
-        }),
-      }),
-    );
+    expect(findAdministrators).toHaveBeenCalledWith({
+      where: {
+        organizationId: {
+          in: ["organization-id", "allowed-organization-id"],
+        },
+        status: "APPROVED",
+        userId: { notIn: ["admin-id"] },
+      },
+      select: { userId: true },
+      distinct: ["userId"],
+    });
     expect(send).toHaveBeenCalledWith({
       recipientUserId: "other-admin-id",
       title: "New slot available",

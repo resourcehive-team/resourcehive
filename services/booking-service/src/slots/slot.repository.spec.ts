@@ -48,6 +48,7 @@ describe("SlotRepository", () => {
             ownerOrganizationId: true,
             pointCost: true,
             cancellationNoticeMinutes: true,
+            allowedOrganizations: { select: { organizationId: true } },
           },
         },
         bookings: {

@@ -133,7 +133,6 @@ model OrganizationMembership {
 
   user         User         @relation("MembershipUser", fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  approver     User?        @relation("MembershipApprover", fields: [reviewedBy], references: [id], onDelete: NoAction, onUpdate: NoAction)
   reviewedAt     DateTime? @map("reviewed_at") @db.Timestamptz
   reviewNote     String?  @map("review_note")
   reviewer     User?                           @relation("MembershipReviewer", fields: [reviewedBy], references: [id], onDelete: NoAction, onUpdate: NoAction)

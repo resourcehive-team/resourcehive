@@ -56,26 +56,6 @@ export class MembershipsService {
     });
   }
 
-  // for updating membership status (approve/reject)
-  async updateMembershipStatus(
-    userId: string,
-    organizationId: string,
-    status: string,
-    approvedByUserId: string,
-  ) {
-    const membership = await this.prisma.organizationMembership.findUnique({
-      where: { userId_organizationId: { userId, organizationId } },
-    });
-    if (!membership) {
-      throw new NotFoundException('Membership request not found');
-    }
-    return this.prisma.organizationMembership.update({
-      where: { userId_organizationId: { userId, organizationId } },
-      data: { status, reviewedBy: approvedByUserId },
-    });
-  }
-
-  // for getting user's memberships
   async getUserMemberships(userId: string) {
     const memberships = await this.prisma.organizationMembership.findMany({
       where: { userId },

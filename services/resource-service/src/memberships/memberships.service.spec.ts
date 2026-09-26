@@ -51,34 +51,6 @@ describe('MembershipsService', () => {
       id: 'org',
       status: 'ACTIVE',
     });
-  });
-
-  describe('updateMembershipStatus', () => {
-    it('should update membership status', async () => {
-      mockPrismaService.organizationMembership.findUnique.mockResolvedValue({
-        id: 'existing',
-      });
-      const expectedResult = { status: 'APPROVED', reviewedBy: 'admin' };
-      mockPrismaService.organizationMembership.update.mockResolvedValue(
-        expectedResult,
-      );
-
-      const result = await service.updateMembershipStatus(
-        'u1',
-        'o1',
-        'APPROVED',
-        'admin',
-      );
-
-      expect(result).toEqual(expectedResult);
-      expect(
-        mockPrismaService.organizationMembership.update,
-      ).toHaveBeenCalledWith({
-        where: {
-          userId_organizationId: { userId: 'u1', organizationId: 'o1' },
-        },
-        data: { status: 'APPROVED', reviewedBy: 'admin' },
-      });
     prisma.organizationMembership.findUnique.mockResolvedValue(null);
     prisma.organizationMembership.create.mockResolvedValue({
       status: 'PENDING',
