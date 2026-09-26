@@ -115,6 +115,13 @@ export function MyBookings() {
 
   return (
     <div className="grid gap-8">
+      <div>
+        <p className="eyebrow text-clay">Reservation history</p>
+        <h3 className="mt-2 mb-4 font-heading text-3xl leading-none">
+          My bookings
+        </h3>
+      </div>
+
       <BookingMetrics
         balanceRefreshKey={balanceRefreshKey}
         bookings={bookings}

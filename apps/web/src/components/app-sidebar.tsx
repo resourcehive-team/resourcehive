@@ -22,6 +22,7 @@ import {
   CalendarDaysIcon,
   ChartBarIcon,
   CircleHelpIcon,
+  FlagIcon,
   LayoutDashboardIcon,
   UsersIcon,
 } from "lucide-react";
@@ -54,19 +55,24 @@ const data = {
       icon: <UsersIcon />,
     },
     {
-      title: "My bookings",
+      title: "Bookings",
       url: "/dashboard/bookings",
       icon: <CalendarDaysIcon />,
+    },
+    {
+      title: "Disputes",
+      url: "/dashboard/disputes",
+      icon: <FlagIcon />,
+    },
+    {
+      title: "Analytics",
+      url: "/dashboard/analytics",
+      icon: <ChartBarIcon />,
     },
     {
       title: "Notifications",
       url: "/dashboard/notifications",
       icon: <BellIcon />,
-    },
-    {
-      title: "Points",
-      url: "#",
-      icon: <ChartBarIcon />,
     },
   ],
   navSecondary: [

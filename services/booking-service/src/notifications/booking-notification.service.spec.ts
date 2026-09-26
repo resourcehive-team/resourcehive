@@ -154,7 +154,12 @@ describe("BookingNotificationService", () => {
     );
   });
 
-  it("notifies other administrators when a slot is created", async () => {
+  it("notifies other resource members when a slot is created", async () => {
+    findAdministrators.mockResolvedValue([
+      { userId: "other-admin-id" },
+      { userId: "member-id" },
+    ]);
+
     await service.slotCreated({
       slotId: "slot-id",
       actorUserId: "admin-id",
@@ -162,15 +167,35 @@ describe("BookingNotificationService", () => {
       startsAt: new Date("2030-08-01T10:00:00.000Z"),
       endsAt: new Date("2030-08-01T11:00:00.000Z"),
       ownerOrganizationId: "organization-id",
+      allowedOrganizationIds: ["allowed-organization-id"],
     });
 
+    expect(findAdministrators).toHaveBeenCalledWith({
+      where: {
+        organizationId: {
+          in: ["organization-id", "allowed-organization-id"],
+        },
+        status: "APPROVED",
+        userId: { notIn: ["admin-id"] },
+      },
+      select: { userId: true },
+      distinct: ["userId"],
+    });
     expect(send).toHaveBeenCalledWith({
       recipientUserId: "other-admin-id",
-      title: "Slot created",
+      title: "New slot available",
       message:
         "A slot for Robotics Lab from 2030-08-01T10:00:00.000Z to 2030-08-01T11:00:00.000Z was created by Admin User.",
       correlationId: "slot-id",
-      channels: ["IN_APP"],
+      channels: ["IN_APP", "PUSH"],
+    });
+    expect(send).toHaveBeenCalledWith({
+      recipientUserId: "member-id",
+      title: "New slot available",
+      message:
+        "A slot for Robotics Lab from 2030-08-01T10:00:00.000Z to 2030-08-01T11:00:00.000Z was created by Admin User.",
+      correlationId: "slot-id",
+      channels: ["IN_APP", "PUSH"],
     });
   });
 

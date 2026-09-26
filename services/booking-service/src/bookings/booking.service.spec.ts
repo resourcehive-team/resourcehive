@@ -74,6 +74,8 @@ describe("BookingService", () => {
         rootOrganizationId: "root-id",
         ownerOrganizationId: "organization-id",
         pointCost: 25,
+        cancellationNoticeMinutes: 15,
+        allowedOrganizations: [],
       },
       bookings: [],
     });
@@ -95,6 +97,7 @@ describe("BookingService", () => {
       resourceId: "resource-id",
       resourceSlotId: "slot-id",
       pointCost: 25,
+      cancellationNoticeMinutes: 15,
       startsAt,
       endsAt,
     });
@@ -115,6 +118,7 @@ describe("BookingService", () => {
       userId: "user-id",
       status: BookingStatus.CONFIRMED,
       createdAt: new Date("2026-08-01T09:00:00.000Z"),
+      cancellationNoticeMinutes: 15,
       resourceSlot: {
         startsAt,
         endsAt,

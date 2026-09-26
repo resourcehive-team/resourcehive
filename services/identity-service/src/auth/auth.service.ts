@@ -736,13 +736,16 @@ export class AuthService {
     );
 
     await this.prisma.$transaction(async (transaction) => {
+      const [{ currentTime: databaseNow }] = await transaction.$queryRaw<
+        Array<{ currentTime: Date }>
+      >`SELECT CURRENT_TIMESTAMP AS "currentTime"`;
       const claimedToken = await transaction.passwordResetToken.updateMany({
         where: {
           id: passwordResetToken.id,
           usedAt: null,
-          expiresAt: { gt: now },
+          expiresAt: { gt: databaseNow },
         },
-        data: { usedAt: now },
+        data: { usedAt: databaseNow },
       });
 
       if (claimedToken.count !== 1) {
@@ -757,16 +760,16 @@ export class AuthService {
         where: {
           userId: passwordResetToken.user.id,
           usedAt: null,
-          expiresAt: { gt: now },
+          expiresAt: { gt: databaseNow },
         },
-        data: { usedAt: now },
+        data: { usedAt: databaseNow },
       });
       await transaction.refreshToken.updateMany({
         where: {
           userId: passwordResetToken.user.id,
           revokedAt: null,
         },
-        data: { revokedAt: now },
+        data: { revokedAt: databaseNow },
       });
     });
 

@@ -17,6 +17,7 @@ export class BookingRepository {
         resourceSlotId: input.resourceSlotId,
         userId: input.userId,
         status: BookingStatus.CONFIRMED,
+        cancellationNoticeMinutes: input.cancellationNoticeMinutes,
       },
       include: {
         resourceSlot: {

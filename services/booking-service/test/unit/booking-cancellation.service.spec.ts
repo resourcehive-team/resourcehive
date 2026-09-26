@@ -21,6 +21,7 @@ const booking = {
   cancelledByUserId: null,
   cancellationReason: null,
   completedAt: null,
+  cancellationNoticeMinutes: 0,
   user: {
     firstName: "Alice",
     lastName: "Perera",
@@ -237,6 +238,20 @@ describe("BookingService cancellation", () => {
         ...booking.resourceSlot,
         startsAt: new Date("2020-08-20T09:00:00.000Z"),
       },
+    });
+
+    await expect(
+      service.cancelBooking(booking.id, booking.userId, {}),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(transaction.booking.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("does not let a user cancel inside the resource's notice period", async () => {
+    const soonSlotStart = new Date(Date.now() + 30 * 60_000);
+    transaction.booking.findUnique.mockReset().mockResolvedValue({
+      ...booking,
+      cancellationNoticeMinutes: 60,
+      resourceSlot: { ...booking.resourceSlot, startsAt: soonSlotStart },
     });
 
     await expect(
