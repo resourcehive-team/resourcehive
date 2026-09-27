@@ -16,11 +16,11 @@ place.
 The API gateway exposes interactive Swagger UI for each private NestJS service
 under a consistent public path. The service API paths themselves are unchanged:
 
-| Service | Interactive docs | JSON | YAML |
-| --- | --- | --- | --- |
-| Identity | `/docs/identity` | `/docs/identity/openapi.json` | `/docs/identity/openapi.yaml` |
-| Resource | `/docs/resource` | `/docs/resource/openapi.json` | `/docs/resource/openapi.yaml` |
-| Booking | `/docs/booking` | `/docs/booking/openapi.json` | `/docs/booking/openapi.yaml` |
+| Service      | Interactive docs     | JSON                              | YAML                              |
+| ------------ | -------------------- | --------------------------------- | --------------------------------- |
+| Identity     | `/docs/identity`     | `/docs/identity/openapi.json`     | `/docs/identity/openapi.yaml`     |
+| Resource     | `/docs/resource`     | `/docs/resource/openapi.json`     | `/docs/resource/openapi.yaml`     |
+| Booking      | `/docs/booking`      | `/docs/booking/openapi.json`      | `/docs/booking/openapi.yaml`      |
 | Notification | `/docs/notification` | `/docs/notification/openapi.json` | `/docs/notification/openapi.yaml` |
 
 Locally, replace the path with `http://localhost:8088`. In production, use the
@@ -70,6 +70,15 @@ db/                             Prisma schema, migrations, and tests
 - Access to a PostgreSQL 15 database
 
 Run commands from the repository root unless stated otherwise.
+
+### Performance and Lighthouse checks
+
+Use the isolated synthetic-data runbook in [perf/README.md](perf/README.md).
+The seed script requires a separately supplied `PERF_DATABASE_URL` and an
+explicit nonproduction confirmation; never run it against production or a
+database containing real user data. The runbook includes the k6 suite,
+Lighthouse comparison method, and instructions for observing Neon, Redis,
+Kafka, and container behavior.
 
 ### First-time setup
 

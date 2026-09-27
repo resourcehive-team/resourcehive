@@ -27,14 +27,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${geist.variable} ${instrumentSerif.variable}`}
-    >
+    <html lang="en" className={`${geist.variable} ${instrumentSerif.variable}`}>
       <body>
         <TooltipProvider>{children}</TooltipProvider>
         <Toaster />
-        <Analytics />
+        {process.env.VERCEL === "1" ? <Analytics /> : null}
       </body>
     </html>
   );

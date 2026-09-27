@@ -20,7 +20,11 @@ import { createKeyv } from '@keyv/redis';
         }
 
         return {
-          stores: [createKeyv(`redis://${host}:${port}`)],
+          stores: [
+            createKeyv(`redis://${host}:${port}`, {
+              namespace: 'resourcehive:identity',
+            }),
+          ],
           ttl: 600000,
         };
       },

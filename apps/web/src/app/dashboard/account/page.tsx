@@ -1,13 +1,10 @@
+import "react-image-crop/dist/ReactCrop.css";
+
 import { AccountDetails } from "@/components/account-details";
 import { CurrentMembershipList } from "@/components/current-membership-list";
 import { ScreenHeading } from "@/components/screen-heading";
 import { SiteHeader } from "@/components/site-header";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function AccountPage() {
   return (

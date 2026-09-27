@@ -158,7 +158,7 @@ export function ResourceRatingsList({
                   }
                   email={rating.user?.email}
                   avatarUrl={rating.user?.avatarUrl}
-                  className="size-10"
+                  size="lg"
                 />
                 <div>
                   <p className="font-medium">

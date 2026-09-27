@@ -1,7 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "react-image-crop/dist/ReactCrop.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -45,6 +44,7 @@
   --color-ink: var(--ink);
   --color-line: var(--line);
   --color-clay: var(--clay);
+  --color-clay-text: var(--clay-text);
   --color-ochre: var(--ochre);
   --color-sage: var(--sage);
   --color-terracotta: var(--terracotta);
@@ -65,6 +65,7 @@
   --ink: #1c1d1d;
   --line: #c9c3b8;
   --clay: #c96f48;
+  --clay-text: #a55334;
   --ochre: #e6a820;
   --sage: #d9ddd0;
   --terracotta: #c87554;
@@ -101,6 +102,7 @@
 }
 
 .dark {
+  --clay-text: #c96f48;
   --background: #1c1d1d;
   --foreground: #f3efe7;
   --card: #242525;

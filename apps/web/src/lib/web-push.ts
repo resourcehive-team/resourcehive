@@ -12,15 +12,6 @@ import {
 
 import { apiRequest } from "@/lib/api-client";
 
-export interface NotificationItem {
-  id: string;
-  type: string;
-  title: string;
-  message: string;
-  readAt: string | null;
-  createdAt: string;
-}
-
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -58,6 +49,7 @@ export async function enableWebPush(): Promise<void> {
     method: "POST",
     json: { token },
   });
+  window.dispatchEvent(new Event("resourcehive:webpush-enabled"));
 }
 
 export async function listenForWebPush(
@@ -65,17 +57,6 @@ export async function listenForWebPush(
 ): Promise<Unsubscribe | undefined> {
   const messaging = await browserMessaging();
   return messaging ? onMessage(messaging, handler) : undefined;
-}
-
-export function listNotifications(): Promise<NotificationItem[]> {
-  return apiRequest("/notifications");
-}
-
-export function sendDevelopmentPush(): Promise<{
-  notificationId?: string;
-  pushDeliveriesQueued: number;
-}> {
-  return apiRequest("/notifications/test-push", { method: "POST" });
 }
 
 async function browserMessaging() {
