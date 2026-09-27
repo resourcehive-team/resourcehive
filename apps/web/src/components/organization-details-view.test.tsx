@@ -12,11 +12,16 @@ import {
   getCurrentUser,
   type CurrentUserResponse,
 } from "@/lib/auth-api";
-import { getCurrentUserMemberships } from "@/lib/resource-service/membership-api";
+import {
+  getCurrentUserMemberships,
+  getOrganizationMembers,
+} from "@/lib/resource-service/membership-api";
 import { getOrganizationDetails } from "@/lib/resource-service/organization-api";
+import { getAccessibleResources } from "@/lib/resource-service/resource-api";
 import type {
   MembershipWithOrganization,
   OrganizationDetails,
+  PaginatedResources,
 } from "@/lib/resource-service/types";
 
 const navigation = vi.hoisted(() => ({
@@ -39,11 +44,16 @@ vi.mock("@/lib/auth-api", async (importOriginal) => {
 
 vi.mock("@/lib/resource-service/membership-api", () => ({
   getCurrentUserMemberships: vi.fn(),
+  getOrganizationMembers: vi.fn(),
   requestOrganizationMembership: vi.fn(),
 }));
 
 vi.mock("@/lib/resource-service/organization-api", () => ({
   getOrganizationDetails: vi.fn(),
+}));
+
+vi.mock("@/lib/resource-service/resource-api", () => ({
+  getAccessibleResources: vi.fn(),
 }));
 
 vi.mock("@/components/allocate-points-dialog", () => ({
@@ -55,6 +65,16 @@ vi.mock("@/components/allocate-points-dialog", () => ({
 const currentUserMock = vi.mocked(getCurrentUser);
 const currentMembershipsMock = vi.mocked(getCurrentUserMemberships);
 const organizationDetailsMock = vi.mocked(getOrganizationDetails);
+const organizationMembersMock = vi.mocked(getOrganizationMembers);
+const accessibleResourcesMock = vi.mocked(getAccessibleResources);
+
+const emptyResourcePage: PaginatedResources = {
+  data: [],
+  total: 0,
+  page: 1,
+  limit: 100,
+  totalPages: 0,
+};
 
 const organization: OrganizationDetails = {
   id: "organization-1",
@@ -125,6 +145,8 @@ describe("OrganizationDetailsView", () => {
     currentUserMock.mockReset().mockResolvedValue(account());
     currentMembershipsMock.mockReset().mockResolvedValue([]);
     organizationDetailsMock.mockReset().mockResolvedValue(organization);
+    organizationMembersMock.mockReset().mockResolvedValue([]);
+    accessibleResourcesMock.mockReset().mockResolvedValue(emptyResourcePage);
   });
 
   it("shows the request action for a regular user without a membership", async () => {
