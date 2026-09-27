@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Building2Icon, CalendarDaysIcon, PackageIcon } from "lucide-react";
+import Link from "next/link";
+import { Building2Icon, CalendarDaysIcon, PackageIcon, PencilIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -26,7 +27,7 @@ import {
   formatOrganizationLabel,
   formatOrganizationPoints,
 } from "@/lib/resource-service/organization-format";
-import { getResourceDetails, uploadResourceImage } from "@/lib/resource-service/resource-api";
+import { getResourceDetails } from "@/lib/resource-service/resource-api";
 import type {
   MembershipWithOrganization,
   ResourceDetails as ResourceDetailsData,
@@ -118,10 +119,10 @@ export function ResourceDetails({
               resourceId={resource.id}
               resourceName={resource.name}
             />
-            <ProtectedResourceImageUpload
-              disabled={!isActive}
+            <ProtectedEditResourceLink
               ownerOrganizationId={resource.ownerOrganizationId}
               resourceId={resource.id}
+              organizationId={organizationId}
             />
           </div>
         }
@@ -319,18 +320,15 @@ function ProtectedSlotCreationDialog({
   ) : null;
 }
 
-function ProtectedResourceImageUpload({
-  disabled,
+function ProtectedEditResourceLink({
   ownerOrganizationId,
   resourceId,
+  organizationId,
 }: {
-  disabled: boolean;
   ownerOrganizationId: string;
   resourceId: string;
+  organizationId: string;
 }) {
-  const router = useRouter();
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
-  const [isUploading, setIsUploading] = React.useState(false);
   const [isAuthorized, setIsAuthorized] = React.useState(false);
 
   React.useEffect(() => {
@@ -353,42 +351,11 @@ function ProtectedResourceImageUpload({
     return () => controller.abort();
   }, [ownerOrganizationId]);
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      setIsUploading(true);
-      await uploadResourceImage(ownerOrganizationId, resourceId, file);
-      toast.success("Resource image updated successfully.");
-      router.refresh();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to upload resource image.");
-    } finally {
-      setIsUploading(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
-    }
-  };
-
   return isAuthorized ? (
-    <>
-      <Button
-        variant="outline"
-        disabled={disabled || isUploading}
-        onClick={() => fileInputRef.current?.click()}
-      >
-        {isUploading ? "Uploading..." : "Upload Image"}
-      </Button>
-      <input
-        type="file"
-        ref={fileInputRef}
-        className="hidden"
-        accept="image/*"
-        onChange={handleFileChange}
-      />
-    </>
+    <Button variant="outline" nativeButton={false} render={<Link href={`/dashboard/resources/${resourceId}/edit?organization=${organizationId}`} />}>
+      <PencilIcon data-icon="inline-start" />
+      Edit Resource
+    </Button>
   ) : null;
 }
 
