@@ -47,6 +47,9 @@ export class SlotsService {
         startsAt: slot.startsAt,
         endsAt: slot.endsAt,
         ownerOrganizationId: slot.resource.ownerOrganizationId,
+        allowedOrganizationIds: slot.resource.allowedOrganizations.map(
+          (allowed) => allowed.organizationId,
+        ),
       });
       return this.toView(slot);
     } catch (error) {

@@ -29,6 +29,9 @@ model User {
   createdResources        Resource[]                   @relation("ResourceCreatedBy")
   bookings                Booking[]                    @relation("BookingUser")
   bookingsCancelled       Booking[]                    @relation("BookingCancelledBy")
+  disputesSubmitted       BookingDispute[]             @relation("DisputeSubmittedBy")
+  disputesReviewed        BookingDispute[]             @relation("DisputeReviewedBy")
+  disputeEvents           BookingDisputeEvent[]        @relation("DisputeEventActor")
   pointTransactions       PointTransaction[]           @relation("PointTransactionUser")
   pointBalance            UserPointBalance?
   emailVerificationTokens EmailVerificationToken[]
@@ -83,6 +86,8 @@ model Organization {
   ownedResources          Resource[]                    @relation("ResourceOwner")
   allowedResources        ResourceAllowedOrganization[] @relation("AllowedOrganization")
   sourcePointTransactions PointTransaction[]            @relation("PointTransactionSourceOrganization")
+  disputes                BookingDispute[]              @relation("DisputeRootOrganization")
+  disputesToResolve       BookingDispute[]              @relation("DisputeResolverOrganization")
 
   @@unique([id, rootOrganizationId], map: "organizations_id_root_unique")
   @@index([parentId], map: "organizations_parent_id_idx")
@@ -125,11 +130,11 @@ model OrganizationMembership {
   status         String   @default("PENDING")
   joinedAt       DateTime @default(now()) @map("joined_at") @db.Timestamptz
   reviewedBy     String?  @map("reviewed_by") @db.Uuid
+
+  user         User         @relation("MembershipUser", fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   reviewedAt     DateTime? @map("reviewed_at") @db.Timestamptz
   reviewNote     String?  @map("review_note")
-
-  user         User                            @relation("MembershipUser", fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  organization Organization                    @relation(fields: [organizationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   reviewer     User?                           @relation("MembershipReviewer", fields: [reviewedBy], references: [id], onDelete: NoAction, onUpdate: NoAction)
   auditEvents  OrganizationMembershipAudit[]
 
@@ -156,19 +161,22 @@ model OrganizationMembershipAudit {
 }
 
 model Resource {
-  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name                String
-  description         String?
-  ownerOrganizationId String   @map("owner_organization_id") @db.Uuid
-  rootOrganizationId  String   @map("root_organization_id") @db.Uuid
-  createdByUserId     String   @map("created_by_user_id") @db.Uuid
-  status              String   @default("ACTIVE")
-  pointCost           Int      @default(0) @map("point_cost")
+  id                        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                      String
+  description               String?
+  ownerOrganizationId       String   @map("owner_organization_id") @db.Uuid
+  rootOrganizationId        String   @map("root_organization_id") @db.Uuid
+  createdByUserId           String   @map("created_by_user_id") @db.Uuid
+  status                    String   @default("ACTIVE")
+  pointCost                 Int      @default(0) @map("point_cost")
+  cancellationNoticeMinutes Int      @default(0) @map("cancellation_notice_minutes")
+  unavailableDisputeId      String?  @unique @map("unavailable_dispute_id") @db.Uuid
+  createdAt                 DateTime @default(now()) @map("created_at") @db.Timestamptz
   imageUrl            String?  @map("image_url")
-  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   ownerOrganization    Organization                  @relation("ResourceOwner", fields: [ownerOrganizationId, rootOrganizationId], references: [id, rootOrganizationId], onDelete: NoAction, onUpdate: NoAction)
   createdByUser        User                          @relation("ResourceCreatedBy", fields: [createdByUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  unavailableDispute   BookingDispute?               @relation("ResourceUnavailableDispute", fields: [unavailableDisputeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   allowedOrganizations ResourceAllowedOrganization[]
   slots                ResourceSlot[]
   ratings              ResourceRating[]
@@ -212,26 +220,79 @@ model ResourceSlot {
 
 /// One non-cancelled booking per slot is enforced by bookings_active_slot_unique.
 model Booking {
-  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  resourceSlotId     String    @map("resource_slot_id") @db.Uuid
-  userId             String    @map("user_id") @db.Uuid
-  status             String    @default("CONFIRMED")
-  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  cancelledAt        DateTime? @map("cancelled_at") @db.Timestamptz
-  cancelledByUserId  String?   @map("cancelled_by_user_id") @db.Uuid
-  cancellationReason String?   @map("cancellation_reason")
-  completedAt        DateTime? @map("completed_at") @db.Timestamptz
+  id                        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  resourceSlotId            String    @map("resource_slot_id") @db.Uuid
+  userId                    String    @map("user_id") @db.Uuid
+  status                    String    @default("CONFIRMED")
+  createdAt                 DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  cancelledAt               DateTime? @map("cancelled_at") @db.Timestamptz
+  cancelledByUserId         String?   @map("cancelled_by_user_id") @db.Uuid
+  cancellationReason        String?   @map("cancellation_reason")
+  completedAt               DateTime? @map("completed_at") @db.Timestamptz
+  /// Snapshot of the resource's notice period at booking time (SRS 3.1.15 #13).
+  cancellationNoticeMinutes Int       @default(0) @map("cancellation_notice_minutes")
 
   resourceSlot      ResourceSlot       @relation(fields: [resourceSlotId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   user              User               @relation("BookingUser", fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   cancelledByUser   User?              @relation("BookingCancelledBy", fields: [cancelledByUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   pointTransactions PointTransaction[]
+  dispute           BookingDispute?
 
   @@unique([id, userId], map: "bookings_id_user_unique")
   @@index([userId, status], map: "bookings_user_status_idx")
   @@index([userId], map: "bookings_user_id_idx")
   @@index([cancelledByUserId], map: "bookings_cancelled_by_user_id_idx")
   @@map("bookings")
+}
+
+/// At most one dispute per booking is enforced by the unique bookingId below.
+model BookingDispute {
+  id                       String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bookingId                String    @unique @map("booking_id") @db.Uuid
+  rootOrganizationId       String    @map("root_organization_id") @db.Uuid
+  /// The organization whose admin is responsible for resolving this dispute:
+  /// the submitter's own organization, or its parent when the submitter is
+  /// themselves an organization admin.
+  resolverOrganizationId   String    @map("resolver_organization_id") @db.Uuid
+  submittedByUserId        String    @map("submitted_by_user_id") @db.Uuid
+  reason                   String
+  description              String
+  evidence                 Json?
+  status                   String    @default("OPEN")
+  resolutionNotes          String?   @map("resolution_notes")
+  reviewedByUserId         String?   @map("reviewed_by_user_id") @db.Uuid
+  createdAt                DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt                DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  resolvedAt               DateTime? @map("resolved_at") @db.Timestamptz
+
+  booking             Booking               @relation(fields: [bookingId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  rootOrganization    Organization          @relation("DisputeRootOrganization", fields: [rootOrganizationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  resolverOrganization Organization         @relation("DisputeResolverOrganization", fields: [resolverOrganizationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  submittedByUser     User                  @relation("DisputeSubmittedBy", fields: [submittedByUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  reviewedByUser      User?                 @relation("DisputeReviewedBy", fields: [reviewedByUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  events              BookingDisputeEvent[]
+  unavailableResource Resource?             @relation("ResourceUnavailableDispute")
+
+  @@index([rootOrganizationId, status], map: "booking_disputes_root_status_idx")
+  @@index([resolverOrganizationId, status], map: "booking_disputes_resolver_org_status_idx")
+  @@map("booking_disputes")
+}
+
+/// Append-only audit trail of status transitions for a dispute.
+model BookingDisputeEvent {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  disputeId   String   @map("dispute_id") @db.Uuid
+  actorUserId String   @map("actor_user_id") @db.Uuid
+  fromStatus  String?  @map("from_status")
+  toStatus    String   @map("to_status")
+  notes       String?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  dispute BookingDispute @relation(fields: [disputeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  actor   User           @relation("DisputeEventActor", fields: [actorUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([disputeId, createdAt], map: "booking_dispute_events_dispute_created_at_idx")
+  @@map("booking_dispute_events")
 }
 
 /// Partial uniqueness and append-only behavior are defined in the baseline migration.

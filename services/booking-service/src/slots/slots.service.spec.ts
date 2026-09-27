@@ -89,6 +89,8 @@ describe("SlotsService", () => {
         rootOrganizationId: "root-id",
         ownerOrganizationId: "organization-id",
         pointCost: 10,
+        cancellationNoticeMinutes: 0,
+        allowedOrganizations: [{ organizationId: "allowed-organization-id" }],
       },
       bookings: [],
     });
@@ -102,6 +104,7 @@ describe("SlotsService", () => {
       startsAt,
       endsAt,
       ownerOrganizationId: "organization-id",
+      allowedOrganizationIds: ["allowed-organization-id"],
     });
   });
 
@@ -135,6 +138,8 @@ describe("SlotsService", () => {
           rootOrganizationId: "root-id",
           ownerOrganizationId: "organization-id",
           pointCost: 10,
+          cancellationNoticeMinutes: 0,
+          allowedOrganizations: [],
         },
         bookings: [],
       },

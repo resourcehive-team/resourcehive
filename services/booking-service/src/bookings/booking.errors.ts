@@ -80,7 +80,7 @@ export class BookingCannotBeCancelledError extends ConflictException {
 
 export class BookingCancellationStartedError extends ConflictException {
   constructor() {
-    super("A booking cannot be cancelled after its slot starts");
+    super("A booking cannot be cancelled after its cancellation deadline");
   }
 }
 

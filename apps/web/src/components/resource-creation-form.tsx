@@ -74,6 +74,10 @@ export function ResourceCreationForm() {
   const [name, setName] = React.useState("");
   const [description, setDescription] = React.useState("");
   const [pointCost, setPointCost] = React.useState("0");
+  const [cancellationMinutes, setCancellationMinutes] = React.useState("0");
+  const [cancellationHours, setCancellationHours] = React.useState("0");
+  const [cancellationDays, setCancellationDays] = React.useState("0");
+  const [cancellationWeeks, setCancellationWeeks] = React.useState("0");
   const [imageFile, setImageFile] = React.useState<File | null>(null);
   const [imagePreview, setImagePreview] = React.useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
@@ -144,6 +148,12 @@ export function ResourceCreationForm() {
 
     const normalizedName = name.trim();
     const numericPointCost = Number(pointCost);
+    const numericCancellationNoticeMinutes = totalCancellationNoticeMinutes({
+      minutes: cancellationMinutes,
+      hours: cancellationHours,
+      days: cancellationDays,
+      weeks: cancellationWeeks,
+    });
 
     if (!normalizedName) {
       setFormError("Resource name is required.");
@@ -155,6 +165,13 @@ export function ResourceCreationForm() {
       return;
     }
 
+    if (numericCancellationNoticeMinutes === null) {
+      setFormError(
+        "Cancellation notice must be non-negative whole numbers.",
+      );
+      return;
+    }
+
     setIsSubmitting(true);
     setFormError("");
 
@@ -163,6 +180,7 @@ export function ResourceCreationForm() {
         name: normalizedName,
         description,
         pointCost: numericPointCost,
+        cancellationNoticeMinutes: numericCancellationNoticeMinutes,
         allowedOrganizationIds,
       });
       
@@ -188,6 +206,10 @@ export function ResourceCreationForm() {
     setName("");
     setDescription("");
     setPointCost("0");
+    setCancellationMinutes("0");
+    setCancellationHours("0");
+    setCancellationDays("0");
+    setCancellationWeeks("0");
     setImageFile(null);
     setImagePreview(null);
     setAllowedOrganizationIds(
@@ -393,6 +415,81 @@ export function ResourceCreationForm() {
               </FieldDescription>
             </Field>
 
+            <FieldSet>
+              <FieldLegend>Cancellation notice</FieldLegend>
+              <FieldDescription>
+                How long before a slot starts a member must cancel to
+                receive a refund. Use 0 in every box to allow cancellation up
+                until the slot starts.
+              </FieldDescription>
+              <div className="grid grid-cols-4 gap-2">
+                <Field>
+                  <FieldLabel htmlFor="resource-cancellation-minutes">
+                    Minutes
+                  </FieldLabel>
+                  <Input
+                    id="resource-cancellation-minutes"
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    step={1}
+                    value={cancellationMinutes}
+                    onChange={(event) =>
+                      setCancellationMinutes(event.target.value)
+                    }
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="resource-cancellation-hours">
+                    Hours
+                  </FieldLabel>
+                  <Input
+                    id="resource-cancellation-hours"
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    step={1}
+                    value={cancellationHours}
+                    onChange={(event) =>
+                      setCancellationHours(event.target.value)
+                    }
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="resource-cancellation-days">
+                    Days
+                  </FieldLabel>
+                  <Input
+                    id="resource-cancellation-days"
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    step={1}
+                    value={cancellationDays}
+                    onChange={(event) =>
+                      setCancellationDays(event.target.value)
+                    }
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="resource-cancellation-weeks">
+                    Weeks
+                  </FieldLabel>
+                  <Input
+                    id="resource-cancellation-weeks"
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    step={1}
+                    value={cancellationWeeks}
+                    onChange={(event) =>
+                      setCancellationWeeks(event.target.value)
+                    }
+                  />
+                </Field>
+              </div>
+            </FieldSet>
+
             <Field>
               <FieldLabel htmlFor="resource-owner">
                 Owner organization
@@ -579,6 +676,36 @@ function uniqueOrganizations(organizations: Organization[]): Organization[] {
       organizations.map((organization) => [organization.id, organization]),
     ).values(),
   ];
+}
+
+function totalCancellationNoticeMinutes({
+  minutes,
+  hours,
+  days,
+  weeks,
+}: {
+  minutes: string;
+  hours: string;
+  days: string;
+  weeks: string;
+}): number | null {
+  const parts = [
+    { value: minutes, multiplier: 1 },
+    { value: hours, multiplier: 60 },
+    { value: days, multiplier: 60 * 24 },
+    { value: weeks, multiplier: 60 * 24 * 7 },
+  ];
+
+  let total = 0;
+  for (const part of parts) {
+    const numericValue = Number(part.value);
+    if (!Number.isInteger(numericValue) || numericValue < 0) {
+      return null;
+    }
+    total += numericValue * part.multiplier;
+  }
+
+  return total;
 }
 
 function compareOrganizations(

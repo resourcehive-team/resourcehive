@@ -31,6 +31,7 @@ export class ResourcesService {
         name: dto.name,
         description: dto.description,
         pointCost: dto.pointCost ?? 0,
+        cancellationNoticeMinutes: dto.cancellationNoticeMinutes ?? 0,
         ownerOrganizationId: organizationId,
         rootOrganizationId: rootOrgId,
         createdByUserId: userId,

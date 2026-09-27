@@ -2,8 +2,10 @@ import { Module } from "@nestjs/common";
 import { CacheModule } from "@nestjs/cache-manager";
 import { PrismaModule } from "@resourcehive/database";
 import { ServiceAuthModule } from "@resourcehive/service-auth";
+import { AnalyticsModule } from "./analytics/analytics.module";
 import { BookingAuthorizationModule } from "./authorization/booking-authorization.module";
 import { BookingsModule } from "./bookings/bookings.module";
+import { DisputesModule } from "./disputes/disputes.module";
 import { HealthModule } from "./health/health.module";
 import { PointsModule } from "./points/points.module";
 import { SlotsModule } from "./slots/slots.module";
@@ -37,6 +39,8 @@ import { createKeyv } from "@keyv/redis";
     HealthModule,
     SlotsModule,
     PointsModule,
+    DisputesModule,
+    AnalyticsModule,
   ],
 })
 export class AppModule {}

@@ -70,6 +70,7 @@ const resource: ResourceDetailsData = {
   createdByUserId: "admin-1",
   status: "ACTIVE",
   pointCost: 10,
+  cancellationNoticeMinutes: 0,
   createdAt: "2026-08-10T00:00:00.000Z",
   imageUrl: null,
     allowedOrganizations: [

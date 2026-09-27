@@ -61,10 +61,15 @@ describe('AuthService password reset', () => {
       .fn<Promise<{ count: number }>, [RevokeRefreshTokensRequest]>()
       .mockResolvedValue({ count: 0 }),
   };
+  const transactionQueryRaw = jest.fn<
+    Promise<Array<{ currentTime: Date }>>,
+    [TemplateStringsArray]
+  >();
   const transaction = {
     passwordResetToken: transactionPasswordResetToken,
     refreshToken: transactionRefreshToken,
     user: transactionUser,
+    $queryRaw: transactionQueryRaw,
   };
   const runTransaction = jest.fn(
     async (callback: (client: typeof transaction) => Promise<unknown>) =>
@@ -106,6 +111,7 @@ describe('AuthService password reset', () => {
     transactionPasswordResetToken.create.mockResolvedValue({ id: 'token-id' });
     transactionUser.update.mockResolvedValue({ id: 'user-id' });
     transactionRefreshToken.updateMany.mockResolvedValue({ count: 0 });
+    transactionQueryRaw.mockResolvedValue([{ currentTime: new Date() }]);
     sendPasswordResetEmail.mockResolvedValue(undefined);
     sendPasswordChangedEmail.mockResolvedValue(undefined);
   });
