@@ -377,13 +377,27 @@ docker compose up -d --build --no-deps identity-service
 Replace `identity-service` with `resource-service`, `booking-service`, or
 `notification-service` as needed. The `--no-deps` form assumes Kafka and the
 service dependencies are already running. For a cold stack, omit `--no-deps`
-or use one of the full startup commands above. The API gateway uses the pulled
-Caddy image rather than a local Dockerfile; restart it after changing its
-configuration:
+or use one of the full startup commands above.
+
+The API gateway uses the pulled Caddy image rather than a local Dockerfile.
+Local Compose starts Caddy with configuration watching enabled, so valid edits
+to `services/api-gateway/Caddyfile` are reloaded without recreating the
+container. If the gateway container was created before this watcher was added,
+recreate it once so the new command is applied:
 
 ```bash
-docker compose restart api-gateway
+docker compose up -d --no-deps --force-recreate api-gateway
 ```
+
+For a manual restart without changing the container command, use
+`docker compose restart api-gateway`.
+
+`docker compose up --build` does not necessarily recreate the gateway when only
+the bind-mounted Caddyfile changes. On production deployments, the deployment
+workflow explicitly recreates only `api-gateway` after updating the Caddyfile,
+then waits for its health check. This makes routes such as `/disputes/*` and
+`/analytics/*` take effect without unnecessarily replacing the application
+services.
 
 `docker compose up --build` evaluates every application service with a
 `build` section. BuildKit normally reuses cached layers for unchanged services,
