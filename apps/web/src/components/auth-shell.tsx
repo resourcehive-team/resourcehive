@@ -1,4 +1,7 @@
+import Link from "next/link";
+
 import { Brand } from "@/components/brand";
+import { marketingPath } from "@/lib/config";
 
 export function AuthShell({ children }: { children: React.ReactNode }) {
   return (
@@ -9,6 +12,43 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
         <p className="mt-12 border-t border-line pt-4 text-xs leading-relaxed text-muted-foreground">
           Resource sharing for trusted university communities.
         </p>
+        <nav
+          className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs text-muted-foreground"
+          aria-label="Help and legal information"
+        >
+          <Link
+            className="underline underline-offset-4 hover:text-foreground"
+            href={marketingPath("/help")}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Help
+          </Link>
+          <Link
+            className="underline underline-offset-4 hover:text-foreground"
+            href={marketingPath("/privacy")}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Privacy
+          </Link>
+          <Link
+            className="underline underline-offset-4 hover:text-foreground"
+            href={marketingPath("/terms")}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Terms
+          </Link>
+          <Link
+            className="underline underline-offset-4 hover:text-foreground"
+            href={marketingPath("/cookies")}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Cookies
+          </Link>
+        </nav>
       </section>
 
       <aside className="relative hidden h-svh overflow-hidden border-l border-line bg-ink p-10 text-paper lg:sticky lg:top-0 lg:flex lg:self-start lg:flex-col lg:justify-between xl:p-16">

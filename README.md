@@ -112,6 +112,7 @@ Set these values in `apps/web/.env.local`:
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:8088
 JWT_SECRET=replace-with-the-same-secret-used-in-the-root-env
+NEXT_PUBLIC_MARKETING_URL=http://localhost:5173
 ```
 
 The two `JWT_SECRET` values must match.
@@ -628,6 +629,7 @@ Add these production environment variables:
 
 ```env
 NEXT_PUBLIC_API_URL=https://api.resourcehive.thisismalindu.com
+NEXT_PUBLIC_MARKETING_URL=https://resourcehive.thisismalindu.com
 JWT_SECRET=the_same_secret_used_in_env_production
 NEXT_PUBLIC_FIREBASE_API_KEY=your-production-web-api-key
 NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your-production-project.firebaseapp.com
@@ -640,6 +642,11 @@ NEXT_PUBLIC_FIREBASE_VAPID_KEY=your-production-public-vapid-key
 `NEXT_PUBLIC_API_URL` is public. `JWT_SECRET` is server-only and must not have a
 `NEXT_PUBLIC_` prefix. Firebase's `NEXT_PUBLIC_*` Web App values and VAPID key
 are public client configuration; the service-account JSON remains private.
+`NEXT_PUBLIC_MARKETING_URL` points to the public site that hosts ResourceHive's
+Privacy, Terms, and Cookie notices. In Google Cloud OAuth branding, use
+`https://resourcehive.thisismalindu.com` as the homepage,
+`https://resourcehive.thisismalindu.com/privacy` as the Privacy Policy URL, and
+`https://resourcehive.thisismalindu.com/terms` as the Terms of Service URL.
 
 ### 6. Configure GitHub Actions
 
