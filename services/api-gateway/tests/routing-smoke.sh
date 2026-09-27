@@ -32,7 +32,7 @@ docker run -d \
   --name "$gateway_container" \
   --network "$network" \
   --publish 18088:8000 \
-  --env API_DOMAIN=http://localhost \
+  --env API_DOMAIN=http://localhost:8000 \
   --env ACME_EMAIL=admin@example.com \
   --volume "$PWD/services/api-gateway/Caddyfile:/etc/caddy/Caddyfile:ro" \
   caddy:2-alpine \
