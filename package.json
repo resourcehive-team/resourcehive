@@ -12,7 +12,8 @@
     "db:migrate:status": "pnpm -F @resourcehive/database run migrate:status",
     "db:seed:demo": "pnpm -F identity-service run seed:demo",
     "db:studio": "pnpm -F @resourcehive/database run studio",
-    "db:test": "bash db/schema/tests/run.sh",
+    "db:test": "node db/schema/tests/run.mjs",
+    "db:test:reset": "node db/schema/tests/run.mjs --reset",
     "db:validate": "pnpm -F @resourcehive/database run validate",
     "dev:identity": "pnpm -F identity-service run start:dev",
     "dev:setup": "pnpm run db:init && pnpm run db:seed:demo",
@@ -23,6 +24,7 @@
   },
   "devDependencies": {
     "@prisma/client": "^5.22.0",
+    "pg": "^8.23.0",
     "prisma": "^5.22.0"
   }
 }

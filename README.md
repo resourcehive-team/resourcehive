@@ -450,10 +450,19 @@ pnpm --filter resource-service run test:e2e
 Run database integrity and concurrent-booking tests only against a clean,
 disposable PostgreSQL 15 database:
 
-```bash
-TEST_DATABASE_URL="postgresql://user:password@host:5432/database" \
-bash db/schema/tests/run.sh
+```powershell
+$env:TEST_DATABASE_URL = "postgresql://user:password@host:5432/database"
+pnpm run db:test
+Remove-Item Env:TEST_DATABASE_URL
 ```
+
+The Node.js runner uses the `pg` driver, so Bash and the PostgreSQL command-line
+client are not required. The database must be empty and disposable. The runner
+checks for existing tables and stops before applying SQL if it finds any.
+To rerun against a disposable database previously populated by this test runner,
+use `pnpm run db:test:reset`. The reset checks for the runner's known user and
+booking fixtures before replacing the `public` schema and running all migrations
+and tests again.
 
 ## Production deployment
 

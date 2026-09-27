@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { PrismaService } from '@resourcehive/database';
 import { NotificationClientService } from '@resourcehive/notification-client';
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
@@ -53,7 +53,9 @@ describe('Authentication Flow (e2e)', () => {
   let authenticationCookie: string;
   let refreshCookie: string;
   let verificationToken: string;
-  const passwordResetToken = 'e2e-password-reset-token-value';
+  let expectedOrganizationId: string;
+  let expectedOrganizationRole: string;
+  const passwordResetToken = randomBytes(32).toString('base64url');
   const resetPassword = 'ResetPassword123!';
   const testEmail = process.env.DEMO_USER_EMAIL ?? 'demo@example.edu';
   const testPassword = process.env.DEMO_USER_PASSWORD ?? 'DemoPassword123!';
@@ -85,6 +87,21 @@ describe('Authentication Flow (e2e)', () => {
     setupIdentitySwagger(app);
     await app.init();
     prisma = app.get(PrismaService);
+
+    const seededUser = await prisma.user.findUniqueOrThrow({
+      where: { email: testEmail },
+      select: { id: true },
+    });
+    const membership = await prisma.organizationMembership.findFirst({
+      where: { userId: seededUser.id, status: 'APPROVED' },
+      orderBy: { joinedAt: 'asc' },
+      select: { organizationId: true, role: true },
+    });
+    if (!membership) {
+      throw new Error('The E2E login fixture requires an approved membership');
+    }
+    expectedOrganizationId = membership.organizationId;
+    expectedOrganizationRole = membership.role.toLowerCase();
   });
 
   it('reports that the service is running', async () => {
@@ -165,8 +182,8 @@ describe('Authentication Flow (e2e)', () => {
 
     // NGINX uses this endpoint to capture headers
     expect(response.headers['x-user-id']).toBeDefined();
-    expect(response.headers['x-tenant-id']).toBeDefined();
-    expect(response.headers['x-user-role']).toBe('member');
+    expect(response.headers['x-tenant-id']).toBe(expectedOrganizationId);
+    expect(response.headers['x-user-role']).toBe(expectedOrganizationRole);
     expect(response.headers['x-user-email']).toBe(testEmail);
   });
 
@@ -189,7 +206,8 @@ describe('Authentication Flow (e2e)', () => {
         platformRole: 'USER',
       },
       organizationContext: {
-        role: 'member',
+        organizationId: expectedOrganizationId,
+        role: expectedOrganizationRole,
       },
     });
     expect(typeof body.user.id).toBe('string');
