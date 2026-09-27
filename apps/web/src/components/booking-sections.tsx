@@ -9,7 +9,6 @@ import { RequestErrorCard } from "@/components/request-error-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ApiAuthenticationError } from "@/lib/api-client";
 import { AuthenticationRequiredError, getCurrentUser } from "@/lib/auth-api";
-import { getOrganizationDetails } from "@/lib/resource-service/organization-api";
 
 type State =
   | { status: "loading" }
@@ -29,18 +28,9 @@ export function BookingSections() {
       const isOrgAdmin =
         account.organizationContext.role?.toUpperCase() === "ADMIN";
 
-      let isTenantAdmin = false;
-      if (isOrgAdmin && account.organizationContext.organizationId) {
-        const organization = await getOrganizationDetails(
-          account.organizationContext.organizationId,
-          controller.signal,
-        );
-        isTenantAdmin = organization?.parentId === null;
-      }
-
       setState({
         status: "loaded",
-        canReviewBookings: isOrgAdmin && !isTenantAdmin,
+        canReviewBookings: isOrgAdmin,
       });
     })().catch((requestError: unknown) => {
       if (controller.signal.aborted) {
