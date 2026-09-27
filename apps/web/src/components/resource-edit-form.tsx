@@ -593,7 +593,6 @@ function NoResourceEditAccess() {
       <CardFooter>
         <Button
           variant="outline"
-          nativeButton={false}
           onClick={() => window.history.back()}
         >
           <ArrowLeftIcon data-icon="inline-start" />
