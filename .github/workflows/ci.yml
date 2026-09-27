@@ -301,6 +301,9 @@ jobs:
           --volume "$PWD/services/api-gateway/Caddyfile:/etc/caddy/Caddyfile:ro"
           caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile
 
+      - name: Smoke-test API gateway service routing
+        run: bash services/api-gateway/tests/routing-smoke.sh
+
       - name: Smoke-test local Kafka broker and topics
         env:
           DATABASE_URL: ${{ env.CI_DATABASE_URL }}
