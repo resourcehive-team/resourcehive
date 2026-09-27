@@ -77,7 +77,7 @@ export function ResourceEditForm({
   const [cancellationHours, setCancellationHours] = React.useState("0");
   const [cancellationDays, setCancellationDays] = React.useState("0");
   const [cancellationWeeks, setCancellationWeeks] = React.useState("0");
-  const [status, setStatus] = React.useState("ACTIVE");
+
   
   const [imageFile, setImageFile] = React.useState<File | null>(null);
   const [imagePreview, setImagePreview] = React.useState<string | null>(null);
@@ -115,7 +115,7 @@ export function ResourceEditForm({
       setName(resource.name);
       setDescription(resource.description || "");
       setPointCost(String(resource.pointCost));
-      setStatus(resource.status);
+
       setAllowedOrganizationIds(resource.allowedOrganizations.map(org => org.organizationId));
       if (resource.imageUrl) {
         setImagePreview(resource.imageUrl);
@@ -211,7 +211,7 @@ export function ResourceEditForm({
         pointCost: numericPointCost,
         cancellationNoticeMinutes: numericCancellationNoticeMinutes,
         allowedOrganizationIds,
-        status,
+
       });
       
       if (imageFile) {
@@ -314,19 +314,6 @@ export function ResourceEditForm({
                 onChange={(event) => setDescription(event.target.value)}
                 placeholder="What is this resource used for?"
               />
-            </Field>
-            
-            <Field>
-              <FieldLabel htmlFor="resource-status">Status</FieldLabel>
-              <Select value={status} onValueChange={(val) => val && setStatus(val)}>
-                <SelectTrigger id="resource-status" className="w-full">
-                  <SelectValue placeholder="Select a status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ACTIVE">Active</SelectItem>
-                  <SelectItem value="ARCHIVED">Archived</SelectItem>
-                </SelectContent>
-              </Select>
             </Field>
 
             <Field>

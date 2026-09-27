@@ -161,7 +161,7 @@ describe("ResourceEditForm", () => {
         allowedOrganizationIds: [
           computingOrganization.id,
         ],
-        status: "ACTIVE",
+
       },
     );
   });
