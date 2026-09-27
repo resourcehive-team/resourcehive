@@ -9,6 +9,7 @@ services:
       - /scripts/suite.js
     environment:
       PERF_BASE_URL: http://api-gateway:8000
+      PERF_HOST_HEADER: ${PERF_HOST_HEADER:-localhost:8000}
       PERF_USER_COUNT: ${PERF_USER_COUNT:-100}
       PERF_USER_PASSWORD: ${PERF_USER_PASSWORD:-PerfOnly-1024!}
       PERF_VUS: ${PERF_VUS:-10}

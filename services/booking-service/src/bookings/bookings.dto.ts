@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { Type } from "class-transformer";
 import {
   IsBoolean,
   IsEnum,
@@ -33,12 +34,14 @@ export class CancelBookingDto {
 class BookingQueryDto {
   @ApiPropertyOptional({ minimum: 0, default: 0 })
   @IsOptional()
+  @Type(() => Number)
   @IsInt()
   @Min(0)
   skip?: number;
 
   @ApiPropertyOptional({ minimum: 1, default: 50 })
   @IsOptional()
+  @Type(() => Number)
   @IsInt()
   @Min(1)
   take?: number;

@@ -281,7 +281,7 @@ async function seedPerformanceFixtures() {
         usersPerTenant,
         organizationIds,
         userEmailPattern: 'perf-user-{NNN}@resourcehive.test',
-        password: testPassword,
+        password: '[redacted]',
         firstResourceSlotId: uuid(40_000),
         slotIdForUserIndex: `UUID suffix 000000000000 + 40000 + zero-based user index`,
         note: 'Synthetic-only dataset; two root organizations are used for tenant isolation checks.',

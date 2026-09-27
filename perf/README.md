@@ -49,7 +49,20 @@ This tooling is for an isolated, synthetic environment only. Do not point it at 
 
 ## Run the k6 suite
 
+### Existing confirmed non-production stack
+
+Run `node perf/prepare-local.cjs --check` for read-only prerequisite checks. Run `node perf/prepare-local.cjs --confirm-nonproduction` to add synthetic fixtures to the database used by the running containers. This does not reset the database or run migrations. It verifies matching service database configurations and disabled Resend/FCM delivery, runs the seed inside Identity's container, and redacts credentials. Only use this on a confirmed non-production test environment.
+
+For a smoke test without recreating dependencies:
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.perf.yml --profile perf run --rm --no-deps -e PERF_VUS=1 -e PERF_RAMP=10s -e PERF_DURATION=30s k6
+```
+
+The suite preserves cookies between iterations and aborts immediately on failed login. Reliability thresholds are unchanged. Booking pagination requires the updated Booking image with numeric query conversion.
+
 The repository pins the official Grafana k6 container to `2.3.0` for repeatability. The Compose runner reaches the local gateway over the private Docker network; the native CLI script defaults to `http://localhost:8088`.
+The Compose runner sets `PERF_HOST_HEADER=localhost:8000` so Caddy matches the local API site while k6 connects to `api-gateway:8000`. If `API_DOMAIN` uses another hostname, set `PERF_HOST_HEADER` to that site's host and port before running k6. Native k6 runs leave this header unset unless explicitly configured.
 
 ```powershell
 $env:PERF_USER_COUNT = "100"
