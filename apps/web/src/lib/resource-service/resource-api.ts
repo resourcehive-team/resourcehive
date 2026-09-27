@@ -101,7 +101,7 @@ export function updateResource(
   const owner = apiPathSegment(ownerOrganizationId, "Organization ID");
   const resource = apiPathSegment(resourceId, "Resource ID");
   
-  const payload: Record<string, any> = {};
+  const payload: Record<string, unknown> = {};
   
   if (input.name !== undefined) {
     const name = input.name.trim();
