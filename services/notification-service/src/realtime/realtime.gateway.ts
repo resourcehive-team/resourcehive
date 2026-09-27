@@ -24,6 +24,10 @@ function resourceRoom(resourceId: string): string {
   return `resource:${resourceId}`;
 }
 
+function organizationRoom(organizationId: string): string {
+  return `organization:${organizationId}`;
+}
+
 @WebSocketGateway({
   path: "/realtime/socket.io",
   cors: {
@@ -67,6 +71,18 @@ export class RealtimeGateway implements OnGatewayConnection {
     void client.leave(resourceRoom(resourceId));
   }
 
+  @SubscribeMessage("organization.watch")
+  handleWatchOrganization(client: Socket, organizationId: unknown): void {
+    if (typeof organizationId !== "string" || !organizationId) return;
+    void client.join(organizationRoom(organizationId));
+  }
+
+  @SubscribeMessage("organization.unwatch")
+  handleUnwatchOrganization(client: Socket, organizationId: unknown): void {
+    if (typeof organizationId !== "string" || !organizationId) return;
+    void client.leave(organizationRoom(organizationId));
+  }
+
   emitBookingEvent(event: BookingEventV1): void {
     const message = {
       eventType: event.eventType,
@@ -74,6 +90,9 @@ export class RealtimeGateway implements OnGatewayConnection {
       payload: event.payload,
     };
     this.server.to(resourceRoom(event.payload.resourceId)).emit("booking.event", message);
+    this.server
+      .to(organizationRoom(event.payload.organizationId))
+      .emit("booking.event", message);
     if (event.payload.userId) {
       this.server.to(userRoom(event.payload.userId)).emit("booking.event", message);
     }

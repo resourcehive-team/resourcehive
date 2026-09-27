@@ -75,7 +75,25 @@ describe("RealtimeGateway", () => {
     expect(socket.join).not.toHaveBeenCalled();
   });
 
-  it("fans a booking event out to the resource and recipient rooms", () => {
+  it("joins and leaves an organization room on request", () => {
+    const socket = fakeSocket();
+
+    gateway.handleWatchOrganization(socket as never, "org-1");
+    expect(socket.join).toHaveBeenCalledWith("organization:org-1");
+
+    gateway.handleUnwatchOrganization(socket as never, "org-1");
+    expect(socket.leave).toHaveBeenCalledWith("organization:org-1");
+  });
+
+  it("ignores non-string organization ids", () => {
+    const socket = fakeSocket();
+
+    gateway.handleWatchOrganization(socket as never, 42);
+
+    expect(socket.join).not.toHaveBeenCalled();
+  });
+
+  it("fans a booking event out to the resource, organization, and recipient rooms", () => {
     gateway.emitBookingEvent({
       kind: "booking.event",
       eventId: "event-1",
@@ -95,11 +113,12 @@ describe("RealtimeGateway", () => {
     });
 
     expect(to).toHaveBeenCalledWith("resource:resource-1");
+    expect(to).toHaveBeenCalledWith("organization:org-1");
     expect(to).toHaveBeenCalledWith("user:user-1");
-    expect(emit).toHaveBeenCalledTimes(2);
+    expect(emit).toHaveBeenCalledTimes(3);
   });
 
-  it("only fans out to the resource room when no recipient user is present", () => {
+  it("only fans out to resource and organization rooms when no recipient user is present", () => {
     gateway.emitBookingEvent({
       kind: "booking.event",
       eventId: "event-2",
@@ -118,7 +137,8 @@ describe("RealtimeGateway", () => {
     });
 
     expect(to).toHaveBeenCalledWith("resource:resource-1");
+    expect(to).toHaveBeenCalledWith("organization:org-1");
     expect(to).not.toHaveBeenCalledWith(expect.stringMatching(/^user:/));
-    expect(emit).toHaveBeenCalledTimes(1);
+    expect(emit).toHaveBeenCalledTimes(2);
   });
 });
