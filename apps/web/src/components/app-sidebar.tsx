@@ -25,7 +25,11 @@ import {
   FlagIcon,
   LayoutDashboardIcon,
   UsersIcon,
+  ShieldCheckIcon,
+  FileTextIcon,
+  CookieIcon,
 } from "lucide-react";
+import { marketingPath } from "@/lib/config";
 
 const data = {
   user: {
@@ -78,8 +82,27 @@ const data = {
   navSecondary: [
     {
       title: "Get Help",
-      url: "#",
+      url: marketingPath("/help"),
       icon: <CircleHelpIcon />,
+      external: true,
+    },
+    {
+      title: "Privacy",
+      url: marketingPath("/privacy"),
+      icon: <ShieldCheckIcon />,
+      external: true,
+    },
+    {
+      title: "Terms",
+      url: marketingPath("/terms"),
+      icon: <FileTextIcon />,
+      external: true,
+    },
+    {
+      title: "Cookie notice",
+      url: marketingPath("/cookies"),
+      icon: <CookieIcon />,
+      external: true,
     },
   ],
 };

@@ -14,12 +14,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  enableWebPush,
-  listNotifications,
-  sendDevelopmentPush,
-  type NotificationItem,
-} from "@/lib/web-push";
+import { listNotifications, sendDevelopmentPush, type NotificationItem } from "@/lib/notification-api";
 
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
@@ -58,6 +53,7 @@ export default function NotificationsPage() {
   async function enableNotifications() {
     setWorking(true);
     try {
+      const { enableWebPush } = await import("@/lib/web-push");
       await enableWebPush();
       setPermission(Notification.permission);
       setPushRegistered(true);

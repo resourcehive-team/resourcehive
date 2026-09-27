@@ -45,3 +45,5 @@ internal-documentation/
 
 # temporary codex output files
 tmp/
+perf/results/*
+!perf/results/.gitkeep

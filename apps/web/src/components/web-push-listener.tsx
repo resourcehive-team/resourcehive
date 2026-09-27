@@ -2,35 +2,69 @@
 
 import { useEffect } from "react";
 
-import { listenForWebPush } from "@/lib/web-push";
-
 export function WebPushListener() {
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
+    let starting = false;
+    let stopped = false;
 
-    void listenForWebPush((payload) => {
-      window.dispatchEvent(new Event("resourcehive:notification-received"));
-      if (Notification.permission !== "granted" || !payload.notification) {
+    const start = () => {
+      if (
+        starting ||
+        unsubscribe ||
+        stopped ||
+        !("Notification" in window) ||
+        Notification.permission !== "granted"
+      ) {
         return;
       }
+      starting = true;
 
-      void navigator.serviceWorker.ready.then((registration) =>
-        registration.showNotification(
-          payload.notification?.title ?? "ResourceHive notification",
-          {
-            body: payload.notification?.body,
-            icon: "/resourcehive-mark.svg",
-            data: { url: "/dashboard/notifications" },
-          },
-        ),
-      );
-    })
-      .then((stop) => {
-        unsubscribe = stop;
-      })
-      .catch(() => undefined);
+      void import("@/lib/web-push")
+        .then(({ listenForWebPush }) =>
+          listenForWebPush((payload) => {
+            window.dispatchEvent(
+              new Event("resourcehive:notification-received"),
+            );
+            if (
+              Notification.permission !== "granted" ||
+              !payload.notification
+            ) {
+              return;
+            }
 
-    return () => unsubscribe?.();
+            void navigator.serviceWorker.ready.then((registration) =>
+              registration.showNotification(
+                payload.notification?.title ?? "ResourceHive notification",
+                {
+                  body: payload.notification?.body,
+                  icon: "/resourcehive-mark.svg",
+                  data: { url: "/dashboard/notifications" },
+                },
+              ),
+            );
+          }),
+        )
+        .then((stop) => {
+          if (stopped) stop?.();
+          else unsubscribe = stop;
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          starting = false;
+        });
+    };
+
+    const handleEnabled = () => start();
+    window.addEventListener("resourcehive:webpush-enabled", handleEnabled);
+    if ("Notification" in window && Notification.permission === "granted")
+      start();
+
+    return () => {
+      stopped = true;
+      window.removeEventListener("resourcehive:webpush-enabled", handleEnabled);
+      unsubscribe?.();
+    };
   }, []);
 
   return null;

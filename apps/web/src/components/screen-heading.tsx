@@ -12,7 +12,9 @@ export function ScreenHeading({
   return (
     <section className="screen-heading">
       <div className="screen-heading-copy">
-        {eyebrow ? <p className="eyebrow mb-3 text-clay">{eyebrow}</p> : null}
+        {eyebrow ? (
+          <p className="eyebrow mb-3 text-clay-text">{eyebrow}</p>
+        ) : null}
         <h2 className="screen-title">{title}</h2>
         {description ? (
           <p className="screen-description">{description}</p>

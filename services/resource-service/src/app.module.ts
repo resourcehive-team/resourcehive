@@ -28,7 +28,11 @@ import { CloudinaryModule } from './cloudinary/cloudinary.module';
         }
 
         return {
-          stores: [new KeyvRedis(`redis://${host}:${port}`)],
+          stores: [
+            new KeyvRedis(`redis://${host}:${port}`, {
+              namespace: 'resourcehive:resource',
+            }),
+          ],
           ttl: 600 * 1000, // 10 minutes default TTL
         };
       },

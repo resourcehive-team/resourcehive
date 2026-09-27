@@ -27,7 +27,11 @@ import { createKeyv } from "@keyv/redis";
         }
 
         return {
-          stores: [createKeyv(`redis://${host}:${port}`)],
+          stores: [
+            createKeyv(`redis://${host}:${port}`, {
+              namespace: "resourcehive:booking",
+            }),
+          ],
           ttl: 600000, // 10 minutes default ttl
         };
       },
