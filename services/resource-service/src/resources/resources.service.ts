@@ -141,7 +141,7 @@ export class ResourcesService {
 
     let allowedOrganizationsUpdate = {};
     let shouldReevaluate = false;
-    
+
     if (allowedOrganizationIds) {
       const allowedOrganizationIdsWithOwner = [
         ...new Set([organizationId, ...allowedOrganizationIds]),
@@ -169,7 +169,9 @@ export class ResourcesService {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ resourceId }),
-      }).catch(err => console.error('Failed to trigger booking reevaluation:', err));
+      }).catch((err) =>
+        console.error('Failed to trigger booking reevaluation:', err),
+      );
     }
 
     return updatedResource;
@@ -191,7 +193,9 @@ export class ResourcesService {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ resourceId }),
-    }).catch(err => console.error('Failed to trigger booking reevaluation:', err));
+    }).catch((err) =>
+      console.error('Failed to trigger booking reevaluation:', err),
+    );
 
     return updatedResource;
   }

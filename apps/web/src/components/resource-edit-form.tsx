@@ -240,7 +240,7 @@ export function ResourceEditForm({
 
     try {
       await removeResource(organizationId, resourceId);
-      router.push(`/dashboard/organizations/${organizationId}`);
+      router.push(`/dashboard/resources`);
       router.refresh();
     } catch (requestError) {
       if (requestError instanceof ApiAuthenticationError) {
@@ -477,7 +477,7 @@ export function ResourceEditForm({
               <FieldLegend>Allowed organizations</FieldLegend>
               <FieldDescription>
                 The owner is always included. Select any additional
-                organizations that may access this resource. If you remove an organization, their members' future bookings will be automatically canceled and refunded.
+                organizations that may access this resource. If you remove an organization, their members&apos; future bookings will be automatically canceled and refunded.
               </FieldDescription>
               <FieldGroup data-slot="checkbox-group">
                 {allowedOrganizations.map((org) => {

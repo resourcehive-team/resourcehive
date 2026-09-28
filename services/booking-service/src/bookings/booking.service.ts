@@ -465,7 +465,7 @@ export class BookingService {
 
       for (const booking of futureBookings) {
         const resource = booking.resourceSlot.resource;
-        
+
         let hasAccess = true;
         if (resource.status !== "ACTIVE") {
           hasAccess = false;
@@ -474,21 +474,23 @@ export class BookingService {
             resource.ownerOrganizationId,
             ...resource.allowedOrganizations.map((o) => o.organizationId),
           ]);
-          
+
           const hasValidMembership = booking.user.memberships.some(
-            (m) => m.status === "APPROVED" && allowedOrgIds.has(m.organizationId),
+            (m) =>
+              m.status === "APPROVED" && allowedOrgIds.has(m.organizationId),
           );
-          
+
           if (!hasValidMembership) {
             hasAccess = false;
           }
         }
 
         if (!hasAccess) {
-          const reason = resource.status !== "ACTIVE" 
-            ? "Resource has been removed" 
-            : "Organization access to this resource was revoked";
-            
+          const reason =
+            resource.status !== "ACTIVE"
+              ? "Resource has been removed"
+              : "Organization access to this resource was revoked";
+
           let refundedPoints = 0;
           await this.prisma.$transaction(async (transaction) => {
             const deduction = await transaction.pointTransaction.findFirst({
@@ -498,9 +500,9 @@ export class BookingService {
                 transactionType: "BOOKING",
               },
             });
-            
+
             refundedPoints = Math.abs(deduction?.amount ?? 0);
-            
+
             await transaction.booking.update({
               where: { id: booking.id },
               data: {
@@ -509,12 +511,12 @@ export class BookingService {
                 cancellationReason: reason,
               },
             });
-            
+
             await transaction.resourceSlot.update({
               where: { id: booking.resourceSlotId },
               data: { status: "WITHDRAWN", withdrawnAt: now },
             });
-            
+
             if (refundedPoints > 0) {
               await this.points.appendBookingRefund(
                 {
@@ -527,7 +529,7 @@ export class BookingService {
               );
             }
           });
-          
+
           try {
             await this.notifications.bookingCancelled({
               bookingId: booking.id,
@@ -536,13 +538,13 @@ export class BookingService {
               resourceName: resource.name,
               startsAt: booking.resourceSlot.startsAt,
               ownerOrganizationId: resource.ownerOrganizationId,
-              actorUserId: booking.userId, 
+              actorUserId: booking.userId,
               cancelledByUser: false,
               reason: reason,
               refundPoints: refundedPoints,
               slotStatus: "WITHDRAWN",
             });
-          } catch (e) {
+          } catch {
             // Ignore notification failure during batch process
           }
         }

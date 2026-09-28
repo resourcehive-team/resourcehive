@@ -58,8 +58,13 @@ export class BookingsController {
   ) {}
 
   @Post("internal/reevaluate")
-  @ApiOperation({ summary: "Re-evaluate bookings for a resource when access is revoked or resource is removed" })
-  async reevaluateBookings(@Body() body: { resourceId: string }): Promise<void> {
+  @ApiOperation({
+    summary:
+      "Re-evaluate bookings for a resource when access is revoked or resource is removed",
+  })
+  async reevaluateBookings(
+    @Body() body: { resourceId: string },
+  ): Promise<void> {
     await this.bookings.reevaluateBookings(body.resourceId);
   }
 
