@@ -663,7 +663,7 @@ function OrganizationNotFound() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <Button variant="outline" render={<Link href="/dashboard/organizations" />}>
+        <Button variant="outline" nativeButton={false} render={<Link href="/dashboard/organizations" />}>
           <ArrowLeftIcon data-icon="inline-start" />
           Back to organizations
         </Button>

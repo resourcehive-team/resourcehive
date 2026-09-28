@@ -83,6 +83,73 @@ export function createResource(
   });
 }
 
+export interface UpdateResourceInput {
+  name?: string;
+  description?: string;
+  pointCost?: number;
+  cancellationNoticeMinutes?: number;
+  allowedOrganizationIds?: string[];
+  status?: string;
+}
+
+export function updateResource(
+  organizationId: string,
+  resourceId: string,
+  input: UpdateResourceInput,
+): Promise<Resource> {
+  const ownerOrganizationId = organizationId.trim();
+  const owner = apiPathSegment(ownerOrganizationId, "Organization ID");
+  const resource = apiPathSegment(resourceId, "Resource ID");
+  
+  const payload: Record<string, unknown> = {};
+  
+  if (input.name !== undefined) {
+    const name = input.name.trim();
+    if (!name) throw new Error("Resource name cannot be empty.");
+    payload.name = name;
+  }
+  
+  if (input.description !== undefined) {
+    payload.description = input.description.trim() || null;
+  }
+  
+  if (input.pointCost !== undefined) {
+    if (!Number.isInteger(input.pointCost) || input.pointCost < 0) {
+      throw new Error("Point cost must be a non-negative integer.");
+    }
+    payload.pointCost = input.pointCost;
+  }
+  
+  if (input.cancellationNoticeMinutes !== undefined) {
+    if (!Number.isInteger(input.cancellationNoticeMinutes) || input.cancellationNoticeMinutes < 0) {
+      throw new Error("Cancellation notice must be a non-negative integer.");
+    }
+    payload.cancellationNoticeMinutes = input.cancellationNoticeMinutes;
+  }
+  
+  if (input.allowedOrganizationIds !== undefined) {
+    payload.allowedOrganizationIds = [
+      ...new Set([
+        ownerOrganizationId,
+        ...input.allowedOrganizationIds.map((id) => {
+          const normalizedId = id.trim();
+          if (!normalizedId) throw new Error("Allowed organization ID is required.");
+          return normalizedId;
+        }),
+      ]),
+    ];
+  }
+  
+  if (input.status !== undefined) {
+    payload.status = input.status;
+  }
+
+  return apiRequest<Resource>(`/resources/organization/${owner}/${resource}`, {
+    method: "PATCH",
+    json: payload,
+  });
+}
+
 export function getAccessibleResources(
   organizationId: string,
   options: ResourceListOptions = {},
@@ -189,3 +256,17 @@ export function uploadResourceImage(
     },
   );
 }
+
+export function removeResource(
+  organizationId: string,
+  resourceId: string,
+): Promise<void> {
+  const organization = apiPathSegment(organizationId, "Organization ID");
+  const resource = apiPathSegment(resourceId, "Resource ID");
+
+  return apiRequest<void>(
+    `/resources/organization/${organization}/${resource}`,
+    { method: "DELETE" },
+  );
+}
+
