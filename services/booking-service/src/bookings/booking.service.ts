@@ -438,6 +438,120 @@ export class BookingService {
     }
   }
 
+  async reevaluateBookings(resourceId: string): Promise<void> {
+    try {
+      const now = new Date();
+      const futureBookings = await this.prisma.booking.findMany({
+        where: {
+          status: BookingStatus.CONFIRMED,
+          resourceSlot: {
+            resourceId,
+            startsAt: { gt: now },
+          },
+        },
+        include: {
+          resourceSlot: {
+            include: {
+              resource: {
+                include: { allowedOrganizations: true },
+              },
+            },
+          },
+          user: {
+            include: { memberships: true },
+          },
+        },
+      });
+
+      for (const booking of futureBookings) {
+        const resource = booking.resourceSlot.resource;
+        
+        let hasAccess = true;
+        if (resource.status !== "ACTIVE") {
+          hasAccess = false;
+        } else {
+          const allowedOrgIds = new Set([
+            resource.ownerOrganizationId,
+            ...resource.allowedOrganizations.map((o) => o.organizationId),
+          ]);
+          
+          const hasValidMembership = booking.user.memberships.some(
+            (m) => m.status === "APPROVED" && allowedOrgIds.has(m.organizationId),
+          );
+          
+          if (!hasValidMembership) {
+            hasAccess = false;
+          }
+        }
+
+        if (!hasAccess) {
+          const reason = resource.status !== "ACTIVE" 
+            ? "Resource has been removed" 
+            : "Organization access to this resource was revoked";
+            
+          let refundedPoints = 0;
+          await this.prisma.$transaction(async (transaction) => {
+            const deduction = await transaction.pointTransaction.findFirst({
+              where: {
+                bookingId: booking.id,
+                userId: booking.userId,
+                transactionType: "BOOKING",
+              },
+            });
+            
+            refundedPoints = Math.abs(deduction?.amount ?? 0);
+            
+            await transaction.booking.update({
+              where: { id: booking.id },
+              data: {
+                status: BookingStatus.CANCELLED,
+                cancelledAt: now,
+                cancellationReason: reason,
+              },
+            });
+            
+            await transaction.resourceSlot.update({
+              where: { id: booking.resourceSlotId },
+              data: { status: "WITHDRAWN", withdrawnAt: now },
+            });
+            
+            if (refundedPoints > 0) {
+              await this.points.appendBookingRefund(
+                {
+                  userId: booking.userId,
+                  bookingId: booking.id,
+                  amount: refundedPoints,
+                  description: `Refund due to administrative revocation/removal for ${resource.name}`,
+                },
+                transaction,
+              );
+            }
+          });
+          
+          try {
+            await this.notifications.bookingCancelled({
+              bookingId: booking.id,
+              userId: booking.userId,
+              studentEmail: booking.user.email,
+              resourceName: resource.name,
+              startsAt: booking.resourceSlot.startsAt,
+              ownerOrganizationId: resource.ownerOrganizationId,
+              actorUserId: booking.userId, 
+              cancelledByUser: false,
+              reason: reason,
+              refundPoints: refundedPoints,
+              slotStatus: "WITHDRAWN",
+            });
+          } catch (e) {
+            // Ignore notification failure during batch process
+          }
+        }
+      }
+    } catch (error) {
+      this.handleError(error, "reevaluate");
+    }
+  }
+
   private async createWithinTransaction(
     resourceSlotId: string,
     user: AuthenticatedUser,

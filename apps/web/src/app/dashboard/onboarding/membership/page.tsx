@@ -13,7 +13,7 @@ export default function MembershipOnboardingPage() {
           eyebrow="Welcome to ResourceHive"
           title="Request organization access"
           description="Your Google account is ready. Choose the organization that should review your membership request. Approval is required before organization-scoped actions become available."
-          actions={<Button variant="outline" render={<Link href="/dashboard" />}>I’ll do this later</Button>}
+          actions={<Button variant="outline" nativeButton={false} render={<Link href="/dashboard" />}>I’ll do this later</Button>}
         />
         <RootOrganizationList />
         <p className="mt-6 text-sm text-muted-foreground">

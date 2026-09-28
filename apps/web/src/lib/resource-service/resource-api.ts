@@ -256,3 +256,17 @@ export function uploadResourceImage(
     },
   );
 }
+
+export function removeResource(
+  organizationId: string,
+  resourceId: string,
+): Promise<void> {
+  const organization = apiPathSegment(organizationId, "Organization ID");
+  const resource = apiPathSegment(resourceId, "Resource ID");
+
+  return apiRequest<void>(
+    `/resources/organization/${organization}/${resource}`,
+    { method: "DELETE" },
+  );
+}
+

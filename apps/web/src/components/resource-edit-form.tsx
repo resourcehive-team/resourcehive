@@ -40,6 +40,7 @@ import {
 } from "@/lib/resource-service/organization-api";
 import {
   getResourceDetails,
+  removeResource,
   updateResource,
   uploadResourceImage,
 } from "@/lib/resource-service/resource-api";
@@ -223,6 +224,31 @@ export function ResourceEditForm({
 
       setFormError(resourceEditErrorMessage(requestError));
     } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (isSubmitting) return;
+
+    if (!window.confirm("Are you sure you want to delete this resource? All future bookings for this resource will be canceled and members will be refunded their points. This action cannot be undone.")) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    setFormError("");
+
+    try {
+      await removeResource(organizationId, resourceId);
+      router.push(`/dashboard/organizations/${organizationId}`);
+      router.refresh();
+    } catch (requestError) {
+      if (requestError instanceof ApiAuthenticationError) {
+        router.replace("/login");
+        router.refresh();
+        return;
+      }
+      setFormError(resourceEditErrorMessage(requestError));
       setIsSubmitting(false);
     }
   }
@@ -451,7 +477,7 @@ export function ResourceEditForm({
               <FieldLegend>Allowed organizations</FieldLegend>
               <FieldDescription>
                 The owner is always included. Select any additional
-                organizations that may access this resource.
+                organizations that may access this resource. If you remove an organization, their members' future bookings will be automatically canceled and refunded.
               </FieldDescription>
               <FieldGroup data-slot="checkbox-group">
                 {allowedOrganizations.map((org) => {
@@ -480,17 +506,27 @@ export function ResourceEditForm({
 
             <Field data-invalid={formError ? "true" : undefined}>
               <FieldError>{formError}</FieldError>
-              <div className="flex flex-wrap gap-2">
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? "Updating..." : "Update resource"}
-                </Button>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap gap-2">
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting ? "Updating..." : "Update resource"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    nativeButton={false}
+                    render={<Link href={`/dashboard/resources/${resourceId}?organization=${organizationId}`} />}
+                  >
+                    <ArrowLeftIcon data-icon="inline-start" />
+                    Cancel
+                  </Button>
+                </div>
                 <Button
-                  variant="outline"
-                  nativeButton={false}
-                  render={<Link href={`/dashboard/resources/${resourceId}?organization=${organizationId}`} />}
+                  type="button"
+                  variant="destructive"
+                  disabled={isSubmitting}
+                  onClick={handleDelete}
                 >
-                  <ArrowLeftIcon data-icon="inline-start" />
-                  Cancel
+                  Delete resource
                 </Button>
               </div>
             </Field>

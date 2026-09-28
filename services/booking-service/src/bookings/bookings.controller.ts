@@ -50,7 +50,6 @@ import {
 @ApiTags("bookings")
 @ApiBearerAuth()
 @ApiCookieAuth("resourcehive_access_token")
-@UseGuards(JwtAuthGuard)
 @Controller("bookings")
 export class BookingsController {
   constructor(
@@ -58,7 +57,14 @@ export class BookingsController {
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
+  @Post("internal/reevaluate")
+  @ApiOperation({ summary: "Re-evaluate bookings for a resource when access is revoked or resource is removed" })
+  async reevaluateBookings(@Body() body: { resourceId: string }): Promise<void> {
+    await this.bookings.reevaluateBookings(body.resourceId);
+  }
+
   @Post()
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: "Create a booking for an available resource slot" })
   @ApiCreatedResponse({
     description: "Booking confirmed and points deducted atomically",
@@ -94,6 +100,7 @@ export class BookingsController {
   }
 
   @Get("me")
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: "List bookings for the current user" })
   @ApiOkResponse({
     description: "List of bookings for the current user",
@@ -112,6 +119,7 @@ export class BookingsController {
   }
 
   @Get("org")
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({
     summary: "List bookings for organizations administered by the current user",
   })
@@ -132,6 +140,7 @@ export class BookingsController {
   }
 
   @Patch(":bookingId/complete")
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: "Mark a booking as completed" })
   @ApiOkResponse({
     description: "Booking marked as completed",
@@ -161,6 +170,7 @@ export class BookingsController {
   }
 
   @Patch(":bookingId/cancel")
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({
     summary: "Cancel a booking and refund points when applicable",
   })

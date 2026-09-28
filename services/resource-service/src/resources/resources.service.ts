@@ -140,6 +140,8 @@ export class ResourcesService {
       dto as Partial<CreateResourceDto> & UpdateResourceDto;
 
     let allowedOrganizationsUpdate = {};
+    let shouldReevaluate = false;
+    
     if (allowedOrganizationIds) {
       const allowedOrganizationIdsWithOwner = [
         ...new Set([organizationId, ...allowedOrganizationIds]),
@@ -150,9 +152,10 @@ export class ResourcesService {
           organizationId: id,
         })),
       };
+      shouldReevaluate = true;
     }
 
-    return this.prisma.resource.update({
+    const updatedResource = await this.prisma.resource.update({
       where: { id: resourceId },
       data: {
         ...rest,
@@ -160,6 +163,16 @@ export class ResourcesService {
       },
       include: { allowedOrganizations: true },
     });
+
+    if (shouldReevaluate) {
+      fetch('http://booking-service:3002/bookings/internal/reevaluate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resourceId }),
+      }).catch(err => console.error('Failed to trigger booking reevaluation:', err));
+    }
+
+    return updatedResource;
   }
 
   async remove(organizationId: string, resourceId: string) {
@@ -169,10 +182,18 @@ export class ResourcesService {
     if (!resource || resource.ownerOrganizationId !== organizationId) {
       throw new NotFoundException('Resource not found');
     }
-    return this.prisma.resource.update({
+    const updatedResource = await this.prisma.resource.update({
       where: { id: resourceId },
       data: { status: 'INACTIVE' },
     });
+
+    fetch('http://booking-service:3002/bookings/internal/reevaluate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resourceId }),
+    }).catch(err => console.error('Failed to trigger booking reevaluation:', err));
+
+    return updatedResource;
   }
 
   async uploadImage(
