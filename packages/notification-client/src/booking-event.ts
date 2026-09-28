@@ -56,9 +56,12 @@ export function parseBookingEvent(input: unknown): BookingEventV1 {
   }
   if (
     !event.eventType ||
-    !["booking.confirmed", "booking.cancelled", "booking.completed", "slot.created"].includes(
-      event.eventType,
-    )
+    ![
+      "booking.confirmed",
+      "booking.cancelled",
+      "booking.completed",
+      "slot.created",
+    ].includes(event.eventType)
   ) {
     reject("Unsupported booking event type");
   }

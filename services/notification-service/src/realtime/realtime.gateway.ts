@@ -6,7 +6,10 @@ import {
   WebSocketServer,
 } from "@nestjs/websockets";
 import { BookingEventV1 } from "@resourcehive/notification-client";
-import { AccessTokenVerifier, extractAccessToken } from "@resourcehive/service-auth";
+import {
+  AccessTokenVerifier,
+  extractAccessToken,
+} from "@resourcehive/service-auth";
 import { Server, Socket } from "socket.io";
 
 function allowedOrigins(): string[] {
@@ -47,7 +50,8 @@ export class RealtimeGateway implements OnGatewayConnection {
     try {
       const token = extractAccessToken({ headers: client.handshake.headers });
       const user = await this.verifier.verify(token);
-      client.data.userId = user.userId;
+      const socketData = client.data as { userId?: string };
+      socketData.userId = user.userId;
       await client.join(userRoom(user.userId));
     } catch (error) {
       this.logger.warn(
@@ -89,12 +93,16 @@ export class RealtimeGateway implements OnGatewayConnection {
       occurredAt: event.occurredAt,
       payload: event.payload,
     };
-    this.server.to(resourceRoom(event.payload.resourceId)).emit("booking.event", message);
+    this.server
+      .to(resourceRoom(event.payload.resourceId))
+      .emit("booking.event", message);
     this.server
       .to(organizationRoom(event.payload.organizationId))
       .emit("booking.event", message);
     if (event.payload.userId) {
-      this.server.to(userRoom(event.payload.userId)).emit("booking.event", message);
+      this.server
+        .to(userRoom(event.payload.userId))
+        .emit("booking.event", message);
     }
   }
 }

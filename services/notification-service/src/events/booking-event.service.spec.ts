@@ -7,14 +7,14 @@ import { NotificationCommandService } from "./notification-command.service";
 import { RealtimeGateway } from "../realtime/realtime.gateway";
 
 function fakeRealtimeGateway() {
-  return { emitBookingEvent: jest.fn() } as unknown as RealtimeGateway;
+  return { emitBookingEvent: jest.fn() };
 }
 
 describe("BookingEventService", () => {
   it("maps confirmation to in-app and push channels", () => {
     const service = new BookingEventService(
       {} as NotificationCommandService,
-      fakeRealtimeGateway(),
+      fakeRealtimeGateway() as unknown as RealtimeGateway,
     );
     const command = service.toCommand({
       kind: "booking.event",
@@ -51,7 +51,7 @@ describe("BookingEventService", () => {
     const realtime = fakeRealtimeGateway();
     const service = new BookingEventService(
       { process } as unknown as NotificationCommandService,
-      realtime,
+      realtime as unknown as RealtimeGateway,
     );
     const result = await service.handle({
       kind: "booking.event",
@@ -79,7 +79,7 @@ describe("BookingEventService", () => {
     const realtime = fakeRealtimeGateway();
     const service = new BookingEventService(
       { process } as unknown as NotificationCommandService,
-      realtime,
+      realtime as unknown as RealtimeGateway,
     );
     const event = {
       kind: "booking.event",
