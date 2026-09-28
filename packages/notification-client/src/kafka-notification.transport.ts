@@ -1,6 +1,7 @@
 import {
   Inject,
   Injectable,
+  Logger,
   OnModuleDestroy,
   OnModuleInit,
 } from "@nestjs/common";
@@ -12,6 +13,7 @@ import type { NotificationKafkaOptions } from "./notification-client.options";
 export class KafkaNotificationTransport
   implements OnModuleInit, OnModuleDestroy
 {
+  private readonly logger = new Logger(KafkaNotificationTransport.name);
   private readonly producer?: Producer;
 
   constructor(
@@ -37,7 +39,14 @@ export class KafkaNotificationTransport
   }
 
   async onModuleInit(): Promise<void> {
-    await this.producer?.connect();
+    try {
+      await this.producer?.connect();
+    } catch (error) {
+      this.logger.error(
+        "Kafka producer failed to connect at startup; will retry lazily on first publish",
+        error instanceof Error ? error.stack : undefined,
+      );
+    }
   }
 
   async onModuleDestroy(): Promise<void> {
@@ -50,6 +59,7 @@ export class KafkaNotificationTransport
         "Notification publishing is disabled; set KAFKA_ENABLED=true",
       );
     }
+    await this.producer.connect();
     await this.producer.send({
       topic,
       messages: [{ key, value: JSON.stringify(value) }],
