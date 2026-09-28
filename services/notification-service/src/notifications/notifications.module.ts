@@ -8,9 +8,10 @@ import { NotificationEventController } from "../events/notification-event.contro
 import { NotificationTemplateService } from "../events/notification-template.service";
 import { BookingEventService } from "../events/booking-event.service";
 import { DevelopmentPushService } from "./development-push.service";
+import { RealtimeModule } from "../realtime/realtime.module";
 
 @Module({
-  imports: [ServiceAuthModule],
+  imports: [ServiceAuthModule, RealtimeModule],
   controllers: [NotificationsController, NotificationEventController],
   providers: [
     NotificationRepository,

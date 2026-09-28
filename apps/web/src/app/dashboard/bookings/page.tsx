@@ -16,7 +16,7 @@ export default function BookingsPage() {
           title="Bookings"
           description="Review upcoming and past reservations, keep booking references close, download receipts when needed, and review bookings for resources you administer."
           actions={
-            <Button render={<Link href="/dashboard/resources" />}>
+            <Button nativeButton={false} render={<Link href="/dashboard/resources" />}>
               <CalendarPlusIcon data-icon="inline-start" />
               Create booking
             </Button>

@@ -6,24 +6,30 @@ describe("BookingNotificationService", () => {
   const findUser = jest.fn();
   const findAdministrators = jest.fn();
   const send = jest.fn();
+  const publishBookingEvent = jest.fn();
   const prisma = {
     user: { findUnique: findUser },
     organizationMembership: { findMany: findAdministrators },
   } as unknown as PrismaService;
   const service = new BookingNotificationService(prisma, {
     send,
+    publishBookingEvent,
   } as unknown as NotificationClientService);
   const booking = {
     bookingId: "booking-id",
     userId: "student-id",
     studentEmail: "student@example.edu",
+    resourceId: "resource-id",
+    resourceSlotId: "slot-id",
     resourceName: "Robotics Lab",
     startsAt: new Date("2030-08-01T10:00:00.000Z"),
+    endsAt: new Date("2030-08-01T11:00:00.000Z"),
     ownerOrganizationId: "organization-id",
   };
 
   beforeEach(() => {
     jest.clearAllMocks();
+    publishBookingEvent.mockResolvedValue({});
     findUser.mockImplementation(({ where }: { where: { id: string } }) =>
       Promise.resolve(
         where.id === "student-id"
@@ -64,6 +70,16 @@ describe("BookingNotificationService", () => {
       correlationId: "booking-id",
       channels: ["IN_APP", "PUSH"],
     });
+    expect(publishBookingEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: "booking.confirmed",
+        bookingId: "booking-id",
+        userId: "student-id",
+        resourceId: "resource-id",
+        resourceName: "Robotics Lab",
+        organizationId: "organization-id",
+      }),
+    );
   });
 
   it("notifies the student and administrators when the student cancels", async () => {
@@ -163,6 +179,7 @@ describe("BookingNotificationService", () => {
     await service.slotCreated({
       slotId: "slot-id",
       actorUserId: "admin-id",
+      resourceId: "resource-id",
       resourceName: "Robotics Lab",
       startsAt: new Date("2030-08-01T10:00:00.000Z"),
       endsAt: new Date("2030-08-01T11:00:00.000Z"),
@@ -197,6 +214,15 @@ describe("BookingNotificationService", () => {
       correlationId: "slot-id",
       channels: ["IN_APP", "PUSH"],
     });
+    expect(publishBookingEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: "slot.created",
+        slotId: "slot-id",
+        resourceId: "resource-id",
+        resourceName: "Robotics Lab",
+        organizationId: "organization-id",
+      }),
+    );
   });
 
   it("does not fail a booking operation when notification publishing fails", async () => {
