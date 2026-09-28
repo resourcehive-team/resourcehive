@@ -304,25 +304,6 @@ jobs:
       - name: Smoke-test API gateway service routing
         run: bash services/api-gateway/tests/routing-smoke.sh
 
-      - name: Smoke-test local Kafka broker and topics
-        env:
-          DATABASE_URL: ${{ env.CI_DATABASE_URL }}
-          DATABASE_URL_UNPOOLED: ${{ env.CI_DATABASE_URL }}
-          JWT_SECRET: ${{ env.CI_JWT_SECRET }}
-        run: |
-          set -euo pipefail
-          trap 'docker compose down --volumes --remove-orphans' EXIT
-          docker compose up -d kafka
-          docker compose run --rm kafka-init
-          topics="$(docker compose exec -T kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list)"
-          for topic in \
-            resourcehive.notification.commands.v1 \
-            resourcehive.identity.notification-commands.v1 \
-            resourcehive.booking.events.v1 \
-            resourcehive.notification.dead-letter.v1; do
-            grep -qx "$topic" <<<"$topics"
-          done
-
   containers:
     name: Build ${{ matrix.label }} image
     runs-on: ubuntu-latest

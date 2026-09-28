@@ -39,7 +39,7 @@ services.
 | Frontend                                  | Next.js, React, Tailwind CSS | Vercel                                        |
 | API gateway                               | Caddy                        | Linode                                        |
 | Identity, Resource, Booking, Notification | NestJS microservices         | Docker on Linode                              |
-| Event transport                           | Apache Kafka                 | Docker locally, external broker in production |
+| Event transport                           | Apache Kafka                 | Aiven-managed broker                          |
 | Browser notifications                     | Firebase Cloud Messaging     | Firebase                                      |
 | Database                                  | PostgreSQL with Prisma       | Neon                                          |
 | Container registry                        | GHCR                         | GitHub                                        |
@@ -135,8 +135,9 @@ RESEND_ENABLED=false
 ```
 
 For real local delivery, set `RESEND_ENABLED=true`, provide
-`RESEND_API_KEY`, and use a verified sender in `RESEND_FROM_EMAIL`. Start the
-Kafka broker and all services before testing email flows. The Resend key is
+`RESEND_API_KEY`, and use a verified sender in `RESEND_FROM_EMAIL`. Confirm
+the Aiven Kafka credentials are configured and start all services before
+testing email flows. The Resend key is
 passed only to Notification Service.
 
 Inspect queued email status with:
@@ -241,8 +242,11 @@ the Firebase values empty.
 
 ### Run the application
 
-The normal local stack uses the base Compose file. It starts the API gateway,
-all four Nest services, the local Kafka broker, and the Kafka topic initializer:
+The normal local stack uses the base Compose file. It starts the API gateway
+and all four Nest services. Kafka is an external, Aiven-managed broker; set
+`KAFKA_BROKERS`, `KAFKA_SASL_USERNAME`, and `KAFKA_SASL_PASSWORD` in the root
+`.env` before starting the stack, and create the required topics on the Aiven
+service ahead of time (see below).
 
 ```bash
 docker compose up --build -d
@@ -279,24 +283,14 @@ installation separately from the source code, so later builds reuse that work
 unless a package file or lockfile changed. The final service images contain
 only the compiled application and its production dependencies.
 
-The base Compose stack provisions a single-node local Kafka KRaft broker and
-creates the four required topics before the application services start. Inside
-Docker, `localhost` means the current container, so Compose services use
-`kafka:19092`; services started directly with pnpm use the host listener at
-`localhost:9092`. TLS and SASL remain disabled only for this local broker.
-
-Inspect the broker and topics with:
-
-```bash
-docker compose ps
-docker compose logs -f kafka
-docker compose exec kafka /opt/kafka/bin/kafka-topics.sh \
-  --bootstrap-server localhost:9092 --list
-```
-
-Kafka data survives `docker compose down` because it is stored in the
-`kafka_data` volume. To intentionally reset local Kafka data and recreate all
-topics, use `docker compose down --volumes`.
+Kafka runs on Aiven for both local development and production; there is no
+local broker container. Every environment (`KAFKA_BROKERS`, `KAFKA_SSL=true`,
+`KAFKA_SASL_USERNAME`, `KAFKA_SASL_PASSWORD`) points at the same managed
+service unless you provision a separate Aiven service per environment. Create
+the four required topics listed in the
+[notification event contracts](services/notification-service/docs/event-contracts.md)
+on the Aiven service before starting the stack; the application does not
+create topics itself.
 
 Email commands still require Kafka even when `RESEND_ENABLED=false`; the
 console provider is selected only after Notification Service consumes the
@@ -351,7 +345,7 @@ docker compose logs -f
 Follow selected services:
 
 ```bash
-docker compose logs -f api-gateway notification-service kafka
+docker compose logs -f api-gateway notification-service
 ```
 
 When the stack is already running, rebuild and recreate only the service you
@@ -385,9 +379,10 @@ docker compose up -d --build --no-deps identity-service
 ```
 
 Replace `identity-service` with `resource-service`, `booking-service`, or
-`notification-service` as needed. The `--no-deps` form assumes Kafka and the
-service dependencies are already running. For a cold stack, omit `--no-deps`
-or use one of the full startup commands above.
+`notification-service` as needed. The `--no-deps` form assumes the Aiven
+Kafka credentials are configured and the other service dependencies are
+already running. For a cold stack, omit `--no-deps` or use one of the full
+startup commands above.
 
 The API gateway uses the pulled Caddy image rather than a local Dockerfile.
 Local Compose starts Caddy with configuration watching enabled, so valid edits

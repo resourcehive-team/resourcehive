@@ -33,16 +33,27 @@ import {
   formatOrganizationPoints,
 } from "@/lib/resource-service/organization-format";
 import { getOrganizationDetails } from "@/lib/resource-service/organization-api";
-import { getCurrentUserMemberships } from "@/lib/resource-service/membership-api";
+import {
+  getCurrentUserMemberships,
+  getOrganizationMembers,
+} from "@/lib/resource-service/membership-api";
+import { getAccessibleResources } from "@/lib/resource-service/resource-api";
 import type {
   Membership,
   Organization,
   OrganizationDetails,
 } from "@/lib/resource-service/types";
 
+const ORGANIZATION_RESOURCE_COUNT_LIMIT = 100;
+
 type DetailsState =
   | { status: "loading" }
-  | { status: "loaded"; organization: OrganizationDetails | null }
+  | {
+      status: "loaded";
+      organization: OrganizationDetails | null;
+      memberCount: number;
+      resourceCount: number;
+    }
   | { status: "error"; error: unknown };
 
 type ViewerState =
@@ -68,17 +79,50 @@ export function OrganizationDetailsView({
   React.useEffect(() => {
     const controller = new AbortController();
 
-    getOrganizationDetails(organizationId, controller.signal)
-      .then((organization) => {
-        setState({ status: "loaded", organization });
+    (async () => {
+      const organization = await getOrganizationDetails(
+        organizationId,
+        controller.signal,
+      ).catch((requestError: unknown) => {
+        if (requestError instanceof ApiError && requestError.status === 404) {
+          return null;
+        }
+
+        throw requestError;
+      });
+
+      if (organization === null) {
+        return { organization, memberCount: 0, resourceCount: 0 };
+      }
+
+      const [members, resources] = await Promise.all([
+        getOrganizationMembers(organizationId, controller.signal),
+        getAccessibleResources(organizationId, {
+          limit: ORGANIZATION_RESOURCE_COUNT_LIMIT,
+          signal: controller.signal,
+        }),
+      ]);
+
+      return {
+        organization,
+        memberCount: members.length,
+        resourceCount: resources.data.filter(
+          (resource) => resource.ownerOrganizationId === organizationId,
+        ).length,
+      };
+    })()
+      .then(({ organization, memberCount, resourceCount }) => {
+        if (!controller.signal.aborted) {
+          setState({
+            status: "loaded",
+            organization,
+            memberCount,
+            resourceCount,
+          });
+        }
       })
       .catch((requestError: unknown) => {
         if (controller.signal.aborted) {
-          return;
-        }
-
-        if (requestError instanceof ApiError && requestError.status === 404) {
-          setState({ status: "loaded", organization: null });
           return;
         }
 
@@ -165,7 +209,11 @@ export function OrganizationDetailsView({
   return (
     <div className="grid gap-8 lg:grid-cols-12">
       <div className="lg:col-span-8">
-        <OrganizationOverview organization={state.organization} />
+        <OrganizationOverview
+          memberCount={state.memberCount}
+          organization={state.organization}
+          resourceCount={state.resourceCount}
+        />
       </div>
       <div className="lg:col-span-4 lg:pt-20">
         <OrganizationActionPanel
@@ -304,9 +352,13 @@ function OrganizationMembershipSummary({
 }
 
 function OrganizationOverview({
+  memberCount,
   organization,
+  resourceCount,
 }: {
+  memberCount: number;
   organization: OrganizationDetails;
+  resourceCount: number;
 }) {
   return (
     <div className="flex flex-col gap-6">
@@ -370,6 +422,18 @@ function OrganizationOverview({
                 <time dateTime={organization.createdAt}>
                   {formatOrganizationDate(organization.createdAt)}
                 </time>
+              </dd>
+            </div>
+            <div className="space-y-1">
+              <dt className="text-muted-foreground">Members</dt>
+              <dd className="font-medium">
+                {memberCount} {memberCount === 1 ? "member" : "members"}
+              </dd>
+            </div>
+            <div className="space-y-1">
+              <dt className="text-muted-foreground">Resources</dt>
+              <dd className="font-medium">
+                {resourceCount} {resourceCount === 1 ? "resource" : "resources"}
               </dd>
             </div>
           </dl>

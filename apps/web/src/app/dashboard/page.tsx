@@ -1,3 +1,4 @@
+import { AdminOrganizationsCard } from "@/components/admin-organizations-card";
 import { RecentActivityCard } from "@/components/recent-activity-card";
 import { ScreenHeading } from "@/components/screen-heading";
 import { SectionCards } from "@/components/section-cards";
@@ -18,6 +19,9 @@ export default function Page() {
         <div className="shared-panel-grid *:data-[slot=card]:border-0 md:grid-cols-2">
           <UpcomingBookingsCard />
           <RecentActivityCard />
+        </div>
+        <div className="shared-panel-grid *:data-[slot=card]:border-0">
+          <AdminOrganizationsCard />
         </div>
       </main>
     </>
