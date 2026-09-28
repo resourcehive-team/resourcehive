@@ -15,7 +15,9 @@ export function useBookingRealtime(
   onEvent: (event: BookingRealtimeEvent) => void,
 ): void {
   const onEventRef = React.useRef(onEvent);
-  onEventRef.current = onEvent;
+  React.useEffect(() => {
+    onEventRef.current = onEvent;
+  });
 
   React.useEffect(() => {
     const socket = getRealtimeSocket();
@@ -48,7 +50,9 @@ export function useOrganizationBookingRealtime(
   onEvent: (event: BookingRealtimeEvent) => void,
 ): void {
   const onEventRef = React.useRef(onEvent);
-  onEventRef.current = onEvent;
+  React.useEffect(() => {
+    onEventRef.current = onEvent;
+  });
   const idsKey = Array.from(new Set(organizationIds)).sort().join(",");
 
   React.useEffect(() => {
