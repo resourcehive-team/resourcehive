@@ -32,6 +32,7 @@ import type {
   MembershipWithOrganization,
   ResourceDetails as ResourceDetailsData,
 } from "@/lib/resource-service/types";
+import { useBookingRealtime } from "@/hooks/use-booking-realtime";
 
 type ResourceState =
   | { status: "loading" }
@@ -403,6 +404,10 @@ function ResourceBookingHistory({ resourceId }: { resourceId: string }) {
 
     return () => controller.abort();
   }, [attempt, resourceId, router]);
+
+  useBookingRealtime(resourceId, () => {
+    setAttempt((currentAttempt) => currentAttempt + 1);
+  });
 
   const handleBookingUpdated = React.useCallback(
     (updatedBooking: OrganizationBooking) => {

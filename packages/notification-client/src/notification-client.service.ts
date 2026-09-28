@@ -60,10 +60,15 @@ export interface SendMembershipDecisionInput {
 export interface PublishBookingEventInput {
   eventId?: string;
   eventType: BookingEventType;
-  bookingId: string;
-  userId: string;
-  email?: string;
+  resourceId: string;
   resourceName: string;
+  organizationId: string;
+  startsAt: string | Date;
+  endsAt?: string | Date;
+  bookingId?: string;
+  slotId?: string;
+  userId?: string;
+  email?: string;
   refundPoints?: number;
   correlationId?: string;
 }
@@ -241,19 +246,27 @@ export class NotificationClientService {
     if (this.options.producer !== "booking-service") {
       throw new Error("Only Booking Service may publish booking events");
     }
+    const partitionKey = input.bookingId ?? input.slotId ?? randomUUID();
     const event = parseBookingEvent({
       kind: "booking.event",
       eventId: input.eventId ?? randomUUID(),
       eventType: input.eventType,
       eventVersion: 1,
       producer: "booking-service",
-      correlationId: input.correlationId ?? input.bookingId,
+      correlationId: input.correlationId ?? partitionKey,
       occurredAt: new Date().toISOString(),
       payload: {
-        bookingId: input.bookingId,
-        userId: input.userId,
-        ...(input.email ? { email: input.email } : {}),
+        resourceId: input.resourceId,
         resourceName: input.resourceName,
+        organizationId: input.organizationId,
+        startsAt: toIsoString(input.startsAt),
+        ...(input.bookingId ? { bookingId: input.bookingId } : {}),
+        ...(input.slotId ? { slotId: input.slotId } : {}),
+        ...(input.userId ? { userId: input.userId } : {}),
+        ...(input.email ? { email: input.email } : {}),
+        ...(input.endsAt === undefined
+          ? {}
+          : { endsAt: toIsoString(input.endsAt) }),
         ...(input.refundPoints === undefined
           ? {}
           : { refundPoints: input.refundPoints }),
@@ -261,9 +274,13 @@ export class NotificationClientService {
     });
     await this.transport.publish(
       NOTIFICATION_TOPICS.bookingEvents,
-      input.bookingId,
+      partitionKey,
       event,
     );
     return event;
   }
+}
+
+function toIsoString(value: string | Date): string {
+  return value instanceof Date ? value.toISOString() : value;
 }

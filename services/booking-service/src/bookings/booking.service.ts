@@ -105,8 +105,11 @@ export class BookingService {
             bookingId: booking.id,
             userId: booking.userId,
             studentEmail: user.email,
+            resourceId: booking.resourceId,
+            resourceSlotId: booking.resourceSlotId,
             resourceName: booking.resourceName,
             startsAt: booking.startsAt,
+            endsAt: booking.endsAt,
             ownerOrganizationId: booking.ownerOrganizationId,
           });
           return booking;
@@ -313,8 +316,11 @@ export class BookingService {
         bookingId: cancelledBooking.id,
         userId: cancelledBooking.userId,
         studentEmail: cancelledBooking.user.email,
+        resourceId: cancelledBooking.resourceSlot.resource.id,
+        resourceSlotId: cancelledBooking.resourceSlotId,
         resourceName: cancelledBooking.resourceSlot.resource.name,
         startsAt: cancelledBooking.resourceSlot.startsAt,
+        endsAt: cancelledBooking.resourceSlot.endsAt,
         ownerOrganizationId:
           cancelledBooking.resourceSlot.resource.ownerOrganizationId,
         actorUserId,
@@ -360,8 +366,11 @@ export class BookingService {
         bookingId: completedBooking.id,
         userId: completedBooking.userId,
         studentEmail: completedBooking.user.email,
+        resourceId: completedBooking.resourceSlot.resource.id,
+        resourceSlotId: completedBooking.resourceSlotId,
         resourceName: completedBooking.resourceSlot.resource.name,
         startsAt: completedBooking.resourceSlot.startsAt,
+        endsAt: completedBooking.resourceSlot.endsAt,
         ownerOrganizationId:
           completedBooking.resourceSlot.resource.ownerOrganizationId,
         actorUserId: administratorUserId,

@@ -146,8 +146,11 @@ describe("BookingService", () => {
       bookingId: "booking-id",
       userId: "user-id",
       studentEmail: "user@example.edu",
+      resourceId: "resource-id",
+      resourceSlotId: "slot-id",
       resourceName: "Room",
       startsAt,
+      endsAt,
       ownerOrganizationId: "organization-id",
     });
   });
