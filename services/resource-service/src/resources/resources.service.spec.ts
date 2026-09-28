@@ -33,9 +33,11 @@ describe('ResourcesService', () => {
     }).compile();
 
     service = module.get<ResourcesService>(ResourcesService);
-    
+
     // Mock global fetch to prevent unhandled rejections from fire-and-forget network calls
-    global.fetch = jest.fn(() => Promise.resolve(new Response(null, { status: 200 })));
+    global.fetch = jest.fn(() =>
+      Promise.resolve(new Response(null, { status: 200 })),
+    );
   });
 
   afterEach(() => {
