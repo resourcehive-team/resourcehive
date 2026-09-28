@@ -120,7 +120,6 @@ const organizationBooking: OrganizationBooking = {
       id: "resource-1",
       name: "Main Library Study Room",
       pointCost: 10,
-      ownerOrganizationId: "organization-1",
     },
   },
   user: {

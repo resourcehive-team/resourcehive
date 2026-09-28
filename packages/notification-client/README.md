@@ -14,12 +14,9 @@ await notifications.send({
 });
 ```
 
-Booking Service uses `publishBookingEvent(...)` after confirmed, cancelled,
-completed, and slot-created state changes. Notification Service maps the
-booking lifecycle events to in-app/browser-push messages for the booking
-user; `slot.created` carries no recipient and is only used for live
-calendar/availability sync by other consumers of the
-`resourcehive.booking.events.v1` topic.
+Booking Service uses `publishBookingEvent(...)` after confirmed, cancelled, and
+completed state changes. Notification Service maps those events to booking-
+specific in-app and browser-push messages for the booking user.
 
 Identity Service alone may call the identity email methods. Provider
 credentials, rendering, persistence, retries, Resend, and Firebase remain

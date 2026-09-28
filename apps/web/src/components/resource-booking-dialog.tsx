@@ -36,7 +36,6 @@ import {
 } from "@/lib/booking-service/booking-api";
 import type { CreatedBooking, ResourceSlot } from "@/lib/booking-service/types";
 import { cn } from "@/lib/utils";
-import { useBookingRealtime } from "@/hooks/use-booking-realtime";
 
 type SlotListState =
   | { status: "idle" }
@@ -102,11 +101,6 @@ export function ResourceBookingDialog({
 
     return () => controller.abort();
   }, [createdBooking, open, resourceId, slotRequestVersion]);
-
-  useBookingRealtime(
-    open && !createdBooking ? resourceId : undefined,
-    () => reloadSlots(),
-  );
 
   function changeOpen(nextOpen: boolean) {
     setOpen(nextOpen);

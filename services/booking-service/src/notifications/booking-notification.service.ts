@@ -6,11 +6,8 @@ interface BookingNotificationInput {
   bookingId: string;
   userId: string;
   studentEmail: string;
-  resourceId: string;
-  resourceSlotId: string;
   resourceName: string;
   startsAt: Date;
-  endsAt: Date;
   ownerOrganizationId: string;
 }
 
@@ -29,7 +26,6 @@ interface BookingCompletionNotificationInput extends BookingNotificationInput {
 interface SlotCreatedNotificationInput {
   slotId: string;
   actorUserId: string;
-  resourceId: string;
   resourceName: string;
   startsAt: Date;
   endsAt: Date;
@@ -72,7 +68,6 @@ export class BookingNotificationService {
             input.bookingId,
             ["IN_APP", "PUSH"],
           ),
-          this.publishLifecycleEvent("booking.confirmed", input),
         ]);
       },
     );
@@ -104,15 +99,10 @@ export class BookingNotificationService {
           input.bookingId,
           ["IN_APP", "PUSH"],
         );
-        const bookingEvent = this.publishLifecycleEvent(
-          "booking.cancelled",
-          input,
-        );
 
         if (input.cancelledByUser) {
           await Promise.all([
             studentNotification,
-            bookingEvent,
             this.sendToAdministrators(
               input.ownerOrganizationId,
               [],
@@ -131,7 +121,6 @@ export class BookingNotificationService {
         );
         await Promise.all([
           studentNotification,
-          bookingEvent,
           this.sendToAdministrators(
             input.ownerOrganizationId,
             [input.actorUserId],
@@ -170,7 +159,6 @@ export class BookingNotificationService {
           input.bookingId,
           ["IN_APP"],
         ),
-        this.publishLifecycleEvent("booking.completed", input),
       ]);
     });
   }
@@ -185,25 +173,14 @@ export class BookingNotificationService {
         input.ownerOrganizationId,
         ...input.allowedOrganizationIds,
       ];
-      await Promise.all([
-        this.sendToResourceMembers(
-          organizationIds,
-          [input.actorUserId],
-          "New slot available",
-          `A slot for ${input.resourceName} from ${input.startsAt.toISOString()} to ${input.endsAt.toISOString()} was created by ${adminName}.`,
-          input.slotId,
-          ["IN_APP", "PUSH"],
-        ),
-        this.notifications.publishBookingEvent({
-          eventType: "slot.created",
-          slotId: input.slotId,
-          resourceId: input.resourceId,
-          resourceName: input.resourceName,
-          organizationId: input.ownerOrganizationId,
-          startsAt: input.startsAt,
-          endsAt: input.endsAt,
-        }),
-      ]);
+      await this.sendToResourceMembers(
+        organizationIds,
+        [input.actorUserId],
+        "New slot available",
+        `A slot for ${input.resourceName} from ${input.startsAt.toISOString()} to ${input.endsAt.toISOString()} was created by ${adminName}.`,
+        input.slotId,
+        ["IN_APP", "PUSH"],
+      );
     });
   }
 
@@ -284,24 +261,6 @@ export class BookingNotificationService {
       message,
       correlationId,
       channels,
-    });
-  }
-
-  private publishLifecycleEvent(
-    eventType: "booking.confirmed" | "booking.cancelled" | "booking.completed",
-    input: BookingNotificationInput,
-  ) {
-    return this.notifications.publishBookingEvent({
-      eventType,
-      bookingId: input.bookingId,
-      userId: input.userId,
-      email: input.studentEmail,
-      resourceId: input.resourceId,
-      slotId: input.resourceSlotId,
-      resourceName: input.resourceName,
-      organizationId: input.ownerOrganizationId,
-      startsAt: input.startsAt,
-      endsAt: input.endsAt,
     });
   }
 

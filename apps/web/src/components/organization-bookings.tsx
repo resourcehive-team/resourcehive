@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 
 import { BookingHistory, BookingHistorySkeleton } from "@/components/booking-history";
 import { RequestErrorCard } from "@/components/request-error-card";
-import { useOrganizationBookingRealtime } from "@/hooks/use-booking-realtime";
 import { ApiAuthenticationError } from "@/lib/api-client";
 import { getOrganizationBookings } from "@/lib/booking-service/booking-api";
 import type { OrganizationBooking } from "@/lib/booking-service/types";
@@ -42,24 +41,6 @@ export function OrganizationBookings() {
 
     return () => controller.abort();
   }, [requestAttempt, router]);
-
-  const organizationIds = React.useMemo(
-    () =>
-      state.status === "loaded"
-        ? Array.from(
-            new Set(
-              state.bookings.map(
-                (booking) => booking.resourceSlot.resource.ownerOrganizationId,
-              ),
-            ),
-          )
-        : [],
-    [state],
-  );
-
-  useOrganizationBookingRealtime(organizationIds, () => {
-    setRequestAttempt((attempt) => attempt + 1);
-  });
 
   const handleBookingUpdated = React.useCallback(
     (updatedBooking: OrganizationBooking) => {

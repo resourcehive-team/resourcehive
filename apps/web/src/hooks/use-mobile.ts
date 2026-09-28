@@ -1,6 +1,6 @@
 import * as React from "react"
 
-const MOBILE_BREAKPOINT = 480
+const MOBILE_BREAKPOINT = 768
 
 const mobileQuery = `(max-width: ${MOBILE_BREAKPOINT - 1}px)`
 

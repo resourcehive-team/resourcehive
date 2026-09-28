@@ -100,7 +100,6 @@ describe("SlotsService", () => {
     expect(slotCreated).toHaveBeenCalledWith({
       slotId: "slot-id",
       actorUserId: "user-id",
-      resourceId: "resource-id",
       resourceName: "Room",
       startsAt,
       endsAt,

@@ -6,7 +6,7 @@ Topics:
 | ------------------------------------------------ | ---------- | ----------------------------------- |
 | `resourcehive.notification.commands.v1`          | user ID    | General typed notification commands |
 | `resourcehive.identity.notification-commands.v1` | user ID    | Verification email commands only    |
-| `resourcehive.booking.events.v1`                 | booking/slot ID | Booking lifecycle and slot-created events |
+| `resourcehive.booking.events.v1`                 | booking ID | Booking lifecycle events            |
 | `resourcehive.notification.dead-letter.v1`       | source key | Permanently rejected input records  |
 
 Every envelope has a UUID event or command ID, version, producer, correlation

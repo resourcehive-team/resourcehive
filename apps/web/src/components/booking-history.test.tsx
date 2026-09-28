@@ -28,7 +28,6 @@ const booking: UserBooking = {
       id: "resource-1",
       name: "Engineering Robotics Lab",
       pointCost: 25,
-      ownerOrganizationId: "organization-1",
     },
   },
 };

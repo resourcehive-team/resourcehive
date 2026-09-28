@@ -36,7 +36,6 @@ export interface UserBooking {
       id: string;
       name: string;
       pointCost: number;
-      ownerOrganizationId: string;
     };
   };
 }

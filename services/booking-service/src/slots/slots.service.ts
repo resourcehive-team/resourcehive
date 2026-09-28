@@ -43,7 +43,6 @@ export class SlotsService {
       await this.notifications.slotCreated({
         slotId: slot.id,
         actorUserId: context.userId,
-        resourceId: slot.resourceId,
         resourceName: slot.resource.name,
         startsAt: slot.startsAt,
         endsAt: slot.endsAt,
