@@ -150,4 +150,20 @@ export class NotificationsController {
   ) {
     return this.notifications.markRead(notificationId, user);
   }
+
+  @Patch(":notificationId/unread")
+  @ApiOperation({ summary: "Mark an owned notification as unread" })
+  @ApiOkResponse({
+    description: "Owned notification marked unread",
+    type: NotificationResponseDto,
+  })
+  @ApiNotFoundResponse({
+    description: "Notification not found or inaccessible",
+  })
+  markUnread(
+    @Param("notificationId", ParseUUIDPipe) notificationId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.notifications.markUnread(notificationId, user);
+  }
 }

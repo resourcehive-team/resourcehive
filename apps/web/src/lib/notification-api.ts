@@ -19,3 +19,19 @@ export function sendDevelopmentPush(): Promise<{
 }> {
   return apiRequest("/notifications/test-push", { method: "POST" });
 }
+
+export function markAsRead(
+  notificationId: string,
+): Promise<NotificationItem> {
+  return apiRequest(`/notifications/${notificationId}/read`, {
+    method: "PATCH",
+  });
+}
+
+export function markAsUnread(
+  notificationId: string,
+): Promise<NotificationItem> {
+  return apiRequest(`/notifications/${notificationId}/unread`, {
+    method: "PATCH",
+  });
+}
