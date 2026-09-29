@@ -97,7 +97,8 @@ export class BookingsController {
         dto.resourceSlotId,
         user,
       );
-      await this.cacheManager.clear();
+      await this.cacheManager.del(`/bookings/me-${user.userId}`);
+      await this.cacheManager.del(`/bookings/org-${user.userId}`);
       return result;
     } catch (error) {
       this.handleError(error);
@@ -111,6 +112,7 @@ export class BookingsController {
     description: "List of bookings for the current user",
     type: [BookingResponseDto],
   })
+  @UseInterceptors(UserCacheInterceptor)
   async getMyBookings(
     @Query() query: GetUserBookingsDto,
     @CurrentUser() user: AuthenticatedUser,
@@ -131,6 +133,7 @@ export class BookingsController {
     description: "List of bookings for admin's organizations",
     type: [OrganizationBookingResponseDto],
   })
+  @UseInterceptors(UserCacheInterceptor)
   async getOrgBookings(
     @Query() query: GetOrgBookingsDto,
     @CurrentUser() user: AuthenticatedUser,
@@ -165,7 +168,8 @@ export class BookingsController {
         bookingId,
         user.userId,
       );
-      await this.cacheManager.clear();
+      await this.cacheManager.del(`/bookings/me-${user.userId}`);
+      await this.cacheManager.del(`/bookings/org-${user.userId}`);
       return result;
     } catch (error) {
       this.handleError(error);
@@ -199,7 +203,8 @@ export class BookingsController {
         user.userId,
         dto,
       );
-      await this.cacheManager.clear();
+      await this.cacheManager.del(`/bookings/me-${user.userId}`);
+      await this.cacheManager.del(`/bookings/org-${user.userId}`);
       return result;
     } catch (error) {
       this.handleError(error);
