@@ -227,6 +227,7 @@ export class ResourcesController {
     default: 10,
   })
   @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiQuery({ name: 'status', required: false, type: String })
   @ApiForbiddenResponse({
     description: 'Forbidden. You do not have access to this organization.',
   })
@@ -236,8 +237,9 @@ export class ResourcesController {
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
     @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
     @Query('search') search?: string,
+    @Query('status') status?: string,
   ) {
-    return this.resourcesService.findAll(organizationId, page, limit, search);
+    return this.resourcesService.findAll(organizationId, page, limit, search, status);
   }
 
   @UseGuards(TenantGuard)

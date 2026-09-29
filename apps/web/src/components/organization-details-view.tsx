@@ -343,6 +343,7 @@ function OrganizationMembershipSummary({
         <Button
           variant="outline"
           render={<Link href="/dashboard/memberships" />}
+          nativeButton={false}
         >
           View my memberships
         </Button>

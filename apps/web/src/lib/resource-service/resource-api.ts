@@ -22,6 +22,7 @@ export interface ResourceListOptions {
   page?: number;
   limit?: number;
   search?: string;
+  status?: string;
   signal?: AbortSignal;
 }
 
@@ -162,9 +163,14 @@ export function getAccessibleResources(
     limit: String(limit),
   });
   const search = options.search?.trim();
+  const status = options.status?.trim();
 
   if (search) {
     query.set("search", search);
+  }
+
+  if (status) {
+    query.set("status", status);
   }
 
   return apiRequest<PaginatedResources>(
