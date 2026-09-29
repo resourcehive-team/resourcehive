@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { PointsBalanceCard } from "@/components/points-balance-card";
 import { UpcomingBookingsStatCard } from "@/components/upcoming-bookings-stat-card";
+import { MembershipsStatCard } from "@/components/memberships-stat-card";
 import {
   Card,
   CardAction,
@@ -17,22 +18,7 @@ export function SectionCards() {
 
       <UpcomingBookingsStatCard />
 
-      <Card>
-        <CardHeader>
-          <CardDescription>Memberships</CardDescription>
-          <CardTitle className="text-3xl font-medium tabular-nums">
-            1
-          </CardTitle>
-          <CardAction>
-            <Badge variant="success">Approved</Badge>
-          </CardAction>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground">
-            Memberships control which resources you can access.
-          </p>
-        </CardContent>
-      </Card>
+      <MembershipsStatCard />
 
       <Card>
         <CardHeader>
