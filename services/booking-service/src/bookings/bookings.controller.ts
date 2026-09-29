@@ -111,7 +111,6 @@ export class BookingsController {
     description: "List of bookings for the current user",
     type: [BookingResponseDto],
   })
-  @UseInterceptors(UserCacheInterceptor)
   async getMyBookings(
     @Query() query: GetUserBookingsDto,
     @CurrentUser() user: AuthenticatedUser,
@@ -132,7 +131,6 @@ export class BookingsController {
     description: "List of bookings for admin's organizations",
     type: [OrganizationBookingResponseDto],
   })
-  @UseInterceptors(UserCacheInterceptor)
   async getOrgBookings(
     @Query() query: GetOrgBookingsDto,
     @CurrentUser() user: AuthenticatedUser,

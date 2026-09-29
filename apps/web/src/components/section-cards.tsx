@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { PointsBalanceCard } from "@/components/points-balance-card";
+import { UpcomingBookingsStatCard } from "@/components/upcoming-bookings-stat-card";
 import {
   Card,
   CardAction,
@@ -14,22 +15,7 @@ export function SectionCards() {
     <div className="shared-panel-grid grid-cols-1 *:data-[slot=card]:border-0 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
       <PointsBalanceCard />
 
-      <Card>
-        <CardHeader>
-          <CardDescription>Upcoming bookings</CardDescription>
-          <CardTitle className="text-3xl font-medium tabular-nums">
-            0
-          </CardTitle>
-          <CardAction>
-            <Badge variant="outline">None scheduled</Badge>
-          </CardAction>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground">
-            Your next confirmed booking will appear here.
-          </p>
-        </CardContent>
-      </Card>
+      <UpcomingBookingsStatCard />
 
       <Card>
         <CardHeader>
