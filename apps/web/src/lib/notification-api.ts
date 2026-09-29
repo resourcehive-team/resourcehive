@@ -35,3 +35,7 @@ export function markAsUnread(
     method: "PATCH",
   });
 }
+
+export function markAllAsRead(): Promise<{ updatedCount: number }> {
+  return apiRequest("/notifications/read-all", { method: "PATCH" });
+}
