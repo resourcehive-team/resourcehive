@@ -1,5 +1,6 @@
 import { AdminOrganizationsCard } from "@/components/admin-organizations-card";
 import { RecentActivityCard } from "@/components/recent-activity-card";
+import { UpcomingBookingsProvider } from "@/components/upcoming-bookings-provider";
 import { ScreenHeading } from "@/components/screen-heading";
 import { SectionCards } from "@/components/section-cards";
 import { SiteHeader } from "@/components/site-header";
@@ -15,11 +16,13 @@ export default function Page() {
           title="Everything shared, in one place."
           description="Track the resources, memberships, and activity that connect you to your campus community."
         />
-        <SectionCards />
-        <div className="shared-panel-grid *:data-[slot=card]:border-0 md:grid-cols-2">
-          <UpcomingBookingsCard />
-          <RecentActivityCard />
-        </div>
+        <UpcomingBookingsProvider>
+          <SectionCards />
+          <div className="shared-panel-grid *:data-[slot=card]:border-0 md:grid-cols-2">
+            <UpcomingBookingsCard />
+            <RecentActivityCard />
+          </div>
+        </UpcomingBookingsProvider>
         <div className="shared-panel-grid *:data-[slot=card]:border-0">
           <AdminOrganizationsCard />
         </div>

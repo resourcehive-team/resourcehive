@@ -32,6 +32,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ApiAuthenticationError } from "@/lib/api-client";
 import { getCurrentUserMemberships } from "@/lib/resource-service/membership-api";
 import { getAccessibleResources } from "@/lib/resource-service/resource-api";
@@ -78,6 +79,7 @@ export function ResourceCatalogue() {
   const [appliedSearch, setAppliedSearch] = React.useState("");
   const [page, setPage] = React.useState(1);
   const [catalogueAttempt, setCatalogueAttempt] = React.useState(0);
+  const [statusFilter, setStatusFilter] = React.useState("ACTIVE");
   const [catalogueState, setCatalogueState] =
     React.useState<CatalogueState>({ status: "idle" });
 
@@ -138,12 +140,14 @@ export function ResourceCatalogue() {
             ),
             page,
             appliedSearch,
+            statusFilter,
             controller.signal,
           )
         : getAccessibleResources(selectedOrganizationId, {
             page,
             limit: RESOURCE_PAGE_SIZE,
             search: appliedSearch,
+            status: statusFilter,
             signal: controller.signal,
           }).then((catalogue) => ({
             ...catalogue,
@@ -178,6 +182,7 @@ export function ResourceCatalogue() {
     page,
     router,
     selectedOrganizationId,
+    statusFilter,
   ]);
 
   function retryMemberships() {
@@ -250,14 +255,42 @@ export function ResourceCatalogue() {
         onSearchInputChange={setSearchInput}
         onSearchSubmit={applySearch}
       />
-      <CatalogueResults
-        appliedSearch={appliedSearch}
-        catalogueState={catalogueState}
-        memberships={membershipsState.memberships}
-        selectedOrganizationId={selectedOrganizationId}
-        onPageChange={changePage}
-        onRetry={retryCatalogue}
-      />
+      
+      <Tabs
+        value={statusFilter}
+        onValueChange={(value) => {
+          setStatusFilter(value);
+          setPage(1);
+          setCatalogueState({ status: "loading" });
+        }}
+      >
+        <TabsList className="mb-4">
+          <TabsTrigger value="ACTIVE">Active Resources</TabsTrigger>
+          <TabsTrigger value="INACTIVE">Inactive Resources</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="ACTIVE">
+          <CatalogueResults
+            appliedSearch={appliedSearch}
+            catalogueState={catalogueState}
+            memberships={membershipsState.memberships}
+            selectedOrganizationId={selectedOrganizationId}
+            onPageChange={changePage}
+            onRetry={retryCatalogue}
+          />
+        </TabsContent>
+
+        <TabsContent value="INACTIVE">
+          <CatalogueResults
+            appliedSearch={appliedSearch}
+            catalogueState={catalogueState}
+            memberships={membershipsState.memberships}
+            selectedOrganizationId={selectedOrganizationId}
+            onPageChange={changePage}
+            onRetry={retryCatalogue}
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
@@ -501,6 +534,7 @@ async function getCombinedCatalogue(
   organizationIds: string[],
   requestedPage: number,
   search: string,
+  status: string,
   signal: AbortSignal,
 ): Promise<CataloguePage> {
   const organizationCatalogues = await Promise.all(
@@ -509,6 +543,7 @@ async function getCombinedCatalogue(
         page: 1,
         limit: AGGREGATE_RESOURCE_PAGE_SIZE,
         search,
+        status,
         signal,
       });
       const remainingPages = await Promise.all(
@@ -519,6 +554,7 @@ async function getCombinedCatalogue(
               page: index + 2,
               limit: AGGREGATE_RESOURCE_PAGE_SIZE,
               search,
+              status,
               signal,
             }),
         ),

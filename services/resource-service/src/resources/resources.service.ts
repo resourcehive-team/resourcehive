@@ -48,6 +48,7 @@ export class ResourcesService {
     page: number = 1,
     limit: number = 10,
     search?: string,
+    status?: string,
   ) {
     const skip = (page - 1) * limit;
 
@@ -60,6 +61,10 @@ export class ResourcesService {
 
     if (search) {
       whereClause.name = { contains: search, mode: 'insensitive' };
+    }
+
+    if (status) {
+      whereClause.status = status;
     }
 
     const [data, total] = await Promise.all([

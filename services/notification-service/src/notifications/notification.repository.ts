@@ -59,6 +59,19 @@ export class NotificationRepository {
     });
   }
 
+  async markUnreadForUser({
+    notificationId,
+    userId,
+  }: NotificationLookup): Promise<NotificationRecord | null> {
+    const owned = await this.findByIdForUser({ notificationId, userId });
+    if (!owned) return null;
+    if (!owned.readAt) return owned;
+    return this.prisma.notification.update({
+      where: { id: owned.id },
+      data: { readAt: null },
+    });
+  }
+
   async markAllReadForUser(userId: string): Promise<number> {
     const result = await this.prisma.notification.updateMany({
       where: { userId, readAt: null },

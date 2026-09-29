@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { BellIcon, SendIcon } from "lucide-react";
+import { BellIcon, SendIcon, CheckCheckIcon } from "lucide-react";
 
 import { ScreenHeading } from "@/components/screen-heading";
 import { SiteHeader } from "@/components/site-header";
@@ -14,7 +14,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { listNotifications, sendDevelopmentPush, type NotificationItem } from "@/lib/notification-api";
+import { listNotifications, sendDevelopmentPush, markAsRead, markAsUnread, markAllAsRead, type NotificationItem } from "@/lib/notification-api";
 
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
@@ -89,6 +89,43 @@ export default function NotificationsPage() {
     }
   }
 
+  async function toggleRead(notification: NotificationItem) {
+    try {
+      const updated = notification.readAt
+        ? await markAsUnread(notification.id)
+        : await markAsRead(notification.id);
+      
+      setNotifications((current) =>
+        current.map((n) => (n.id === updated.id ? updated : n))
+      );
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to update notification status."
+      );
+    }
+  }
+
+  async function markAllRead() {
+    setWorking(true);
+    try {
+      await markAllAsRead();
+      await load();
+      setMessage("All notifications marked as read.");
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to mark notifications as read.",
+      );
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  const hasUnread = notifications.some((n) => !n.readAt);
+
   return (
     <>
       <SiteHeader title="Notifications" />
@@ -99,6 +136,14 @@ export default function NotificationsPage() {
           description="See ResourceHive activity here and enable browser alerts on this laptop."
           actions={
             <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                onClick={markAllRead}
+                disabled={working || !hasUnread}
+              >
+                <CheckCheckIcon data-icon="inline-start" />
+                Mark all as read
+              </Button>
               <Button
                 onClick={enableNotifications}
                 disabled={working || pushRegistered}
@@ -152,7 +197,16 @@ export default function NotificationsPage() {
                     {!notification.readAt ? <Badge>New</Badge> : null}
                   </div>
                 </CardHeader>
-                <CardContent>{notification.message}</CardContent>
+                <CardContent>
+                  <p className="mb-4">{notification.message}</p>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => void toggleRead(notification)}
+                  >
+                    {notification.readAt ? "Mark as unread" : "Mark as read"}
+                  </Button>
+                </CardContent>
               </Card>
             ))
           )}

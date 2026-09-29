@@ -51,6 +51,19 @@ export class NotificationReadService {
     return this.toView(notification);
   }
 
+  async markUnread(
+    notificationId: string,
+    user: AuthenticatedUser,
+  ): Promise<NotificationView> {
+    await this.assertActive(user.userId);
+    const notification = await this.repository.markUnreadForUser({
+      notificationId,
+      userId: user.userId,
+    });
+    if (!notification) throw new NotFoundException("Notification not found");
+    return this.toView(notification);
+  }
+
   async markAllRead(
     user: AuthenticatedUser,
   ): Promise<{ updatedCount: number }> {
