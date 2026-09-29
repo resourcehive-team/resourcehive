@@ -10,23 +10,21 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { getCurrentUserMemberships } from "@/lib/resource-service/membership-api";
+import { listNotifications } from "@/lib/notification-api";
 import { Skeleton } from "@/components/ui/skeleton";
 
-export function MembershipsStatCard() {
-  const [count, setCount] = React.useState<number | null>(null);
+export function NotificationsStatCard() {
+  const [unreadCount, setUnreadCount] = React.useState<number | null>(null);
   const [error, setError] = React.useState<boolean>(false);
 
   React.useEffect(() => {
     const controller = new AbortController();
 
-    getCurrentUserMemberships(controller.signal)
-      .then((memberships) => {
-        // Count approved memberships
-        const approvedCount = memberships.filter(
-          (m) => m.status.toUpperCase() === "APPROVED"
-        ).length;
-        setCount(approvedCount);
+    listNotifications()
+      .then((notifications) => {
+        if (controller.signal.aborted) return;
+        const unread = notifications.filter((n) => n.readAt === null).length;
+        setUnreadCount(unread);
       })
       .catch((err) => {
         if (!controller.signal.aborted) {
@@ -41,7 +39,7 @@ export function MembershipsStatCard() {
     return (
       <Card className="border-destructive/50">
         <CardHeader>
-          <CardDescription className="text-destructive">Memberships</CardDescription>
+          <CardDescription className="text-destructive">Unread notifications</CardDescription>
           <CardTitle className="text-3xl font-medium tabular-nums text-destructive">
             —
           </CardTitle>
@@ -51,25 +49,25 @@ export function MembershipsStatCard() {
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground">
-            Unable to load memberships.
+            Unable to load notifications.
           </p>
         </CardContent>
       </Card>
     );
   }
 
-  if (count === null) {
+  if (unreadCount === null) {
     return (
       <Card aria-busy="true">
         <CardHeader>
-          <CardDescription>Memberships</CardDescription>
+          <CardDescription>Unread notifications</CardDescription>
           <CardTitle className="text-3xl font-medium tabular-nums">—</CardTitle>
           <CardAction>
             <Badge variant="outline">Loading</Badge>
           </CardAction>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground">Checking your memberships...</p>
+          <p className="text-muted-foreground">Checking notifications...</p>
         </CardContent>
       </Card>
     );
@@ -78,19 +76,19 @@ export function MembershipsStatCard() {
   return (
     <Card>
       <CardHeader>
-        <CardDescription>Memberships</CardDescription>
+        <CardDescription>Unread notifications</CardDescription>
         <CardTitle className="text-3xl font-medium tabular-nums">
-          {count}
+          {unreadCount}
         </CardTitle>
         <CardAction>
-          <Badge variant={count > 0 ? "success" : "secondary"}>
-            {count > 0 ? "Approved" : "None"}
+          <Badge variant={unreadCount > 0 ? "default" : "outline"}>
+            {unreadCount > 0 ? "New updates" : "Up to date"}
           </Badge>
         </CardAction>
       </CardHeader>
       <CardContent>
         <p className="text-muted-foreground">
-          Memberships control which resources you can access.
+          Booking and membership updates will appear here.
         </p>
       </CardContent>
     </Card>

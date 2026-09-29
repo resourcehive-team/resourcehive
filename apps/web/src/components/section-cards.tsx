@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { PointsBalanceCard } from "@/components/points-balance-card";
 import { UpcomingBookingsStatCard } from "@/components/upcoming-bookings-stat-card";
 import { MembershipsStatCard } from "@/components/memberships-stat-card";
+import { NotificationsStatCard } from "@/components/notifications-stat-card";
 import {
   Card,
   CardAction,
@@ -20,22 +21,7 @@ export function SectionCards() {
 
       <MembershipsStatCard />
 
-      <Card>
-        <CardHeader>
-          <CardDescription>Unread notifications</CardDescription>
-          <CardTitle className="text-3xl font-medium tabular-nums">
-            0
-          </CardTitle>
-          <CardAction>
-            <Badge variant="outline">Up to date</Badge>
-          </CardAction>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground">
-            Booking and membership updates will appear here.
-          </p>
-        </CardContent>
-      </Card>
+      <NotificationsStatCard />
     </div>
   );
 }
