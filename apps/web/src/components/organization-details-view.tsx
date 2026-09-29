@@ -96,10 +96,33 @@ export function OrganizationDetailsView({
       }
 
       const [members, resources] = await Promise.all([
-        getOrganizationMembers(organizationId, controller.signal),
+        getOrganizationMembers(organizationId, controller.signal).catch(
+          (requestError: unknown) => {
+            if (
+              requestError instanceof ApiError &&
+              requestError.status === 403
+            ) {
+              return [];
+            }
+            throw requestError;
+          },
+        ),
         getAccessibleResources(organizationId, {
           limit: ORGANIZATION_RESOURCE_COUNT_LIMIT,
           signal: controller.signal,
+        }).catch((requestError: unknown) => {
+          if (
+            requestError instanceof ApiError &&
+            requestError.status === 403
+          ) {
+            return {
+              data: [],
+              total: 0,
+              page: 1,
+              limit: ORGANIZATION_RESOURCE_COUNT_LIMIT,
+            };
+          }
+          throw requestError;
         }),
       ]);
 
