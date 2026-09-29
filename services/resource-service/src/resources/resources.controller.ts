@@ -239,7 +239,13 @@ export class ResourcesController {
     @Query('search') search?: string,
     @Query('status') status?: string,
   ) {
-    return this.resourcesService.findAll(organizationId, page, limit, search, status);
+    return this.resourcesService.findAll(
+      organizationId,
+      page,
+      limit,
+      search,
+      status,
+    );
   }
 
   @UseGuards(TenantGuard)

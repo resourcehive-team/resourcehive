@@ -1,16 +1,7 @@
-import { Badge } from "@/components/ui/badge";
 import { PointsBalanceCard } from "@/components/points-balance-card";
 import { UpcomingBookingsStatCard } from "@/components/upcoming-bookings-stat-card";
 import { MembershipsStatCard } from "@/components/memberships-stat-card";
 import { NotificationsStatCard } from "@/components/notifications-stat-card";
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 
 export function SectionCards() {
   return (

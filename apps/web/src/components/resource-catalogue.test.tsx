@@ -145,6 +145,7 @@ describe("ResourceCatalogue", () => {
     expect(resourcesMock).toHaveBeenCalledWith("organization-1", {
       page: 1,
       limit: 100,
+      status: "ACTIVE",
       search: "",
       signal: expect.any(AbortSignal),
     });
@@ -216,6 +217,7 @@ describe("ResourceCatalogue", () => {
       page: 1,
       limit: 100,
       search: "microscope",
+      status: "ACTIVE",
       signal: expect.any(AbortSignal),
     });
   });
@@ -244,6 +246,7 @@ describe("ResourceCatalogue", () => {
       page: 1,
       limit: 100,
       search: "",
+      status: "ACTIVE",
       signal: expect.any(AbortSignal),
     });
   });

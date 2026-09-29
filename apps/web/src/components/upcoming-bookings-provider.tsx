@@ -24,9 +24,6 @@ export function UpcomingBookingsProvider({ children }: { children: React.ReactNo
   React.useEffect(() => {
     const controller = new AbortController();
 
-    setBookings(null); // Reset when retrying
-    setError(null);
-
     getMyBookings(controller.signal)
       .then((allBookings) => {
         const now = new Date().getTime();
@@ -55,7 +52,15 @@ export function UpcomingBookingsProvider({ children }: { children: React.ReactNo
 
   return (
     <BookingsContext.Provider
-      value={{ bookings, error, retry: () => setAttempt((a) => a + 1) }}
+      value={{
+        bookings,
+        error,
+        retry: () => {
+          setBookings(null);
+          setError(null);
+          setAttempt((a) => a + 1);
+        },
+      }}
     >
       {children}
     </BookingsContext.Provider>

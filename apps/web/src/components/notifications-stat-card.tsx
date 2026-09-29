@@ -11,7 +11,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { listNotifications } from "@/lib/notification-api";
-import { Skeleton } from "@/components/ui/skeleton";
 
 export function NotificationsStatCard() {
   const [unreadCount, setUnreadCount] = React.useState<number | null>(null);
@@ -26,7 +25,7 @@ export function NotificationsStatCard() {
         const unread = notifications.filter((n) => n.readAt === null).length;
         setUnreadCount(unread);
       })
-      .catch((err) => {
+      .catch(() => {
         if (!controller.signal.aborted) {
           setError(true);
         }

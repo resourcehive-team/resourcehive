@@ -11,7 +11,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { getCurrentUserMemberships } from "@/lib/resource-service/membership-api";
-import { Skeleton } from "@/components/ui/skeleton";
 
 export function MembershipsStatCard() {
   const [count, setCount] = React.useState<number | null>(null);
@@ -28,7 +27,7 @@ export function MembershipsStatCard() {
         ).length;
         setCount(approvedCount);
       })
-      .catch((err) => {
+      .catch(() => {
         if (!controller.signal.aborted) {
           setError(true);
         }
