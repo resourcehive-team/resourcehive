@@ -20,6 +20,7 @@ export class NotificationReadService {
     await this.assertActive(user.userId);
     const notifications = await this.repository.findManyForUser({
       userId: user.userId,
+      rootOrganizationId: this.requireRoot(user),
       ...query,
     });
     return notifications.map((notification) => this.toView(notification));
@@ -33,6 +34,7 @@ export class NotificationReadService {
     const notification = await this.repository.findByIdForUser({
       notificationId,
       userId: user.userId,
+      rootOrganizationId: this.requireRoot(user),
     });
     if (!notification) throw new NotFoundException("Notification not found");
     return this.toView(notification);
@@ -46,6 +48,7 @@ export class NotificationReadService {
     const notification = await this.repository.markReadForUser({
       notificationId,
       userId: user.userId,
+      rootOrganizationId: this.requireRoot(user),
     });
     if (!notification) throw new NotFoundException("Notification not found");
     return this.toView(notification);
@@ -59,6 +62,7 @@ export class NotificationReadService {
     const notification = await this.repository.markUnreadForUser({
       notificationId,
       userId: user.userId,
+      rootOrganizationId: this.requireRoot(user),
     });
     if (!notification) throw new NotFoundException("Notification not found");
     return this.toView(notification);
@@ -69,27 +73,27 @@ export class NotificationReadService {
   ): Promise<{ updatedCount: number }> {
     await this.assertActive(user.userId);
     return {
-      updatedCount: await this.repository.markAllReadForUser(user.userId),
+      updatedCount: await this.repository.markAllReadForUser(user.userId, this.requireRoot(user)),
     };
   }
 
   async registerWebPush(user: AuthenticatedUser, input: RegisterWebPushDto) {
     await this.assertActive(user.userId);
     return this.subscriptionView(
-      await this.repository.registerWebPush(user.userId, input.token.trim()),
+      await this.repository.registerWebPush(user.userId, this.requireRoot(user), input.token.trim()),
     );
   }
 
   async listWebPush(user: AuthenticatedUser) {
     await this.assertActive(user.userId);
-    return (await this.repository.listWebPush(user.userId)).map(
+    return (await this.repository.listWebPush(user.userId, this.requireRoot(user))).map(
       (subscription) => this.subscriptionView(subscription),
     );
   }
 
   async removeWebPush(id: string, user: AuthenticatedUser) {
     await this.assertActive(user.userId);
-    if (!(await this.repository.removeWebPush(id, user.userId))) {
+    if (!(await this.repository.removeWebPush(id, user.userId, this.requireRoot(user)))) {
       throw new NotFoundException("Web push subscription not found");
     }
     return { removed: true };
@@ -99,6 +103,11 @@ export class NotificationReadService {
     if (!(await this.repository.isActiveUser(userId))) {
       throw new UnauthorizedException("An active account is required");
     }
+  }
+
+  private requireRoot(user: AuthenticatedUser): string {
+    if (!user.rootOrganizationId) throw new UnauthorizedException("Select a university first");
+    return user.rootOrganizationId;
   }
 
   private toView(notification: NotificationRecord): NotificationView {

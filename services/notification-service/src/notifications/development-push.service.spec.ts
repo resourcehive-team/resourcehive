@@ -1,5 +1,6 @@
 import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "@resourcehive/database";
+import { AuthenticatedUser } from "@resourcehive/service-auth";
 import { NotificationCommandService } from "../events/notification-command.service";
 import { DevelopmentPushService } from "./development-push.service";
 
@@ -14,6 +15,13 @@ describe("DevelopmentPushService", () => {
   } as unknown as NotificationCommandService;
   const service = new DevelopmentPushService(prisma, commands);
   const userId = "22222222-2222-4222-8222-222222222222";
+  const user = {
+    userId,
+    email: "user@example.edu",
+    organizationId: "33333333-3333-4333-8333-333333333333",
+    rootOrganizationId: "44444444-4444-4444-8444-444444444444",
+    role: "member",
+  } as AuthenticatedUser;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -28,7 +36,7 @@ describe("DevelopmentPushService", () => {
   it("is unavailable in production", async () => {
     process.env.NODE_ENV = "production";
 
-    await expect(service.queue(userId)).rejects.toBeInstanceOf(
+    await expect(service.queue(user)).rejects.toBeInstanceOf(
       NotFoundException,
     );
     expect(countSubscriptions).not.toHaveBeenCalled();
@@ -37,7 +45,7 @@ describe("DevelopmentPushService", () => {
   it("requires the real FCM provider", async () => {
     process.env.FCM_ENABLED = "false";
 
-    await expect(service.queue(userId)).rejects.toThrow(
+    await expect(service.queue(user)).rejects.toThrow(
       "FCM_ENABLED must be true",
     );
   });
@@ -45,7 +53,7 @@ describe("DevelopmentPushService", () => {
   it("requires an active browser subscription", async () => {
     countSubscriptions.mockResolvedValue(0);
 
-    await expect(service.queue(userId)).rejects.toBeInstanceOf(
+    await expect(service.queue(user)).rejects.toBeInstanceOf(
       BadRequestException,
     );
     expect(processCommand).not.toHaveBeenCalled();
@@ -58,7 +66,7 @@ describe("DevelopmentPushService", () => {
       notificationId: "44444444-4444-4444-8444-444444444444",
     });
 
-    await expect(service.queue(userId)).resolves.toEqual({
+    await expect(service.queue(user)).resolves.toEqual({
       notificationId: "44444444-4444-4444-8444-444444444444",
       pushDeliveriesQueued: 2,
     });
@@ -66,6 +74,7 @@ describe("DevelopmentPushService", () => {
       expect.objectContaining({
         producer: "notification-service",
         recipient: { userId },
+        rootOrganizationId: user.rootOrganizationId,
         channels: ["IN_APP", "PUSH"],
         template: {
           key: "development.test-push.v1",

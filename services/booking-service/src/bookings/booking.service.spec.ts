@@ -46,6 +46,7 @@ describe("BookingService", () => {
     userId: "user-id",
     email: "user@example.edu",
     organizationId: "organization-id",
+    rootOrganizationId: "root-id",
     role: "member",
   };
   const startsAt = new Date("2030-08-01T10:00:00.000Z");

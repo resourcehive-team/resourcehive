@@ -129,8 +129,25 @@ export class OrganizationContextDto {
   @ApiProperty({ nullable: true, format: 'uuid' })
   organizationId!: string | null;
 
+  @ApiProperty({ nullable: true, format: 'uuid' })
+  rootOrganizationId!: string | null;
+
   @ApiProperty({ nullable: true, enum: ['MEMBER', 'ADMIN'] })
   role!: string | null;
+}
+
+export class UniversityOptionDto {
+  @ApiProperty({ format: 'uuid' })
+  rootOrganizationId!: string;
+
+  @ApiProperty({ format: 'uuid' })
+  organizationId!: string;
+
+  @ApiProperty()
+  name!: string;
+
+  @ApiProperty({ enum: ['MEMBER', 'ADMIN'] })
+  role!: string;
 }
 
 export class CurrentUserResponseDto {
@@ -139,6 +156,9 @@ export class CurrentUserResponseDto {
 
   @ApiProperty({ type: OrganizationContextDto })
   organizationContext!: OrganizationContextDto;
+
+  @ApiProperty({ type: [UniversityOptionDto] })
+  universities!: UniversityOptionDto[];
 }
 
 export class AvatarResponseDto {

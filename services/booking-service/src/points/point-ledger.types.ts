@@ -8,6 +8,7 @@ export type PointLedgerClient = Pick<
 export interface AppendBookingEntryInput {
   userId: string;
   bookingId: string;
+  rootOrganizationId: string;
   amount: number;
   description?: string;
 }

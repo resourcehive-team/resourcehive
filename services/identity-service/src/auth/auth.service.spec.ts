@@ -31,6 +31,36 @@ interface CreateVerificationTokenRequest {
   };
 }
 
+interface CreatePlatformOrganizationRequest {
+  data: {
+    id: string;
+    name: string;
+    type: string;
+    parentId: string | null;
+    rootOrganizationId: string;
+    joinBonusPoints: number;
+    status: string;
+    createdBy: string;
+  };
+  select: { id: true; name: true };
+}
+
+interface CreatePlatformMembershipRequest {
+  data: {
+    userId: string;
+    organizationId: string;
+    role: string;
+    status: string;
+    reviewedBy: string;
+    reviewedAt: Date;
+  };
+  select: { id: true };
+}
+
+interface CreateMembershipAuditRequest {
+  data: { membershipId: string; actorUserId: string; action: string };
+}
+
 describe('AuthService registration', () => {
   const organizationEmailDomain = {
     findUnique: jest.fn(),
@@ -47,9 +77,27 @@ describe('AuthService registration', () => {
       [CreateVerificationTokenRequest]
     >(),
   };
+  const transactionOrganization = {
+    create: jest.fn<
+      Promise<{ id: string; name: string }>,
+      [CreatePlatformOrganizationRequest]
+    >(),
+  };
+  const transactionMembership = {
+    create: jest.fn<
+      Promise<{ id: string }>,
+      [CreatePlatformMembershipRequest]
+    >(),
+  };
+  const transactionMembershipAudit = {
+    create: jest.fn<Promise<{ id: string }>, [CreateMembershipAuditRequest]>(),
+  };
   const transaction = {
     user: transactionUser,
     emailVerificationToken,
+    organization: transactionOrganization,
+    organizationMembership: transactionMembership,
+    organizationMembershipAudit: transactionMembershipAudit,
   };
   const runTransaction = jest.fn(
     async (callback: (client: typeof transaction) => Promise<unknown>) =>
@@ -178,6 +226,84 @@ describe('AuthService registration', () => {
       }),
     ).rejects.toBeInstanceOf(ConflictException);
 
+    expect(runTransaction).not.toHaveBeenCalled();
+  });
+
+  it('creates a root university, its first admin, and an audit event atomically', async () => {
+    user.findUnique.mockResolvedValueOnce({
+      id: 'tenant-admin-id',
+      email: 'admin@example.edu',
+      status: 'ACTIVE',
+      platformRole: 'USER',
+      emailVerifiedAt: new Date(),
+    });
+    transactionOrganization.create.mockImplementation(({ data }) =>
+      Promise.resolve({ id: data.id, name: data.name }),
+    );
+    transactionMembership.create.mockResolvedValue({ id: 'membership-id' });
+    transactionMembershipAudit.create.mockResolvedValue({ id: 'audit-id' });
+
+    const result = await service.createPlatformUniversity(
+      '  Example University  ',
+      ' ADMIN@EXAMPLE.EDU ',
+      'platform-admin-id',
+    );
+
+    expect(transactionOrganization.create).toHaveBeenCalledTimes(1);
+    const createOrganizationRequest =
+      transactionOrganization.create.mock.calls[0][0];
+    expect(createOrganizationRequest.data).toMatchObject({
+      name: 'Example University',
+      type: 'UNIVERSITY',
+      parentId: null,
+      joinBonusPoints: 0,
+      status: 'ACTIVE',
+      createdBy: 'platform-admin-id',
+    });
+    expect(createOrganizationRequest.data.id).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+    );
+    expect(createOrganizationRequest.data.rootOrganizationId).toBe(
+      createOrganizationRequest.data.id,
+    );
+    expect(transactionMembership.create).toHaveBeenCalledTimes(1);
+    const createMembershipRequest =
+      transactionMembership.create.mock.calls[0][0];
+    expect(createMembershipRequest.data).toMatchObject({
+      userId: 'tenant-admin-id',
+      organizationId: createOrganizationRequest.data.id,
+      role: 'ADMIN',
+      status: 'APPROVED',
+      reviewedBy: 'platform-admin-id',
+    });
+    expect(createMembershipRequest.data.reviewedAt).toBeInstanceOf(Date);
+    expect(transactionMembershipAudit.create).toHaveBeenCalledWith({
+      data: {
+        membershipId: 'membership-id',
+        actorUserId: 'platform-admin-id',
+        action: 'ADMIN_GRANTED',
+      },
+    });
+    expect(runTransaction).toHaveBeenCalledTimes(1);
+    expect(result.administrator.email).toBe('admin@example.edu');
+  });
+
+  it('rejects an ineligible tenant admin before creating anything', async () => {
+    user.findUnique.mockResolvedValueOnce({
+      id: 'tenant-admin-id',
+      email: 'admin@example.edu',
+      status: 'ACTIVE',
+      platformRole: 'USER',
+      emailVerifiedAt: null,
+    });
+
+    await expect(
+      service.createPlatformUniversity(
+        'Example University',
+        'admin@example.edu',
+        'platform-admin-id',
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
     expect(runTransaction).not.toHaveBeenCalled();
   });
 });

@@ -4,7 +4,7 @@ import {
   Injectable,
   ForbiddenException,
 } from '@nestjs/common';
-import { OrganizationMembership, PrismaService } from '@resourcehive/database';
+import { OrganizationMembership, Prisma, PrismaService } from '@resourcehive/database';
 import type { AuthenticatedRequest } from '@resourcehive/service-auth';
 
 interface TenantRequest extends AuthenticatedRequest {
@@ -33,11 +33,28 @@ export class TenantGuard implements CanActivate {
       return true;
     }
 
+    if (!user.rootOrganizationId) {
+      throw new ForbiddenException('Select a university before accessing organizations.');
+    }
+
+    return this.prisma.withUniversity(
+      { rootOrganizationId: user.rootOrganizationId, userId: user.userId },
+      async (transaction) => this.checkOrganizationAccess(request, organizationId, user.userId, transaction),
+    );
+  }
+
+  private async checkOrganizationAccess(
+    request: TenantRequest,
+    organizationId: string,
+    userId: string,
+    transaction: Pick<Prisma.TransactionClient, 'organization' | 'organizationMembership'>,
+  ): Promise<boolean> {
+
     // Verify if the user has a direct membership to this organization
     const directMembership =
-      await this.prisma.organizationMembership.findUnique({
+      await transaction.organizationMembership.findUnique({
         where: {
-          userId_organizationId: { userId: user.userId, organizationId },
+          userId_organizationId: { userId, organizationId },
         },
       });
 
@@ -53,7 +70,7 @@ export class TenantGuard implements CanActivate {
     }
 
     // Otherwise, check inherited admin access up to the root
-    const targetOrg = await this.prisma.organization.findUnique({
+    const targetOrg = await transaction.organization.findUnique({
       where: { id: organizationId },
     });
 
@@ -72,7 +89,7 @@ export class TenantGuard implements CanActivate {
 
     while (currentOrgId) {
       // Fetch the current ancestor organization to ensure we stay within the tenant
-      const currentOrg = await this.prisma.organization.findUnique({
+      const currentOrg = await transaction.organization.findUnique({
         where: { id: currentOrgId },
       });
 
@@ -86,10 +103,10 @@ export class TenantGuard implements CanActivate {
 
       // Check if user is an ADMIN of this ancestor organization
       const ancestorMembership =
-        await this.prisma.organizationMembership.findUnique({
+        await transaction.organizationMembership.findUnique({
           where: {
             userId_organizationId: {
-              userId: user.userId,
+              userId,
               organizationId: currentOrgId,
             },
           },

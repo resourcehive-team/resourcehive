@@ -41,6 +41,7 @@ export interface NotificationCommandV1 {
   commandId: string;
   producer: NotificationProducer;
   recipient: NotificationRecipient;
+  rootOrganizationId?: string | null;
   channels: NotificationChannel[];
   template: {
     key: NotificationTemplateKey;

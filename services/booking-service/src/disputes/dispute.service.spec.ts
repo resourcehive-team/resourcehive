@@ -36,6 +36,7 @@ describe("DisputeService", () => {
     userId: "user-id",
     email: "user@example.edu",
     organizationId: "org-id",
+    rootOrganizationId: "root-id",
     role: "member",
   };
 

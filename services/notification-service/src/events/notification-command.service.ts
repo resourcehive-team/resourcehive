@@ -1,5 +1,5 @@
 import { Injectable, UnauthorizedException } from "@nestjs/common";
-import { Prisma, PrismaService } from "@resourcehive/database";
+import { Prisma, WorkerPrismaService } from "@resourcehive/database";
 import {
   NotificationCommandV1,
   parseNotificationCommand,
@@ -23,7 +23,7 @@ export interface NotificationProcessingResult {
 @Injectable()
 export class NotificationCommandService {
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly prisma: WorkerPrismaService,
     private readonly templates: NotificationTemplateService,
   ) {}
 
@@ -33,6 +33,12 @@ export class NotificationCommandService {
       throw new UnauthorizedException(
         "Notification commands currently require a ResourceHive user",
       );
+    }
+    if (
+      (command.channels.includes("IN_APP") || command.channels.includes("PUSH")) &&
+      !command.rootOrganizationId
+    ) {
+      throw new UnauthorizedException("Tenant notifications require a university context");
     }
     const result = await this.prisma.$transaction((transaction) =>
       this.processWithinTransaction(command, transaction),
@@ -61,6 +67,24 @@ export class NotificationCommandService {
     if (!user)
       throw new UnauthorizedException("An active recipient is required");
 
+    if (command.rootOrganizationId) {
+      const membership = await transaction.organizationMembership.findFirst({
+        where: {
+          userId: user.id,
+          status: "APPROVED",
+          organization: {
+            rootOrganizationId: command.rootOrganizationId,
+            status: "ACTIVE",
+            rootOrganization: { status: "ACTIVE" },
+          },
+        },
+        select: { id: true },
+      });
+      if (!membership) {
+        throw new UnauthorizedException("Recipient is not a member of this university");
+      }
+    }
+
     const rendered = this.templates.render(command);
     const createsNotification =
       command.channels.includes("IN_APP") || command.channels.includes("PUSH");
@@ -68,6 +92,7 @@ export class NotificationCommandService {
       ? await transaction.notification.create({
           data: {
             userId: user.id,
+            rootOrganizationId: command.rootOrganizationId ?? null,
             type: rendered.type,
             title: rendered.title,
             message: rendered.message,
@@ -80,6 +105,7 @@ export class NotificationCommandService {
     if (command.channels.includes("EMAIL")) {
       deliveries.push({
         userId: user.id,
+        rootOrganizationId: command.rootOrganizationId ?? null,
         channel: "EMAIL",
         destination: command.recipient.email ?? user.email,
         subject: rendered.emailSubject,
@@ -88,12 +114,17 @@ export class NotificationCommandService {
     }
     if (command.channels.includes("PUSH")) {
       const subscriptions = await transaction.webPushSubscription.findMany({
-        where: { userId: user.id, active: true },
+        where: {
+          userId: user.id,
+          rootOrganizationId: command.rootOrganizationId ?? null,
+          active: true,
+        },
         select: { token: true },
       });
       deliveries.push(
         ...subscriptions.map(({ token }) => ({
           userId: user.id,
+          rootOrganizationId: command.rootOrganizationId ?? null,
           notificationId: notification?.id,
           channel: "PUSH",
           destination: token,

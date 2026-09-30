@@ -61,6 +61,7 @@ services:
       context: .
       dockerfile: services/identity-service/Dockerfile
     environment:
+      APP_DATABASE_URL: ${AUTH_DATABASE_URL}
       DATABASE_URL: ${DATABASE_URL}
       DATABASE_URL_UNPOOLED: ${DATABASE_URL_UNPOOLED}
       JWT_SECRET: ${JWT_SECRET}
@@ -86,6 +87,7 @@ services:
     command: >-
       sh -c "/migrator/node_modules/.bin/prisma migrate deploy
       --schema /migrator/schema/schema.prisma &&
+      unset DATABASE_URL DATABASE_URL_UNPOOLED &&
       exec node dist/main.js"
 
   resource-service:
@@ -94,7 +96,8 @@ services:
       context: .
       dockerfile: services/resource-service/Dockerfile
     environment:
-      DATABASE_URL: ${DATABASE_URL}
+      APP_DATABASE_URL: ${APP_DATABASE_URL}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN}
       JWT_SECRET: ${JWT_SECRET}
       PORT: 3004
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
@@ -112,7 +115,9 @@ services:
       context: .
       dockerfile: services/booking-service/Dockerfile
     environment:
-      DATABASE_URL: ${DATABASE_URL}
+      APP_DATABASE_URL: ${APP_DATABASE_URL}
+      PLATFORM_REPORT_DATABASE_URL: ${PLATFORM_REPORT_DATABASE_URL}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN}
       JWT_SECRET: ${JWT_SECRET}
       PORT: 3002
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
@@ -125,7 +130,8 @@ services:
       context: .
       dockerfile: services/notification-service/Dockerfile
     environment:
-      DATABASE_URL: ${DATABASE_URL}
+      APP_DATABASE_URL: ${APP_DATABASE_URL}
+      WORKER_DATABASE_URL: ${WORKER_DATABASE_URL}
       JWT_SECRET: ${JWT_SECRET}
       PORT: 3003
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}

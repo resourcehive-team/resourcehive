@@ -1,7 +1,6 @@
 name: resourcehive-production
 
 x-service-environment: &service-environment
-  DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env.production}
   JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env.production}
   CORS_ORIGINS: ${CORS_ORIGINS:?Set CORS_ORIGINS in .env.production}
   NODE_ENV: production
@@ -47,7 +46,7 @@ services:
     <<: *service-defaults
     environment:
       <<: *service-environment
-      DATABASE_URL_UNPOOLED: ${DATABASE_URL_UNPOOLED:?Set DATABASE_URL_UNPOOLED in .env.production}
+      APP_DATABASE_URL: ${AUTH_DATABASE_URL:?Set AUTH_DATABASE_URL in .env.production}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-15m}
       REFRESH_TOKEN_EXPIRES_IN: ${REFRESH_TOKEN_EXPIRES_IN:-30d}
       PORT: 3000
@@ -78,6 +77,8 @@ services:
     <<: *service-defaults
     environment:
       <<: *service-environment
+      APP_DATABASE_URL: ${APP_DATABASE_URL:?Set APP_DATABASE_URL in .env.production}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?Set INTERNAL_SERVICE_TOKEN in .env.production}
       PORT: 3004
       KAFKA_ENABLED: "true"
       KAFKA_BROKERS: ${KAFKA_BROKERS:?Set KAFKA_BROKERS in .env.production}
@@ -96,6 +97,9 @@ services:
     <<: *service-defaults
     environment:
       <<: *service-environment
+      APP_DATABASE_URL: ${APP_DATABASE_URL:?Set APP_DATABASE_URL in .env.production}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?Set INTERNAL_SERVICE_TOKEN in .env.production}
+      PLATFORM_REPORT_DATABASE_URL: ${PLATFORM_REPORT_DATABASE_URL:?Set PLATFORM_REPORT_DATABASE_URL in .env.production}
       PORT: 3002
       KAFKA_ENABLED: "true"
       KAFKA_BROKERS: ${KAFKA_BROKERS:?Set KAFKA_BROKERS in .env.production}
@@ -108,6 +112,8 @@ services:
     <<: *service-defaults
     environment:
       <<: *service-environment
+      APP_DATABASE_URL: ${APP_DATABASE_URL:?Set APP_DATABASE_URL in .env.production}
+      WORKER_DATABASE_URL: ${WORKER_DATABASE_URL:?Set WORKER_DATABASE_URL in .env.production}
       PORT: 3003
       DELIVERY_POLL_INTERVAL_MS: ${DELIVERY_POLL_INTERVAL_MS:-5000}
       KAFKA_ENABLED: "true"

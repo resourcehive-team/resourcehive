@@ -22,6 +22,7 @@ export interface BookingEventV1 {
   correlationId: string;
   occurredAt: string;
   payload: {
+    rootOrganizationId: string;
     bookingId?: string;
     slotId?: string;
     resourceId: string;
@@ -69,6 +70,7 @@ export function parseBookingEvent(input: unknown): BookingEventV1 {
   const payload = event.payload;
   if (
     !payload ||
+    !isUUID(payload.rootOrganizationId) ||
     !isUUID(payload.resourceId) ||
     !isUUID(payload.organizationId) ||
     !payload.resourceName?.trim() ||

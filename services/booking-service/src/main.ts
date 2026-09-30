@@ -2,10 +2,12 @@ import { ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { AppModule } from "./app.module";
 import { setupBookingSwagger } from "./swagger";
+import { UniversityContextInterceptor } from "@resourcehive/database";
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
   app.enableShutdownHooks();
+  app.useGlobalInterceptors(new UniversityContextInterceptor());
   const allowedOrigins = (process.env.CORS_ORIGINS ?? "http://localhost:3000")
     .split(",")
     .map((origin) => origin.trim())

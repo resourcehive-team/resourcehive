@@ -15,7 +15,7 @@ describe("PointLedgerService", () => {
 
   it("accepts a balance equal to the required points", async () => {
     jest.spyOn(repository, "getBalance").mockResolvedValue(20);
-    await expect(service.assertSufficientBalance("user-id", 20)).resolves.toBe(
+    await expect(service.assertSufficientBalance("user-id", "university-id", 20)).resolves.toBe(
       20,
     );
   });
@@ -23,7 +23,7 @@ describe("PointLedgerService", () => {
   it("rejects an insufficient balance with balance details", async () => {
     jest.spyOn(repository, "getBalance").mockResolvedValue(19);
     await expect(
-      service.assertSufficientBalance("user-id", 20),
+      service.assertSufficientBalance("user-id", "university-id", 20),
     ).rejects.toEqual(new InsufficientPointsError(19, 20));
   });
 
@@ -31,6 +31,7 @@ describe("PointLedgerService", () => {
     await expect(
       service.appendBookingDeduction({
         userId: "user-id",
+        rootOrganizationId: "university-id",
         bookingId: "booking-id",
         amount: 0,
       }),
@@ -41,6 +42,7 @@ describe("PointLedgerService", () => {
     await expect(
       service.appendBookingRefund({
         userId: "user-id",
+        rootOrganizationId: "university-id",
         bookingId: "booking-id",
         amount: 0,
       }),

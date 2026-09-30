@@ -103,6 +103,7 @@ describe("RealtimeGateway", () => {
       correlationId: "booking-1",
       occurredAt: "2026-01-01T00:00:00.000Z",
       payload: {
+        rootOrganizationId: "root-1",
         bookingId: "booking-1",
         userId: "user-1",
         resourceId: "resource-1",
@@ -128,6 +129,7 @@ describe("RealtimeGateway", () => {
       correlationId: "slot-1",
       occurredAt: "2026-01-01T00:00:00.000Z",
       payload: {
+        rootOrganizationId: "root-1",
         slotId: "slot-1",
         resourceId: "resource-1",
         resourceName: "Robotics Lab",

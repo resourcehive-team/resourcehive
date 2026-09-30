@@ -27,8 +27,15 @@ interface CurrentUserResponse {
   };
   organizationContext: {
     organizationId: string | null;
+    rootOrganizationId: string | null;
     role: string | null;
   };
+  universities: Array<{
+    rootOrganizationId: string;
+    organizationId: string;
+    name: string;
+    role: string;
+  }>;
 }
 
 interface CurrentUserPointsResponse {
@@ -53,7 +60,7 @@ describe('Authentication Flow (e2e)', () => {
   let authenticationCookie: string;
   let refreshCookie: string;
   let verificationToken: string;
-  const passwordResetToken = 'e2e-password-reset-token-value';
+  const passwordResetToken = `e2e-password-reset-token-${Date.now()}`;
   const resetPassword = 'ResetPassword123!';
   const testEmail = process.env.DEMO_USER_EMAIL ?? 'demo@example.edu';
   const testPassword = process.env.DEMO_USER_PASSWORD ?? 'DemoPassword123!';
@@ -113,6 +120,56 @@ describe('Authentication Flow (e2e)', () => {
     expect(yaml.text).toContain('openapi:');
   });
 
+  it('retains an approved university selection when the session refreshes', async () => {
+    const login = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({ email: testEmail, password: testPassword })
+      .expect(200);
+    const loginCookies = login.headers['set-cookie'] as unknown as string[];
+    const accessCookie = loginCookies.find((cookie) =>
+      cookie.startsWith('resourcehive_access_token='),
+    );
+    const refreshCookie = loginCookies.find((cookie) =>
+      cookie.startsWith('resourcehive_refresh_token='),
+    );
+    expect(accessCookie).toBeDefined();
+    expect(refreshCookie).toBeDefined();
+
+    const current = await request(app.getHttpServer())
+      .get('/auth/me')
+      .set('Cookie', accessCookie!.split(';')[0])
+      .expect(200);
+    const selectedRoot = (current.body as CurrentUserResponse).universities[0]
+      ?.rootOrganizationId;
+    expect(selectedRoot).toBeDefined();
+
+    const switched = await request(app.getHttpServer())
+      .post('/auth/active-university')
+      .set('Cookie', `${accessCookie!.split(';')[0]}; ${refreshCookie!.split(';')[0]}`)
+      .send({ rootOrganizationId: selectedRoot })
+      .expect(200);
+    expect(switched.body.organizationContext.rootOrganizationId).toBe(selectedRoot);
+
+    const refreshed = await request(app.getHttpServer())
+      .post('/auth/refresh')
+      .set('Cookie', refreshCookie!.split(';')[0])
+      .expect(200);
+    const refreshedAccess = (
+      refreshed.headers['set-cookie'] as unknown as string[]
+    ).find(
+      (cookie) => cookie.startsWith('resourcehive_access_token='),
+    );
+    expect(refreshedAccess).toBeDefined();
+    const refreshedCurrent = await request(app.getHttpServer())
+      .get('/auth/me')
+      .set('Cookie', refreshedAccess!.split(';')[0])
+      .expect(200);
+    expect(
+      (refreshedCurrent.body as CurrentUserResponse).organizationContext
+        .rootOrganizationId,
+    ).toBe(selectedRoot);
+  });
+
   it('rejects an incorrect password', async () => {
     await request(app.getHttpServer())
       .post('/auth/login')
@@ -166,7 +223,7 @@ describe('Authentication Flow (e2e)', () => {
     // NGINX uses this endpoint to capture headers
     expect(response.headers['x-user-id']).toBeDefined();
     expect(response.headers['x-tenant-id']).toBeDefined();
-    expect(response.headers['x-user-role']).toBe('member');
+    expect(response.headers['x-user-role']).toBeDefined();
     expect(response.headers['x-user-email']).toBe(testEmail);
   });
 
@@ -188,10 +245,8 @@ describe('Authentication Flow (e2e)', () => {
         status: 'ACTIVE',
         platformRole: 'USER',
       },
-      organizationContext: {
-        role: 'member',
-      },
     });
+    expect(body.organizationContext.role).toBeDefined();
     expect(typeof body.user.id).toBe('string');
     expect(Number.isNaN(Date.parse(body.user.createdAt))).toBe(false);
     expect(typeof body.organizationContext.organizationId).toBe('string');

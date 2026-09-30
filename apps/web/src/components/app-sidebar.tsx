@@ -8,9 +8,19 @@ import { NavUser } from "@/components/nav-user";
 import { useDashboardCurrentUser } from "@/components/dashboard-current-user";
 import { Brand } from "@/components/brand";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuItem,
@@ -30,6 +40,8 @@ import {
   CookieIcon,
 } from "lucide-react";
 import { marketingPath } from "@/lib/config";
+import { getCurrentUser, switchActiveUniversity } from "@/lib/auth-api";
+import { useRouter } from "next/navigation";
 
 const data = {
   user: {
@@ -107,7 +119,10 @@ const data = {
   ],
 };
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const { state } = useDashboardCurrentUser();
+  const { state, setAccount } = useDashboardCurrentUser();
+  const router = useRouter();
+  const [switching, setSwitching] = React.useState(false);
+  const [switchError, setSwitchError] = React.useState<string | null>(null);
   const user =
     state.status === "loaded"
       ? {
@@ -127,6 +142,58 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
+        {state.status === "loaded" && state.account.universities.length > 0 && (
+          <SidebarGroup className="pb-0">
+            <SidebarGroupLabel render={<label htmlFor="active-university" />}>
+              University
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <Select
+                items={Object.fromEntries(
+                  state.account.universities.map((university) => [
+                    university.rootOrganizationId,
+                    university.name,
+                  ]),
+                )}
+                value={state.account.organizationContext.rootOrganizationId ?? null}
+                disabled={switching}
+                onValueChange={async (rootOrganizationId) => {
+                  if (typeof rootOrganizationId !== "string" || !rootOrganizationId) return;
+                  setSwitching(true);
+                  setSwitchError(null);
+                  try {
+                    await switchActiveUniversity(rootOrganizationId);
+                    setAccount(await getCurrentUser());
+                    router.refresh();
+                  } catch {
+                    setSwitchError("Unable to switch university. Try again.");
+                  } finally {
+                    setSwitching(false);
+                  }
+                }}
+              >
+                <SelectTrigger id="active-university" className="w-full">
+                  <SelectValue placeholder="Choose a university" />
+                </SelectTrigger>
+                <SelectContent>
+                  {state.account.universities.map((university) => (
+                    <SelectItem
+                      key={university.rootOrganizationId}
+                      value={university.rootOrganizationId}
+                    >
+                      {university.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {switchError && (
+                <p className="mt-1 text-xs text-destructive" role="alert">
+                  {switchError}
+                </p>
+              )}
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
         <NavMain items={data.navMain} />
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>

@@ -1,5 +1,5 @@
-import { ForbiddenException, Injectable } from "@nestjs/common";
-import { Prisma, PrismaService } from "@resourcehive/database";
+import { ForbiddenException, Injectable, ServiceUnavailableException } from "@nestjs/common";
+import { PlatformReportPrismaService, Prisma, PrismaService } from "@resourcehive/database";
 import { AuthenticatedUser } from "@resourcehive/service-auth";
 import { BookingAuthorizationService } from "../authorization/booking-authorization.service";
 import { DateRangeDto } from "./analytics.dto";
@@ -42,6 +42,7 @@ export class AnalyticsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly authorization: BookingAuthorizationService,
+    private readonly platformReportPrisma: PlatformReportPrismaService,
   ) {}
 
   async inventoryDemand(
@@ -151,8 +152,11 @@ export class AnalyticsService {
     range: DateRangeDto,
   ): Promise<PlatformCompanyOverview[]> {
     await this.assertPlatformAdmin(user);
+    if (!process.env.PLATFORM_REPORT_DATABASE_URL) {
+      throw new ServiceUnavailableException("Platform reporting database role is not configured");
+    }
     const { from, to } = this.resolveRange(range);
-    return this.prisma.$queryRaw<PlatformCompanyOverview[]>`
+    return this.platformReportPrisma.$queryRaw<PlatformCompanyOverview[]>`
       WITH companies AS (
         SELECT id, name FROM organizations WHERE parent_id IS NULL
       ),
@@ -191,7 +195,7 @@ export class AnalyticsService {
   }
 
   private async assertPlatformAdmin(user: AuthenticatedUser): Promise<void> {
-    const record = await this.prisma.user.findUnique({
+    const record = await this.platformReportPrisma.user.findUnique({
       where: { id: user.userId },
       select: { platformRole: true },
     });

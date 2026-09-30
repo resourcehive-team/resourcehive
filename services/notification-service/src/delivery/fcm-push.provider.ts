@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { applicationDefault, getApps, initializeApp } from "firebase-admin/app";
 import { getMessaging } from "firebase-admin/messaging";
-import { PrismaService } from "@resourcehive/database";
+import { WorkerPrismaService } from "@resourcehive/database";
 import { ConsolePushProvider } from "./console-delivery.providers";
 import {
   DeliveryMessage,
@@ -15,7 +15,7 @@ export class FcmPushProvider implements DeliveryProvider {
   readonly channel = "PUSH" as const;
   constructor(
     private readonly consoleProvider: ConsolePushProvider,
-    private readonly prisma: PrismaService,
+    private readonly prisma: WorkerPrismaService,
   ) {}
 
   async send(message: DeliveryMessage): Promise<DeliveryProviderResult> {

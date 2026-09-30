@@ -1,5 +1,6 @@
 export interface CreateNotificationInput {
   userId: string;
+  rootOrganizationId: string | null;
   type: string;
   title: string;
   message: string;
@@ -8,10 +9,12 @@ export interface CreateNotificationInput {
 export interface NotificationLookup {
   notificationId: string;
   userId: string;
+  rootOrganizationId: string;
 }
 
 export interface NotificationListQuery {
   userId: string;
+  rootOrganizationId: string;
   unreadOnly?: boolean;
   skip?: number;
   take?: number;
