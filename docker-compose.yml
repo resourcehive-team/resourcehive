@@ -39,7 +39,7 @@ services:
       - caddyfile
       - --watch
     ports:
-      - "${API_PORT:-8088}:${API_PORT:-8088}"
+      - "${API_PORT:-8088}:8000"
     environment:
       API_DOMAIN: ${API_DOMAIN:-http://localhost:8000}
       ACME_EMAIL: ${ACME_EMAIL:-admin@localhost}
