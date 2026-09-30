@@ -73,27 +73,40 @@ export class NotificationReadService {
   ): Promise<{ updatedCount: number }> {
     await this.assertActive(user.userId);
     return {
-      updatedCount: await this.repository.markAllReadForUser(user.userId, this.requireRoot(user)),
+      updatedCount: await this.repository.markAllReadForUser(
+        user.userId,
+        this.requireRoot(user),
+      ),
     };
   }
 
   async registerWebPush(user: AuthenticatedUser, input: RegisterWebPushDto) {
     await this.assertActive(user.userId);
     return this.subscriptionView(
-      await this.repository.registerWebPush(user.userId, this.requireRoot(user), input.token.trim()),
+      await this.repository.registerWebPush(
+        user.userId,
+        this.requireRoot(user),
+        input.token.trim(),
+      ),
     );
   }
 
   async listWebPush(user: AuthenticatedUser) {
     await this.assertActive(user.userId);
-    return (await this.repository.listWebPush(user.userId, this.requireRoot(user))).map(
-      (subscription) => this.subscriptionView(subscription),
-    );
+    return (
+      await this.repository.listWebPush(user.userId, this.requireRoot(user))
+    ).map((subscription) => this.subscriptionView(subscription));
   }
 
   async removeWebPush(id: string, user: AuthenticatedUser) {
     await this.assertActive(user.userId);
-    if (!(await this.repository.removeWebPush(id, user.userId, this.requireRoot(user)))) {
+    if (
+      !(await this.repository.removeWebPush(
+        id,
+        user.userId,
+        this.requireRoot(user),
+      ))
+    ) {
       throw new NotFoundException("Web push subscription not found");
     }
     return { removed: true };
@@ -106,7 +119,8 @@ export class NotificationReadService {
   }
 
   private requireRoot(user: AuthenticatedUser): string {
-    if (!user.rootOrganizationId) throw new UnauthorizedException("Select a university first");
+    if (!user.rootOrganizationId)
+      throw new UnauthorizedException("Select a university first");
     return user.rootOrganizationId;
   }
 

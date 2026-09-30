@@ -55,7 +55,11 @@ describe("NotificationRepository", () => {
       take: 10,
     });
     expect(notification.findMany).toHaveBeenCalledWith({
-      where: { userId: "recipient-id", rootOrganizationId: "root-id", readAt: null },
+      where: {
+        userId: "recipient-id",
+        rootOrganizationId: "root-id",
+        readAt: null,
+      },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       skip: 5,
       take: 10,
@@ -99,8 +103,17 @@ describe("NotificationRepository", () => {
     await repository.registerWebPush("user-id", "root-id", "fcm-token");
 
     expect(webPushSubscription.upsert).toHaveBeenCalledWith({
-      where: { rootOrganizationId_token: { rootOrganizationId: "root-id", token: "fcm-token" } },
-      create: { userId: "user-id", rootOrganizationId: "root-id", token: "fcm-token" },
+      where: {
+        rootOrganizationId_token: {
+          rootOrganizationId: "root-id",
+          token: "fcm-token",
+        },
+      },
+      create: {
+        userId: "user-id",
+        rootOrganizationId: "root-id",
+        token: "fcm-token",
+      },
       update: { userId: "user-id", active: true },
     });
   });

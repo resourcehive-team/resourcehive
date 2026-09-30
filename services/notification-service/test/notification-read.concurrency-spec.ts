@@ -13,6 +13,7 @@ describe("Concurrent notification reads", () => {
 
   it("keeps one notification record when concurrent requests mark it read", async () => {
     const userId = randomUUID();
+    const rootOrganizationId = randomUUID();
     const notificationId = randomUUID();
     await prisma.user.create({
       data: {
@@ -23,10 +24,20 @@ describe("Concurrent notification reads", () => {
         lastName: "Notification",
       },
     });
+    await prisma.organization.create({
+      data: {
+        id: rootOrganizationId,
+        name: "Notification concurrency university",
+        type: "UNIVERSITY",
+        rootOrganizationId,
+        createdBy: userId,
+      },
+    });
     await prisma.notification.create({
       data: {
         id: notificationId,
         userId,
+        rootOrganizationId,
         type: "BOOKING_CREATED",
         title: "Booking confirmed",
         message: "Concurrent read test",
@@ -36,7 +47,11 @@ describe("Concurrent notification reads", () => {
     try {
       const results = await Promise.all(
         Array.from({ length: 8 }, () =>
-          repository.markReadForUser({ notificationId, userId }),
+          repository.markReadForUser({
+            notificationId,
+            userId,
+            rootOrganizationId,
+          }),
         ),
       );
 
@@ -55,6 +70,7 @@ describe("Concurrent notification reads", () => {
       expect(stored?.readAt).toBeInstanceOf(Date);
     } finally {
       await prisma.notification.delete({ where: { id: notificationId } });
+      await prisma.organization.delete({ where: { id: rootOrganizationId } });
       await prisma.user.delete({ where: { id: userId } });
     }
   });

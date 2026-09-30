@@ -27,7 +27,11 @@ describe("AnalyticsService", () => {
       role: "MEMBER",
     }),
   } as unknown as BookingAuthorizationService;
-  const service = new AnalyticsService(prisma, authorization, platformReportPrisma as never);
+  const service = new AnalyticsService(
+    prisma,
+    authorization,
+    platformReportPrisma as never,
+  );
   const user = {
     userId: "user-id",
     email: "user@example.edu",
@@ -89,7 +93,9 @@ describe("AnalyticsService", () => {
   });
 
   it("queries platform overview for a platform administrator", async () => {
-    platformFindUniqueUser.mockResolvedValue({ platformRole: "PLATFORM_ADMIN" });
+    platformFindUniqueUser.mockResolvedValue({
+      platformRole: "PLATFORM_ADMIN",
+    });
 
     await service.platformOverview(user, {});
 

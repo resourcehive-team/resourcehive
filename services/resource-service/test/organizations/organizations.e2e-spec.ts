@@ -5,14 +5,17 @@ import { App } from 'supertest/types';
 import { AppModule } from '../../src/app.module';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '@resourcehive/database';
+import {
+  PrismaClient,
+  UniversityContextInterceptor,
+} from '@resourcehive/database';
 
 describe('OrganizationsController (e2e)', () => {
   jest.setTimeout(30000);
   let app: INestApplication<App>;
   let jwtToken: string;
   let adminJwtToken: string;
-  let prisma: PrismaService;
+  let prisma: PrismaClient;
 
   const demoUserId = '00000000-0000-4000-8000-000000000001';
   const demoOrganizationId = '00000000-0000-4000-8000-000000000002';
@@ -30,9 +33,12 @@ describe('OrganizationsController (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    app.useGlobalInterceptors(new UniversityContextInterceptor());
     await app.init();
 
-    prisma = app.get(PrismaService);
+    prisma = new PrismaClient({
+      datasources: { db: { url: process.env.DATABASE_URL } },
+    });
 
     // Setup deep hierarchy user
     await prisma.user.upsert({
@@ -142,6 +148,7 @@ describe('OrganizationsController (e2e)', () => {
         sub: demoUserId,
         email: 'demo@example.edu',
         organizationId: demoOrganizationId,
+        rootOrganizationId: demoOrganizationId,
         role: 'member',
       },
       { secret },
@@ -152,6 +159,7 @@ describe('OrganizationsController (e2e)', () => {
         sub: deepAdminUserId,
         email: 'deep-admin@example.edu',
         organizationId: rootOrgId,
+        rootOrganizationId: rootOrgId,
         role: 'admin',
       },
       { secret },
@@ -180,6 +188,7 @@ describe('OrganizationsController (e2e)', () => {
     await prisma.organization
       .delete({ where: { id: otherTenantOrgId } })
       .catch(() => {});
+    await prisma.$disconnect();
     await app.close();
   });
 

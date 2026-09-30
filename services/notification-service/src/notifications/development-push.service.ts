@@ -30,10 +30,16 @@ export class DevelopmentPushService {
     }
 
     if (!user.rootOrganizationId) {
-      throw new BadRequestException("Select a university before sending a test push");
+      throw new BadRequestException(
+        "Select a university before sending a test push",
+      );
     }
     const pushDeliveriesQueued = await this.prisma.webPushSubscription.count({
-      where: { userId: user.userId, rootOrganizationId: user.rootOrganizationId, active: true },
+      where: {
+        userId: user.userId,
+        rootOrganizationId: user.rootOrganizationId,
+        active: true,
+      },
     });
     if (pushDeliveriesQueued === 0) {
       throw new BadRequestException(

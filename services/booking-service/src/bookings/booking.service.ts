@@ -1,5 +1,9 @@
 import { HttpException, Injectable } from "@nestjs/common";
-import { Prisma, PrismaService, runWithUniversityContext } from "@resourcehive/database";
+import {
+  Prisma,
+  PrismaService,
+  runWithUniversityContext,
+} from "@resourcehive/database";
 import { AuthenticatedUser } from "@resourcehive/service-auth";
 import { BookingAuthorizationService } from "../authorization/booking-authorization.service";
 import { BookingNotificationService } from "../notifications/booking-notification.service";
@@ -450,14 +454,18 @@ export class BookingService {
     }
   }
 
-  async reevaluateBookings(resourceId: string, rootOrganizationId: string): Promise<void> {
-    return runWithUniversityContext(
-      { rootOrganizationId, userId: "" },
-      () => this.reevaluateBookingsWithinTenant(resourceId),
+  async reevaluateBookings(
+    resourceId: string,
+    rootOrganizationId: string,
+  ): Promise<void> {
+    return runWithUniversityContext({ rootOrganizationId, userId: "" }, () =>
+      this.reevaluateBookingsWithinTenant(resourceId),
     );
   }
 
-  private async reevaluateBookingsWithinTenant(resourceId: string): Promise<void> {
+  private async reevaluateBookingsWithinTenant(
+    resourceId: string,
+  ): Promise<void> {
     try {
       const now = new Date();
       const futureBookings = await this.prisma.booking.findMany({

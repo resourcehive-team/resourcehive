@@ -113,8 +113,10 @@ const account = (platformRole = "USER"): CurrentUserResponse => ({
   },
   organizationContext: {
     organizationId: null,
+    rootOrganizationId: null,
     role: null,
   },
+  universities: [],
 });
 
 function membership(

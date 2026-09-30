@@ -50,6 +50,7 @@ describe("BookingsController (e2e read and completion endpoints)", () => {
             userId: "user-123",
             email: "user@example.com",
             organizationId: "org-456",
+            rootOrganizationId: "root-456",
             role: "admin",
           };
           return true;

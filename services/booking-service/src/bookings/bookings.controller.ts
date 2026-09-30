@@ -37,7 +37,7 @@ import {
   JwtAuthGuard,
 } from "@resourcehive/service-auth";
 import { BookingService } from "./booking.service";
-import { InternalReevaluateDto } from './internal-reevaluate.dto';
+import { InternalReevaluateDto } from "./internal-reevaluate.dto";
 import {
   CancelBookingDto,
   CreateBookingDto,
@@ -68,17 +68,23 @@ export class BookingsController {
   })
   async reevaluateBookings(
     @Body() body: InternalReevaluateDto,
-    @Headers('x-internal-service-token') serviceToken: string | undefined,
+    @Headers("x-internal-service-token") serviceToken: string | undefined,
   ): Promise<void> {
     const expected = process.env.INTERNAL_SERVICE_TOKEN;
     if (
-      !expected || !serviceToken ||
+      !expected ||
+      !serviceToken ||
       Buffer.byteLength(expected) !== Buffer.byteLength(serviceToken) ||
       !timingSafeEqual(Buffer.from(expected), Buffer.from(serviceToken))
     ) {
-      throw new UnauthorizedException('Internal service authentication is required.');
+      throw new UnauthorizedException(
+        "Internal service authentication is required.",
+      );
     }
-    await this.bookings.reevaluateBookings(body.resourceId, body.rootOrganizationId);
+    await this.bookings.reevaluateBookings(
+      body.resourceId,
+      body.rootOrganizationId,
+    );
   }
 
   @Post()

@@ -73,6 +73,7 @@ describeWithDatabase("Atomic booking creation integration", () => {
             data: {
               id: slotId,
               resourceId,
+              rootOrganizationId: organizationId,
               startsAt: new Date("2035-08-01T10:00:00.000Z"),
               endsAt: new Date("2035-08-01T11:00:00.000Z"),
             },
@@ -80,11 +81,23 @@ describeWithDatabase("Atomic booking creation integration", () => {
           await transaction.pointTransaction.create({
             data: {
               userId,
+              rootOrganizationId: organizationId,
               amount: 100,
               transactionType: "JOIN_BONUS",
               sourceOrganizationId: organizationId,
             },
           });
+          await expect(
+            transaction.userPointBalance.findUnique({
+              where: {
+                userId_rootOrganizationId: {
+                  userId,
+                  rootOrganizationId: organizationId,
+                },
+              },
+              select: { availablePoints: true },
+            }),
+          ).resolves.toEqual({ availablePoints: 100 });
 
           const transactionalPrisma = {
             $transaction: <T>(
@@ -105,6 +118,7 @@ describeWithDatabase("Atomic booking creation integration", () => {
             userId,
             email: `atomic-booking-${userId}@example.edu`,
             organizationId,
+            rootOrganizationId: organizationId,
             role: "member",
           });
 
@@ -129,6 +143,17 @@ describeWithDatabase("Atomic booking creation integration", () => {
               },
             }),
           ).resolves.toBe(1);
+          await expect(
+            transaction.userPointBalance.findUnique({
+              where: {
+                userId_rootOrganizationId: {
+                  userId,
+                  rootOrganizationId: organizationId,
+                },
+              },
+              select: { availablePoints: true },
+            }),
+          ).resolves.toEqual({ availablePoints: 75 });
 
           throw rollbackFixture;
         },

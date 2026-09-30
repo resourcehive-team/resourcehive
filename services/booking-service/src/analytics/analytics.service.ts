@@ -1,5 +1,13 @@
-import { ForbiddenException, Injectable, ServiceUnavailableException } from "@nestjs/common";
-import { PlatformReportPrismaService, Prisma, PrismaService } from "@resourcehive/database";
+import {
+  ForbiddenException,
+  Injectable,
+  ServiceUnavailableException,
+} from "@nestjs/common";
+import {
+  PlatformReportPrismaService,
+  Prisma,
+  PrismaService,
+} from "@resourcehive/database";
 import { AuthenticatedUser } from "@resourcehive/service-auth";
 import { BookingAuthorizationService } from "../authorization/booking-authorization.service";
 import { DateRangeDto } from "./analytics.dto";
@@ -153,7 +161,9 @@ export class AnalyticsService {
   ): Promise<PlatformCompanyOverview[]> {
     await this.assertPlatformAdmin(user);
     if (!process.env.PLATFORM_REPORT_DATABASE_URL) {
-      throw new ServiceUnavailableException("Platform reporting database role is not configured");
+      throw new ServiceUnavailableException(
+        "Platform reporting database role is not configured",
+      );
     }
     const { from, to } = this.resolveRange(range);
     return this.platformReportPrisma.$queryRaw<PlatformCompanyOverview[]>`

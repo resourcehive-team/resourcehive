@@ -69,8 +69,10 @@ const account: CurrentUserResponse = {
   },
   organizationContext: {
     organizationId: "organization-1",
+    rootOrganizationId: "university-1",
     role: "member",
   },
+  universities: [],
 };
 
 describe("AccountDetails", () => {

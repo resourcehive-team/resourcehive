@@ -35,10 +35,13 @@ export class NotificationCommandService {
       );
     }
     if (
-      (command.channels.includes("IN_APP") || command.channels.includes("PUSH")) &&
+      (command.channels.includes("IN_APP") ||
+        command.channels.includes("PUSH")) &&
       !command.rootOrganizationId
     ) {
-      throw new UnauthorizedException("Tenant notifications require a university context");
+      throw new UnauthorizedException(
+        "Tenant notifications require a university context",
+      );
     }
     const result = await this.prisma.$transaction((transaction) =>
       this.processWithinTransaction(command, transaction),
@@ -81,7 +84,9 @@ export class NotificationCommandService {
         select: { id: true },
       });
       if (!membership) {
-        throw new UnauthorizedException("Recipient is not a member of this university");
+        throw new UnauthorizedException(
+          "Recipient is not a member of this university",
+        );
       }
     }
 

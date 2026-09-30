@@ -36,9 +36,7 @@ describe("DevelopmentPushService", () => {
   it("is unavailable in production", async () => {
     process.env.NODE_ENV = "production";
 
-    await expect(service.queue(user)).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(service.queue(user)).rejects.toBeInstanceOf(NotFoundException);
     expect(countSubscriptions).not.toHaveBeenCalled();
   });
 

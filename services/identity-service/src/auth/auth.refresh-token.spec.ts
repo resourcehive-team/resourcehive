@@ -193,7 +193,10 @@ describe('AuthService refresh sessions', () => {
       revokedAt: null,
       usedAt: null,
     });
-    user.findUnique.mockResolvedValue({ id: 'user-id', email: 'alex@example.edu' });
+    user.findUnique.mockResolvedValue({
+      id: 'user-id',
+      email: 'alex@example.edu',
+    });
 
     const result = await service.switchActiveUniversity(
       'user-id',

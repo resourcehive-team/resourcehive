@@ -23,7 +23,11 @@ export class PointLedgerService {
     client?: PointLedgerClient,
   ): Promise<number> {
     try {
-      return await this.repository.getBalance(userId, rootOrganizationId, client);
+      return await this.repository.getBalance(
+        userId,
+        rootOrganizationId,
+        client,
+      );
     } catch (error) {
       this.handleError(error, "retrieve");
     }
@@ -39,7 +43,11 @@ export class PointLedgerService {
       if (!Number.isInteger(required) || required < 0) {
         throw new InvalidPointRequirementError();
       }
-      const balance = await this.repository.getBalance(userId, rootOrganizationId, client);
+      const balance = await this.repository.getBalance(
+        userId,
+        rootOrganizationId,
+        client,
+      );
       if (balance < required) {
         throw new InsufficientPointsError(balance, required);
       }

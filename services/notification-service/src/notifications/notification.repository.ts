@@ -55,7 +55,11 @@ export class NotificationRepository {
     userId,
     rootOrganizationId,
   }: NotificationLookup): Promise<NotificationRecord | null> {
-    const owned = await this.findByIdForUser({ notificationId, userId, rootOrganizationId });
+    const owned = await this.findByIdForUser({
+      notificationId,
+      userId,
+      rootOrganizationId,
+    });
     if (!owned) return null;
     if (owned.readAt) return owned;
     return this.prisma.notification.update({
@@ -69,7 +73,11 @@ export class NotificationRepository {
     userId,
     rootOrganizationId,
   }: NotificationLookup): Promise<NotificationRecord | null> {
-    const owned = await this.findByIdForUser({ notificationId, userId, rootOrganizationId });
+    const owned = await this.findByIdForUser({
+      notificationId,
+      userId,
+      rootOrganizationId,
+    });
     if (!owned) return null;
     if (!owned.readAt) return owned;
     return this.prisma.notification.update({
@@ -78,7 +86,10 @@ export class NotificationRepository {
     });
   }
 
-  async markAllReadForUser(userId: string, rootOrganizationId: string): Promise<number> {
+  async markAllReadForUser(
+    userId: string,
+    rootOrganizationId: string,
+  ): Promise<number> {
     const result = await this.prisma.notification.updateMany({
       where: { userId, rootOrganizationId, readAt: null },
       data: { readAt: new Date() },
@@ -109,7 +120,11 @@ export class NotificationRepository {
     });
   }
 
-  async removeWebPush(id: string, userId: string, rootOrganizationId: string): Promise<boolean> {
+  async removeWebPush(
+    id: string,
+    userId: string,
+    rootOrganizationId: string,
+  ): Promise<boolean> {
     const result = await this.prisma.webPushSubscription.updateMany({
       where: { id, userId, rootOrganizationId },
       data: { active: false },

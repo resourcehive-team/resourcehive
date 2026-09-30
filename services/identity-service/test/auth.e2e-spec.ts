@@ -1,8 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
-import { PrismaService } from '@resourcehive/database';
+import { JwtService } from '@nestjs/jwt';
+import {
+  PrismaService,
+  UniversityContextInterceptor,
+} from '@resourcehive/database';
 import { NotificationClientService } from '@resourcehive/notification-client';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
@@ -82,6 +86,7 @@ describe('Authentication Flow (e2e)', () => {
       .compile();
 
     app = moduleFixture.createNestApplication();
+    app.useGlobalInterceptors(new UniversityContextInterceptor());
     app.useGlobalPipes(
       new ValidationPipe({
         transform: true,
@@ -99,6 +104,101 @@ describe('Authentication Flow (e2e)', () => {
       .get('/')
       .expect(200)
       .expect('Identity Service is running');
+  });
+
+  it('lets a platform administrator create a university for an existing verified account', async () => {
+    const suffix = randomUUID();
+    const platformAdmin = await prisma.user.create({
+      data: {
+        email: `platform-${suffix}@example.edu`,
+        firstName: 'Platform',
+        lastName: 'Admin',
+        emailVerifiedAt: new Date(),
+        platformRole: 'PLATFORM_ADMIN',
+      },
+    });
+    const assignedAdmin = await prisma.user.create({
+      data: {
+        email: `tenant-${suffix}@example.edu`,
+        firstName: 'Tenant',
+        lastName: 'Admin',
+        emailVerifiedAt: new Date(),
+      },
+    });
+    const token = await app
+      .get<JwtService>(JwtService)
+      .signAsync(
+        { sub: platformAdmin.id, email: platformAdmin.email },
+        { secret: process.env.JWT_SECRET },
+      );
+
+    const response = await request(app.getHttpServer())
+      .post('/auth/platform/organizations')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'New RLS University', adminEmail: assignedAdmin.email })
+      .expect(201);
+
+    const rootId = (response.body as { university: { id: string } }).university
+      .id;
+    expect(response.body).toMatchObject({
+      university: { id: rootId, name: 'New RLS University' },
+      administrator: { email: assignedAdmin.email },
+    });
+    const organization = await prisma.organization.findUniqueOrThrow({
+      where: { id: rootId },
+    });
+    expect(organization).toMatchObject({
+      id: rootId,
+      rootOrganizationId: rootId,
+      parentId: null,
+      type: 'UNIVERSITY',
+      createdBy: platformAdmin.id,
+    });
+    const membership = await prisma.organizationMembership.findUniqueOrThrow({
+      where: {
+        userId_organizationId: {
+          userId: assignedAdmin.id,
+          organizationId: rootId,
+        },
+      },
+    });
+    expect(membership).toMatchObject({
+      role: 'ADMIN',
+      status: 'APPROVED',
+      reviewedBy: platformAdmin.id,
+    });
+    await expect(
+      prisma.organizationMembershipAudit.findFirst({
+        where: { membershipId: membership.id, actorUserId: platformAdmin.id },
+      }),
+    ).resolves.toMatchObject({ action: 'ADMIN_GRANTED' });
+  });
+
+  it('rejects university creation by ordinary users and unauthenticated callers', async () => {
+    const ordinaryUser = await prisma.user.create({
+      data: {
+        email: `ordinary-${randomUUID()}@example.edu`,
+        firstName: 'Ordinary',
+        lastName: 'User',
+        emailVerifiedAt: new Date(),
+      },
+    });
+    const token = await app
+      .get<JwtService>(JwtService)
+      .signAsync(
+        { sub: ordinaryUser.id, email: ordinaryUser.email },
+        { secret: process.env.JWT_SECRET },
+      );
+
+    await request(app.getHttpServer())
+      .post('/auth/platform/organizations')
+      .send({ name: 'Denied University', adminEmail: ordinaryUser.email })
+      .expect(401);
+    await request(app.getHttpServer())
+      .post('/auth/platform/organizations')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'Denied University', adminEmail: ordinaryUser.email })
+      .expect(403);
   });
 
   it('serves the identity OpenAPI document and raw YAML document', async () => {
@@ -137,7 +237,7 @@ describe('Authentication Flow (e2e)', () => {
 
     const current = await request(app.getHttpServer())
       .get('/auth/me')
-      .set('Cookie', accessCookie!.split(';')[0])
+      .set('Cookie', accessCookie.split(';')[0])
       .expect(200);
     const selectedRoot = (current.body as CurrentUserResponse).universities[0]
       ?.rootOrganizationId;
@@ -145,24 +245,28 @@ describe('Authentication Flow (e2e)', () => {
 
     const switched = await request(app.getHttpServer())
       .post('/auth/active-university')
-      .set('Cookie', `${accessCookie!.split(';')[0]}; ${refreshCookie!.split(';')[0]}`)
+      .set(
+        'Cookie',
+        `${accessCookie.split(';')[0]}; ${refreshCookie.split(';')[0]}`,
+      )
       .send({ rootOrganizationId: selectedRoot })
       .expect(200);
-    expect(switched.body.organizationContext.rootOrganizationId).toBe(selectedRoot);
+    expect(
+      (switched.body as CurrentUserResponse).organizationContext
+        .rootOrganizationId,
+    ).toBe(selectedRoot);
 
     const refreshed = await request(app.getHttpServer())
       .post('/auth/refresh')
-      .set('Cookie', refreshCookie!.split(';')[0])
+      .set('Cookie', refreshCookie.split(';')[0])
       .expect(200);
     const refreshedAccess = (
       refreshed.headers['set-cookie'] as unknown as string[]
-    ).find(
-      (cookie) => cookie.startsWith('resourcehive_access_token='),
-    );
+    ).find((cookie) => cookie.startsWith('resourcehive_access_token='));
     expect(refreshedAccess).toBeDefined();
     const refreshedCurrent = await request(app.getHttpServer())
       .get('/auth/me')
-      .set('Cookie', refreshedAccess!.split(';')[0])
+      .set('Cookie', refreshedAccess.split(';')[0])
       .expect(200);
     expect(
       (refreshedCurrent.body as CurrentUserResponse).organizationContext

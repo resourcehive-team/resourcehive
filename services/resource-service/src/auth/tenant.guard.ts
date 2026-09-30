@@ -4,7 +4,11 @@ import {
   Injectable,
   ForbiddenException,
 } from '@nestjs/common';
-import { OrganizationMembership, Prisma, PrismaService } from '@resourcehive/database';
+import {
+  OrganizationMembership,
+  Prisma,
+  PrismaService,
+} from '@resourcehive/database';
 import type { AuthenticatedRequest } from '@resourcehive/service-auth';
 
 interface TenantRequest extends AuthenticatedRequest {
@@ -34,12 +38,20 @@ export class TenantGuard implements CanActivate {
     }
 
     if (!user.rootOrganizationId) {
-      throw new ForbiddenException('Select a university before accessing organizations.');
+      throw new ForbiddenException(
+        'Select a university before accessing organizations.',
+      );
     }
 
     return this.prisma.withUniversity(
       { rootOrganizationId: user.rootOrganizationId, userId: user.userId },
-      async (transaction) => this.checkOrganizationAccess(request, organizationId, user.userId, transaction),
+      async (transaction) =>
+        this.checkOrganizationAccess(
+          request,
+          organizationId,
+          user.userId,
+          transaction,
+        ),
     );
   }
 
@@ -47,9 +59,11 @@ export class TenantGuard implements CanActivate {
     request: TenantRequest,
     organizationId: string,
     userId: string,
-    transaction: Pick<Prisma.TransactionClient, 'organization' | 'organizationMembership'>,
+    transaction: Pick<
+      Prisma.TransactionClient,
+      'organization' | 'organizationMembership'
+    >,
   ): Promise<boolean> {
-
     // Verify if the user has a direct membership to this organization
     const directMembership =
       await transaction.organizationMembership.findUnique({

@@ -16,7 +16,12 @@ permissions:
 env:
   CI_DATABASE_URL: postgresql://postgres:password@localhost:5432/testdb?schema=public
   CI_TEST_DATABASE_URL: postgresql://postgres:password@localhost:5432/integritydb
+  CI_APP_DATABASE_URL: postgresql://resourcehive_app_login:ci-password@localhost:5432/testdb?schema=public
+  CI_AUTH_DATABASE_URL: postgresql://resourcehive_auth_login:ci-password@localhost:5432/testdb?schema=public
+  CI_WORKER_DATABASE_URL: postgresql://resourcehive_worker_login:ci-password@localhost:5432/testdb?schema=public
+  CI_PLATFORM_REPORT_DATABASE_URL: postgresql://resourcehive_platform_login:ci-password@localhost:5432/testdb?schema=public
   CI_JWT_SECRET: resourcehive-ci-secret-at-least-thirty-two-characters
+  CI_INTERNAL_SERVICE_TOKEN: resourcehive-ci-internal-service-token
 
 jobs:
   database:
@@ -68,6 +73,25 @@ jobs:
         env:
           DATABASE_URL: ${{ env.CI_DATABASE_URL }}
           DATABASE_URL_UNPOOLED: ${{ env.CI_DATABASE_URL }}
+
+      - name: Create restricted CI runtime logins
+        run: psql "postgresql://postgres:password@localhost:5432/testdb" -v ON_ERROR_STOP=1 -f db/schema/tests/create-ci-roles.sql
+
+      - name: Build database client for RLS checks
+        run: pnpm --filter @resourcehive/database run build
+        env:
+          DATABASE_URL: ${{ env.CI_DATABASE_URL }}
+          DATABASE_URL_UNPOOLED: ${{ env.CI_DATABASE_URL }}
+
+      - name: Verify university row security with restricted roles
+        run: node db/schema/tests/rls-test.cjs
+        env:
+          DATABASE_URL: ${{ env.CI_DATABASE_URL }}
+          CI_OWNER_DATABASE_URL: ${{ env.CI_DATABASE_URL }}
+          APP_DATABASE_URL: ${{ env.CI_APP_DATABASE_URL }}
+          AUTH_DATABASE_URL: ${{ env.CI_AUTH_DATABASE_URL }}
+          WORKER_DATABASE_URL: ${{ env.CI_WORKER_DATABASE_URL }}
+          PLATFORM_REPORT_DATABASE_URL: ${{ env.CI_PLATFORM_REPORT_DATABASE_URL }}
 
       - name: Create disposable integrity-test database
         run: createdb --host localhost --username postgres integritydb
@@ -214,6 +238,11 @@ jobs:
       DATABASE_URL: postgresql://postgres:password@localhost:5432/testdb?schema=public
       DATABASE_URL_UNPOOLED: postgresql://postgres:password@localhost:5432/testdb?schema=public
       TEST_DATABASE_URL: postgresql://postgres:password@localhost:5432/testdb?schema=public
+      APP_DATABASE_URL: postgresql://resourcehive_app_login:ci-password@localhost:5432/testdb?schema=public
+      AUTH_DATABASE_URL: postgresql://resourcehive_auth_login:ci-password@localhost:5432/testdb?schema=public
+      WORKER_DATABASE_URL: postgresql://resourcehive_worker_login:ci-password@localhost:5432/testdb?schema=public
+      PLATFORM_REPORT_DATABASE_URL: postgresql://resourcehive_platform_login:ci-password@localhost:5432/testdb?schema=public
+      INTERNAL_SERVICE_TOKEN: resourcehive-ci-internal-service-token
       JWT_SECRET: resourcehive-ci-secret-at-least-thirty-two-characters
       BCRYPT_ROUNDS: "4"
 
@@ -236,6 +265,7 @@ jobs:
       - name: Initialize test database and shared packages
         run: |
           pnpm run db:init
+          psql "postgresql://postgres:password@localhost:5432/testdb" -v ON_ERROR_STOP=1 -f db/schema/tests/create-ci-roles.sql
           pnpm --filter @resourcehive/service-auth run build
           pnpm --filter @resourcehive/notification-client run build
 
@@ -244,6 +274,8 @@ jobs:
 
       - name: Run Identity Service e2e tests
         run: pnpm --filter identity-service run test:e2e
+        env:
+          APP_DATABASE_URL: ${{ env.CI_AUTH_DATABASE_URL }}
 
       - name: Run Resource Service e2e tests
         run: pnpm --filter resource-service run test:e2e
@@ -253,18 +285,26 @@ jobs:
 
       - name: Run Booking Service integration tests
         run: pnpm --filter booking-service run test:integration
+        env:
+          APP_DATABASE_URL: ${{ env.CI_DATABASE_URL }}
 
       - name: Run Booking Service concurrency tests
         run: pnpm --filter booking-service run test:concurrency
+        env:
+          APP_DATABASE_URL: ${{ env.CI_DATABASE_URL }}
 
       - name: Run Notification Service e2e tests
         run: pnpm --filter notification-service run test:e2e
 
       - name: Run Notification Service integration tests
         run: pnpm --filter notification-service run test:integration
+        env:
+          APP_DATABASE_URL: ${{ env.CI_DATABASE_URL }}
 
       - name: Run Notification Service concurrency tests
         run: pnpm --filter notification-service run test:concurrency
+        env:
+          APP_DATABASE_URL: ${{ env.CI_DATABASE_URL }}
 
   infrastructure:
     name: Deployment configuration
@@ -284,6 +324,11 @@ jobs:
         env:
           DATABASE_URL: ${{ env.CI_DATABASE_URL }}
           DATABASE_URL_UNPOOLED: ${{ env.CI_DATABASE_URL }}
+          APP_DATABASE_URL: ${{ env.CI_APP_DATABASE_URL }}
+          AUTH_DATABASE_URL: ${{ env.CI_AUTH_DATABASE_URL }}
+          WORKER_DATABASE_URL: ${{ env.CI_WORKER_DATABASE_URL }}
+          PLATFORM_REPORT_DATABASE_URL: ${{ env.CI_PLATFORM_REPORT_DATABASE_URL }}
+          INTERNAL_SERVICE_TOKEN: ${{ env.CI_INTERNAL_SERVICE_TOKEN }}
           FIREBASE_PROJECT_ID: resourcehive-ci
           GOOGLE_APPLICATION_CREDENTIALS: .env.example
           JWT_SECRET: ${{ env.CI_JWT_SECRET }}

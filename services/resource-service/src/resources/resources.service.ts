@@ -172,8 +172,14 @@ export class ResourcesService {
     if (shouldReevaluate) {
       fetch('http://booking-service:3002/bookings/internal/reevaluate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-internal-service-token': process.env.INTERNAL_SERVICE_TOKEN ?? '' },
-        body: JSON.stringify({ resourceId, rootOrganizationId: resource.rootOrganizationId }),
+        headers: {
+          'Content-Type': 'application/json',
+          'x-internal-service-token': process.env.INTERNAL_SERVICE_TOKEN ?? '',
+        },
+        body: JSON.stringify({
+          resourceId,
+          rootOrganizationId: resource.rootOrganizationId,
+        }),
       }).catch((err) =>
         console.error('Failed to trigger booking reevaluation:', err),
       );
@@ -196,8 +202,14 @@ export class ResourcesService {
 
     fetch('http://booking-service:3002/bookings/internal/reevaluate', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-internal-service-token': process.env.INTERNAL_SERVICE_TOKEN ?? '' },
-      body: JSON.stringify({ resourceId, rootOrganizationId: resource.rootOrganizationId }),
+      headers: {
+        'Content-Type': 'application/json',
+        'x-internal-service-token': process.env.INTERNAL_SERVICE_TOKEN ?? '',
+      },
+      body: JSON.stringify({
+        resourceId,
+        rootOrganizationId: resource.rootOrganizationId,
+      }),
     }).catch((err) =>
       console.error('Failed to trigger booking reevaluation:', err),
     );

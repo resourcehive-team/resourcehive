@@ -80,6 +80,10 @@ describe("NotificationReadService", () => {
 
     await service.registerWebPush(user, { token: " fcm-token " });
 
-    expect(registerWebPush).toHaveBeenCalledWith(user.userId, "root-id", "fcm-token");
+    expect(registerWebPush).toHaveBeenCalledWith(
+      user.userId,
+      "root-id",
+      "fcm-token",
+    );
   });
 });
