@@ -1,9 +1,16 @@
 import { Resend } from "resend";
-import { ResendEmailProvider } from "./resend-email.provider";
+import { classifyResendError, ResendEmailProvider } from "./resend.provider";
 
 jest.mock("resend", () => ({
   Resend: jest.fn(),
 }));
+
+describe("Resend error classification", () => {
+  it("retries rate limits", () =>
+    expect(classifyResendError({ statusCode: 429 }).transient).toBe(true));
+  it("does not retry invalid recipients", () =>
+    expect(classifyResendError({ statusCode: 422 }).transient).toBe(false));
+});
 
 describe("ResendEmailProvider", () => {
   const message = {

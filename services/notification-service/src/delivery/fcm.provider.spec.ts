@@ -1,4 +1,4 @@
-import { classifyFcmError, isInvalidFcmTarget } from "./fcm-error-classifier";
+import { classifyFcmError, isInvalidFcmTarget } from "./fcm.provider";
 
 describe("FCM error classification", () => {
   it("retries provider availability errors", () =>

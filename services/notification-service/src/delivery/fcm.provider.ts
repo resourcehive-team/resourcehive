@@ -2,13 +2,37 @@ import { Injectable } from "@nestjs/common";
 import { applicationDefault, getApps, initializeApp } from "firebase-admin/app";
 import { getMessaging } from "firebase-admin/messaging";
 import { PrismaService } from "@resourcehive/database";
-import { ConsolePushProvider } from "./console-delivery.providers";
 import {
+  ConsolePushProvider,
   DeliveryMessage,
   DeliveryProvider,
+  DeliveryProviderError,
   DeliveryProviderResult,
 } from "./delivery-provider";
-import { classifyFcmError, isInvalidFcmTarget } from "./fcm-error-classifier";
+
+const transientCodes = new Set([
+  "messaging/internal-error",
+  "messaging/server-unavailable",
+  "messaging/message-rate-exceeded",
+]);
+const invalidTargetCodes = new Set([
+  "messaging/invalid-registration-token",
+  "messaging/registration-token-not-registered",
+]);
+
+export function classifyFcmError(error: unknown): DeliveryProviderError {
+  const value = (error ?? {}) as { code?: string; message?: string };
+  const code = value.code ?? "FCM_UNKNOWN_ERROR";
+  return new DeliveryProviderError(
+    code,
+    transientCodes.has(code),
+    value.message ?? "FCM rejected the push notification",
+  );
+}
+
+export function isInvalidFcmTarget(error: unknown): boolean {
+  return invalidTargetCodes.has((error as { code?: string })?.code ?? "");
+}
 
 @Injectable()
 export class FcmPushProvider implements DeliveryProvider {

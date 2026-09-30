@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { PrismaService } from "@resourcehive/database";
+import { decideRetry } from "./retry-policy";
 
 @Injectable()
 export class DeliveryRepository {
@@ -37,10 +38,7 @@ export class DeliveryRepository {
     });
   }
 
-  fail(
-    id: string,
-    decision: ReturnType<typeof import("./retry-policy").decideRetry>,
-  ) {
+  fail(id: string, decision: ReturnType<typeof decideRetry>) {
     return this.prisma.notificationDelivery.update({
       where: { id },
       data: {
