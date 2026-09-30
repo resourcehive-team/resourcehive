@@ -4,11 +4,13 @@ import {
   Injectable,
   InternalServerErrorException,
   Logger,
+  NotFoundException,
   Optional,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '@resourcehive/database';
+import { getUniversityDbContext } from '@resourcehive/database';
 import * as bcrypt from 'bcrypt';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { EmailService } from '../email/email.service';
@@ -46,8 +48,12 @@ export class AuthService {
   ) {}
 
   async getCurrentUserPoints(userId: string) {
+    const rootOrganizationId = getUniversityDbContext()?.rootOrganizationId;
+    if (!rootOrganizationId) {
+      return { userId, availablePoints: 0, updatedAt: null };
+    }
     const balance = await this.prisma.userPointBalance.findUnique({
-      where: { userId },
+      where: { userId_rootOrganizationId: { userId, rootOrganizationId } },
       select: {
         availablePoints: true,
         updatedAt: true,
@@ -59,6 +65,74 @@ export class AuthService {
       availablePoints: balance?.availablePoints ?? 0,
       updatedAt: balance?.updatedAt.toISOString() ?? null,
     };
+  }
+
+  async createPlatformUniversity(
+    name: string,
+    adminEmail: string,
+    actorUserId: string,
+  ) {
+    const admin = await this.prisma.user.findUnique({
+      where: { email: adminEmail.trim().toLowerCase() },
+      select: {
+        id: true,
+        email: true,
+        status: true,
+        platformRole: true,
+        emailVerifiedAt: true,
+      },
+    });
+    if (!admin)
+      throw new NotFoundException('No account exists for that email.');
+    if (
+      admin.status !== 'ACTIVE' ||
+      !admin.emailVerifiedAt ||
+      admin.platformRole !== 'USER'
+    ) {
+      throw new ConflictException(
+        'The administrator must be an active, verified user account.',
+      );
+    }
+
+    const organizationId = randomUUID();
+    return this.prisma.$transaction(async (transaction) => {
+      const organization = await transaction.organization.create({
+        data: {
+          id: organizationId,
+          name: name.trim(),
+          type: 'UNIVERSITY',
+          parentId: null,
+          rootOrganizationId: organizationId,
+          joinBonusPoints: 0,
+          status: 'ACTIVE',
+          createdBy: actorUserId,
+        },
+        select: { id: true, name: true },
+      });
+      const membership = await transaction.organizationMembership.create({
+        data: {
+          userId: admin.id,
+          organizationId,
+          role: 'ADMIN',
+          status: 'APPROVED',
+          reviewedBy: actorUserId,
+          reviewedAt: new Date(),
+        },
+        select: { id: true },
+      });
+      await transaction.organizationMembershipAudit.create({
+        data: {
+          membershipId: membership.id,
+          actorUserId,
+          action: 'ADMIN_GRANTED',
+        },
+      });
+
+      return {
+        university: organization,
+        administrator: { email: admin.email },
+      };
+    });
   }
 
   private getJwtSecret() {
@@ -537,6 +611,7 @@ export class AuthService {
       select: {
         id: true,
         familyId: true,
+        activeRootOrganizationId: true,
         expiresAt: true,
         usedAt: true,
         revokedAt: true,
@@ -570,7 +645,23 @@ export class AuthService {
       throw new UnauthorizedException('Invalid or expired session');
     }
 
-    const accessToken = await this.issueAccessToken(storedToken.user);
+    if (
+      storedToken.activeRootOrganizationId &&
+      !(await this.resolveUniversityContext(
+        storedToken.user.id,
+        storedToken.activeRootOrganizationId,
+      ))
+    ) {
+      await this.revokeRefreshTokenFamily(storedToken.familyId, now);
+      throw new UnauthorizedException(
+        'The active university membership is no longer valid',
+      );
+    }
+
+    const accessToken = await this.issueAccessToken(
+      storedToken.user,
+      storedToken.activeRootOrganizationId,
+    );
     const nextToken = randomBytes(32).toString('base64url');
 
     await this.prisma.$transaction(async (transaction) => {
@@ -594,6 +685,7 @@ export class AuthService {
           familyId: storedToken.familyId,
           tokenHash: this.hashToken(nextToken),
           expiresAt: storedToken.expiresAt,
+          activeRootOrganizationId: storedToken.activeRootOrganizationId,
         },
       });
     });
@@ -616,6 +708,111 @@ export class AuthService {
     if (!storedToken) return;
 
     await this.revokeRefreshTokenFamily(storedToken.familyId, new Date());
+  }
+
+  async listUserUniversities(userId: string) {
+    const memberships = await this.prisma.organizationMembership.findMany({
+      where: {
+        userId,
+        status: 'APPROVED',
+        organization: {
+          status: 'ACTIVE',
+          rootOrganization: { status: 'ACTIVE' },
+        },
+      },
+      select: {
+        organizationId: true,
+        role: true,
+        organization: {
+          select: {
+            rootOrganizationId: true,
+            rootOrganization: { select: { name: true } },
+          },
+        },
+      },
+      orderBy: [{ joinedAt: 'asc' }, { id: 'asc' }],
+    });
+    const roots = new Map<
+      string,
+      {
+        rootOrganizationId: string;
+        organizationId: string;
+        name: string;
+        role: string;
+      }
+    >();
+    for (const membership of memberships) {
+      const organization = membership.organization;
+      if (!roots.has(organization.rootOrganizationId)) {
+        roots.set(organization.rootOrganizationId, {
+          rootOrganizationId: organization.rootOrganizationId,
+          organizationId: membership.organizationId,
+          name: organization.rootOrganization.name,
+          role: membership.role,
+        });
+      }
+    }
+    return [...roots.values()];
+  }
+
+  async switchActiveUniversity(
+    userId: string,
+    rootOrganizationId: string,
+    rawRefreshToken: string | null,
+  ) {
+    const context = await this.resolveUniversityContext(
+      userId,
+      rootOrganizationId,
+    );
+    if (!context) {
+      throw new UnauthorizedException(
+        'An approved university membership is required',
+      );
+    }
+
+    if (!rawRefreshToken) {
+      throw new UnauthorizedException('An active refresh session is required');
+    }
+    {
+      const token = await this.prisma.refreshToken.findUnique({
+        where: { tokenHash: this.hashToken(rawRefreshToken) },
+        select: {
+          id: true,
+          familyId: true,
+          userId: true,
+          expiresAt: true,
+          revokedAt: true,
+          usedAt: true,
+        },
+      });
+      if (
+        !token ||
+        token.userId !== userId ||
+        token.expiresAt <= new Date() ||
+        token.revokedAt ||
+        token.usedAt
+      ) {
+        throw new UnauthorizedException(
+          'The active refresh session is invalid',
+        );
+      }
+      await this.prisma.refreshToken.updateMany({
+        where: { familyId: token.familyId, revokedAt: null },
+        data: { activeRootOrganizationId: rootOrganizationId },
+      });
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true },
+    });
+    if (!user) throw new UnauthorizedException('The account is unavailable');
+
+    return {
+      accessToken: await this.issueAccessToken(user, rootOrganizationId),
+      organizationId: context.organizationId,
+      rootOrganizationId: context.rootOrganizationId,
+    };
   }
 
   async requestPasswordReset(request: ForgotPasswordDto) {
@@ -1131,26 +1328,71 @@ export class AuthService {
   }
 
   private async createSessionForUser(user: { id: string; email: string }) {
-    const accessToken = await this.issueAccessToken(user);
-    const refreshToken = await this.issueRefreshToken(user.id);
+    const context = await this.resolveUniversityContext(user.id);
+    const accessToken = await this.issueAccessToken(
+      user,
+      context?.rootOrganizationId,
+    );
+    const refreshToken = await this.issueRefreshToken(
+      user.id,
+      context?.rootOrganizationId ?? null,
+    );
     return { accessToken, ...refreshToken };
   }
 
-  private async issueAccessToken(user: { id: string; email: string }) {
+  private async resolveUniversityContext(
+    userId: string,
+    requestedRootId?: string | null,
+  ) {
     const membership = await this.prisma.organizationMembership.findFirst({
       where: {
-        userId: user.id,
+        userId,
         status: 'APPROVED',
+        organization: {
+          status: 'ACTIVE',
+          rootOrganization: { status: 'ACTIVE' },
+        },
+        ...(requestedRootId
+          ? {
+              organization: {
+                rootOrganizationId: requestedRootId,
+                status: 'ACTIVE',
+                rootOrganization: { status: 'ACTIVE' },
+              },
+            }
+          : {}),
       },
-      orderBy: { joinedAt: 'asc' },
+      orderBy: [{ joinedAt: 'asc' }, { id: 'asc' }],
+      select: {
+        organizationId: true,
+        role: true,
+        organization: { select: { rootOrganizationId: true } },
+      },
     });
+    return membership
+      ? {
+          organizationId: membership.organizationId,
+          role: membership.role,
+          rootOrganizationId: membership.organization.rootOrganizationId,
+        }
+      : null;
+  }
+
+  private async issueAccessToken(
+    user: { id: string; email: string },
+    rootOrganizationId?: string | null,
+  ) {
+    const context = rootOrganizationId
+      ? await this.resolveUniversityContext(user.id, rootOrganizationId)
+      : await this.resolveUniversityContext(user.id);
 
     return this.jwtService.signAsync(
       {
         sub: user.id,
         email: user.email,
-        organizationId: membership?.organizationId ?? null,
-        role: membership?.role.toLowerCase() ?? null,
+        organizationId: context?.organizationId ?? null,
+        rootOrganizationId: context?.rootOrganizationId ?? null,
+        role: context?.role.toLowerCase() ?? null,
       },
       {
         secret: this.getJwtSecret(),
@@ -1159,7 +1401,10 @@ export class AuthService {
     );
   }
 
-  private async issueRefreshToken(userId: string) {
+  private async issueRefreshToken(
+    userId: string,
+    rootOrganizationId: string | null,
+  ) {
     const token = randomBytes(32).toString('base64url');
     const expiresAt = new Date(Date.now() + this.getRefreshTokenLifetimeMs());
 
@@ -1167,6 +1412,7 @@ export class AuthService {
       data: {
         userId,
         familyId: randomUUID(),
+        activeRootOrganizationId: rootOrganizationId,
         tokenHash: this.hashToken(token),
         expiresAt,
       },

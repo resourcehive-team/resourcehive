@@ -4,6 +4,7 @@ import {
   ConflictException,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   Header,
   HttpCode,
@@ -62,6 +63,8 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { AuthenticatedRequest, JwtAuthGuard } from './jwt-auth.guard';
 import { PasswordActionDto } from './dto/password-action.dto';
+import { SwitchUniversityDto } from './dto/switch-university.dto';
+import { CreatePlatformUniversityDto } from './dto/create-platform-university.dto';
 import {
   AuthProvidersResponseDto,
   AuthorizationUrlResponseDto,
@@ -435,7 +438,64 @@ export class AuthController {
       },
       organizationContext: {
         organizationId: user.tenantId || null,
+        rootOrganizationId: user.rootOrganizationId || null,
         role: user.role || null,
+      },
+      universities: await this.authService.listUserUniversities(user.userId),
+    };
+  }
+
+  @Post('platform/organizations')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Create a university and assign its first admin' })
+  @ApiBearerAuth('bearer')
+  @ApiCookieAuth('resourcehive_access_token')
+  @ApiCreatedResponse({ description: 'University and admin created.' })
+  @ApiUnauthorizedResponse({ description: 'Authentication is required.' })
+  async createPlatformUniversity(
+    @Req() request: AuthenticatedRequest,
+    @Body() body: CreatePlatformUniversityDto,
+  ) {
+    const actor = request.user;
+    if (!actor) throw new UnauthorizedException('Authentication is required');
+    if (actor.platformRole !== 'PLATFORM_ADMIN') {
+      throw new ForbiddenException(
+        'Platform administrator access is required.',
+      );
+    }
+    return this.authService.createPlatformUniversity(
+      body.name,
+      body.adminEmail,
+      actor.userId,
+    );
+  }
+
+  @Post('active-university')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Switch the active university for this session' })
+  @ApiBearerAuth('bearer')
+  @ApiCookieAuth('resourcehive_access_token')
+  @ApiOkResponse({ description: 'The active university was changed.' })
+  @ApiUnauthorizedResponse({ description: 'Membership or session is invalid.' })
+  @HttpCode(HttpStatus.OK)
+  async switchUniversity(
+    @Req() request: AuthenticatedRequest,
+    @Body() body: SwitchUniversityDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    if (!request.user)
+      throw new UnauthorizedException('Authentication is required');
+    const result = await this.authService.switchActiveUniversity(
+      request.user.userId,
+      body.rootOrganizationId,
+      extractRefreshToken(request),
+    );
+    setAccessTokenCookie(response, result.accessToken);
+    return {
+      message: 'Active university changed.',
+      organizationContext: {
+        organizationId: result.organizationId,
+        rootOrganizationId: result.rootOrganizationId,
       },
     };
   }

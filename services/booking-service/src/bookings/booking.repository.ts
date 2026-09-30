@@ -16,6 +16,7 @@ export class BookingRepository {
       data: {
         resourceSlotId: input.resourceSlotId,
         userId: input.userId,
+        rootOrganizationId: input.rootOrganizationId,
         status: BookingStatus.CONFIRMED,
         cancellationNoticeMinutes: input.cancellationNoticeMinutes,
       },

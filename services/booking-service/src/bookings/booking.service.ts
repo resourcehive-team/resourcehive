@@ -1,5 +1,9 @@
 import { HttpException, Injectable } from "@nestjs/common";
-import { Prisma, PrismaService } from "@resourcehive/database";
+import {
+  Prisma,
+  PrismaService,
+  runWithUniversityContext,
+} from "@resourcehive/database";
 import { AuthenticatedUser } from "@resourcehive/service-auth";
 import { BookingAuthorizationService } from "../authorization/booking-authorization.service";
 import { BookingNotificationService } from "../notifications/booking-notification.service";
@@ -178,12 +182,14 @@ export class BookingService {
       if (client) {
         await this.points.assertSufficientBalance(
           context.userId,
+          context.rootOrganizationId,
           slot.resource.pointCost,
           client,
         );
       } else {
         await this.points.assertSufficientBalance(
           context.userId,
+          context.rootOrganizationId,
           slot.resource.pointCost,
         );
       }
@@ -289,6 +295,7 @@ export class BookingService {
               {
                 userId: booking.userId,
                 bookingId,
+                rootOrganizationId: booking.rootOrganizationId,
                 amount: refundPoints,
                 description: isUserCancellation
                   ? `50% refund for cancelled booking for ${booking.resourceSlot.resource.name}`
@@ -447,7 +454,18 @@ export class BookingService {
     }
   }
 
-  async reevaluateBookings(resourceId: string): Promise<void> {
+  async reevaluateBookings(
+    resourceId: string,
+    rootOrganizationId: string,
+  ): Promise<void> {
+    return runWithUniversityContext({ rootOrganizationId, userId: "" }, () =>
+      this.reevaluateBookingsWithinTenant(resourceId),
+    );
+  }
+
+  private async reevaluateBookingsWithinTenant(
+    resourceId: string,
+  ): Promise<void> {
     try {
       const now = new Date();
       const futureBookings = await this.prisma.booking.findMany({
@@ -531,6 +549,7 @@ export class BookingService {
                 {
                   userId: booking.userId,
                   bookingId: booking.id,
+                  rootOrganizationId: booking.rootOrganizationId,
                   amount: refundedPoints,
                   description: `Refund due to administrative revocation/removal for ${resource.name}`,
                 },
@@ -580,6 +599,7 @@ export class BookingService {
       {
         resourceSlotId: context.resourceSlotId,
         userId: context.userId,
+        rootOrganizationId: context.rootOrganizationId,
         cancellationNoticeMinutes: context.cancellationNoticeMinutes,
       },
       transaction,
@@ -590,6 +610,7 @@ export class BookingService {
         {
           userId: context.userId,
           bookingId: booking.id,
+          rootOrganizationId: context.rootOrganizationId,
           amount: -context.pointCost,
           description: `Booking for ${booking.resourceSlot.resource.name}`,
         },

@@ -4,14 +4,21 @@ import { BookingAuthorizationService } from "../authorization/booking-authorizat
 import { AnalyticsService } from "./analytics.service";
 
 describe("AnalyticsService", () => {
+  const originalPlatformReportUrl = process.env.PLATFORM_REPORT_DATABASE_URL;
   const organizationMembership = { findMany: jest.fn() };
   const findUniqueUser = jest.fn();
   const queryRaw = jest.fn().mockResolvedValue([]);
+  const platformQueryRaw = jest.fn().mockResolvedValue([]);
+  const platformFindUniqueUser = jest.fn();
   const prisma = {
     organizationMembership,
     user: { findUnique: findUniqueUser },
     $queryRaw: queryRaw,
   } as unknown as PrismaService;
+  const platformReportPrisma = {
+    $queryRaw: platformQueryRaw,
+    user: { findUnique: platformFindUniqueUser },
+  };
   const authorization = {
     resolve: jest.fn().mockResolvedValue({
       userId: "user-id",
@@ -20,15 +27,31 @@ describe("AnalyticsService", () => {
       role: "MEMBER",
     }),
   } as unknown as BookingAuthorizationService;
-  const service = new AnalyticsService(prisma, authorization);
+  const service = new AnalyticsService(
+    prisma,
+    authorization,
+    platformReportPrisma as never,
+  );
   const user = {
     userId: "user-id",
     email: "user@example.edu",
     organizationId: "org-id",
+    rootOrganizationId: "root-id",
     role: "member",
   };
 
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    process.env.PLATFORM_REPORT_DATABASE_URL = "configured-for-test";
+    jest.clearAllMocks();
+  });
+
+  afterAll(() => {
+    if (originalPlatformReportUrl === undefined) {
+      delete process.env.PLATFORM_REPORT_DATABASE_URL;
+    } else {
+      process.env.PLATFORM_REPORT_DATABASE_URL = originalPlatformReportUrl;
+    }
+  });
 
   it("rejects org analytics for a non-administrator", async () => {
     organizationMembership.findMany.mockResolvedValue([]);
@@ -61,19 +84,21 @@ describe("AnalyticsService", () => {
   });
 
   it("rejects platform analytics for a non platform administrator", async () => {
-    findUniqueUser.mockResolvedValue({ platformRole: "USER" });
+    platformFindUniqueUser.mockResolvedValue({ platformRole: "USER" });
 
     await expect(service.platformOverview(user, {})).rejects.toBeInstanceOf(
       ForbiddenException,
     );
-    expect(queryRaw).not.toHaveBeenCalled();
+    expect(platformQueryRaw).not.toHaveBeenCalled();
   });
 
   it("queries platform overview for a platform administrator", async () => {
-    findUniqueUser.mockResolvedValue({ platformRole: "PLATFORM_ADMIN" });
+    platformFindUniqueUser.mockResolvedValue({
+      platformRole: "PLATFORM_ADMIN",
+    });
 
     await service.platformOverview(user, {});
 
-    expect(queryRaw).toHaveBeenCalledTimes(1);
+    expect(platformQueryRaw).toHaveBeenCalledTimes(1);
   });
 });

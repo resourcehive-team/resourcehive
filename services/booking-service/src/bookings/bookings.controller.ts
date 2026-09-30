@@ -12,7 +12,10 @@ import {
   UseGuards,
   UseInterceptors,
   Inject,
+  Headers,
+  UnauthorizedException,
 } from "@nestjs/common";
+import { timingSafeEqual } from "node:crypto";
 import { CACHE_MANAGER } from "@nestjs/cache-manager";
 import type { Cache } from "cache-manager";
 import { UserCacheInterceptor } from "../common/interceptors/user-cache.interceptor";
@@ -34,6 +37,7 @@ import {
   JwtAuthGuard,
 } from "@resourcehive/service-auth";
 import { BookingService } from "./booking.service";
+import { InternalReevaluateDto } from "./internal-reevaluate.dto";
 import {
   CancelBookingDto,
   CreateBookingDto,
@@ -63,9 +67,24 @@ export class BookingsController {
       "Re-evaluate bookings for a resource when access is revoked or resource is removed",
   })
   async reevaluateBookings(
-    @Body() body: { resourceId: string },
+    @Body() body: InternalReevaluateDto,
+    @Headers("x-internal-service-token") serviceToken: string | undefined,
   ): Promise<void> {
-    await this.bookings.reevaluateBookings(body.resourceId);
+    const expected = process.env.INTERNAL_SERVICE_TOKEN;
+    if (
+      !expected ||
+      !serviceToken ||
+      Buffer.byteLength(expected) !== Buffer.byteLength(serviceToken) ||
+      !timingSafeEqual(Buffer.from(expected), Buffer.from(serviceToken))
+    ) {
+      throw new UnauthorizedException(
+        "Internal service authentication is required.",
+      );
+    }
+    await this.bookings.reevaluateBookings(
+      body.resourceId,
+      body.rootOrganizationId,
+    );
   }
 
   @Post()

@@ -80,7 +80,7 @@ export class NotificationsController {
   })
   @ApiNotFoundResponse({ description: "Unavailable in production" })
   sendTestPush(@CurrentUser() user: AuthenticatedUser) {
-    return this.developmentPush.queue(user.userId);
+    return this.developmentPush.queue(user);
   }
 
   @Post("push-subscriptions")

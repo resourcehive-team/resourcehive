@@ -5,6 +5,7 @@ import {
 } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 import { PrismaService } from "@resourcehive/database";
+import { AuthenticatedUser } from "@resourcehive/service-auth";
 import { NOTIFICATION_TEMPLATES } from "@resourcehive/notification-client";
 import { NotificationCommandService } from "../events/notification-command.service";
 
@@ -15,7 +16,7 @@ export class DevelopmentPushService {
     private readonly commands: NotificationCommandService,
   ) {}
 
-  async queue(userId: string): Promise<{
+  async queue(user: AuthenticatedUser): Promise<{
     notificationId?: string;
     pushDeliveriesQueued: number;
   }> {
@@ -28,8 +29,17 @@ export class DevelopmentPushService {
       );
     }
 
+    if (!user.rootOrganizationId) {
+      throw new BadRequestException(
+        "Select a university before sending a test push",
+      );
+    }
     const pushDeliveriesQueued = await this.prisma.webPushSubscription.count({
-      where: { userId, active: true },
+      where: {
+        userId: user.userId,
+        rootOrganizationId: user.rootOrganizationId,
+        active: true,
+      },
     });
     if (pushDeliveriesQueued === 0) {
       throw new BadRequestException(
@@ -42,7 +52,8 @@ export class DevelopmentPushService {
       kind: "notification.command",
       commandId,
       producer: "notification-service",
-      recipient: { userId },
+      recipient: { userId: user.userId },
+      rootOrganizationId: user.rootOrganizationId,
       channels: ["IN_APP", "PUSH"],
       template: {
         key: NOTIFICATION_TEMPLATES.developmentTestPush,

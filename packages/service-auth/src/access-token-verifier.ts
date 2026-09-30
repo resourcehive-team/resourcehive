@@ -60,6 +60,10 @@ export class AccessTokenVerifier {
         typeof claims.organizationId === "string"
           ? claims.organizationId
           : null,
+      rootOrganizationId:
+        typeof claims.rootOrganizationId === "string"
+          ? claims.rootOrganizationId
+          : null,
       role: typeof claims.role === "string" ? claims.role : null,
     };
   }

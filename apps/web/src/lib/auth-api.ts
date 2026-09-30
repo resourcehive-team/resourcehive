@@ -57,8 +57,53 @@ export interface CurrentUserResponse {
   };
   organizationContext: {
     organizationId: string | null;
+    rootOrganizationId: string | null;
     role: string | null;
   };
+  universities: Array<{
+    rootOrganizationId: string;
+    organizationId: string;
+    name: string;
+    role: string;
+  }>;
+}
+
+export interface CreatePlatformUniversityResponse {
+  university: { id: string; name: string };
+  administrator: { email: string };
+}
+
+export async function createPlatformUniversity(
+  name: string,
+  adminEmail: string,
+): Promise<CreatePlatformUniversityResponse> {
+  const response = await fetchWithSessionRefresh(
+    `${apiUrl}/auth/platform/organizations`,
+    {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, adminEmail }),
+    },
+  );
+  if (response.status === 401) throw new AuthenticationRequiredError();
+
+  const data: unknown = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(getApiErrorMessage(data, "Unable to create the university."));
+  }
+  return data as CreatePlatformUniversityResponse;
+}
+
+export async function switchActiveUniversity(rootOrganizationId: string): Promise<void> {
+  const response = await fetchWithSessionRefresh(`${apiUrl}/auth/active-university`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ rootOrganizationId }),
+  });
+  const data: unknown = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(getApiErrorMessage(data, "Unable to switch university."));
 }
 
 export interface CurrentUserPointsResponse {
@@ -617,9 +662,19 @@ function isCurrentUserResponse(data: unknown): data is CurrentUserResponse {
     "organizationId" in organizationContext &&
     (typeof organizationContext.organizationId === "string" ||
       organizationContext.organizationId === null) &&
+    "rootOrganizationId" in organizationContext &&
+    (typeof organizationContext.rootOrganizationId === "string" || organizationContext.rootOrganizationId === null) &&
     "role" in organizationContext &&
     (typeof organizationContext.role === "string" ||
-      organizationContext.role === null)
+      organizationContext.role === null) &&
+    "universities" in data &&
+    Array.isArray(data.universities) &&
+    data.universities.every((university) =>
+      !!university && typeof university === "object" &&
+      "rootOrganizationId" in university && typeof university.rootOrganizationId === "string" &&
+      "organizationId" in university && typeof university.organizationId === "string" &&
+      "name" in university && typeof university.name === "string" &&
+      "role" in university && typeof university.role === "string")
   );
 }
 

@@ -1,9 +1,9 @@
 import { Injectable } from "@nestjs/common";
-import { PrismaService } from "@resourcehive/database";
+import { WorkerPrismaService } from "@resourcehive/database";
 
 @Injectable()
 export class DeliveryRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: WorkerPrismaService) {}
 
   async claim(id: string) {
     const now = new Date();

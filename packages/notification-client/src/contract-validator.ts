@@ -39,6 +39,12 @@ export function parseNotificationCommand(
     invalid("producer");
   }
   requireUuid(value.correlationId, "correlationId");
+  if (
+    value.rootOrganizationId !== undefined &&
+    value.rootOrganizationId !== null
+  ) {
+    requireUuid(value.rootOrganizationId, "rootOrganizationId");
+  }
   if (typeof value.occurredAt !== "string" || !isISO8601(value.occurredAt)) {
     invalid("occurredAt");
   }

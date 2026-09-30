@@ -77,6 +77,7 @@ describe("Concurrent booking creation", () => {
       data: {
         id: slotId,
         resourceId,
+        rootOrganizationId: organizationId,
         startsAt: new Date("2035-09-01T10:00:00.000Z"),
         endsAt: new Date("2035-09-01T11:00:00.000Z"),
       },
@@ -87,6 +88,7 @@ describe("Concurrent booking creation", () => {
         userId,
         email: `concurrent-booking-${userId}@example.edu`,
         organizationId,
+        rootOrganizationId: organizationId,
         role: "member",
       };
       const attempts = await Promise.allSettled([

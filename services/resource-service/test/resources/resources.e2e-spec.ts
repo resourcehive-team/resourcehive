@@ -5,7 +5,10 @@ import { App } from 'supertest/types';
 import { AppModule } from '../../src/app.module';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '@resourcehive/database';
+import {
+  PrismaClient,
+  UniversityContextInterceptor,
+} from '@resourcehive/database';
 
 interface ResourceResponse {
   id: string;
@@ -36,7 +39,7 @@ describe('ResourcesController (e2e)', () => {
   let app: INestApplication<App>;
   let jwtToken: string;
   let adminJwtToken: string;
-  let prisma: PrismaService;
+  let prisma: PrismaClient;
   let createdResourceId: string;
 
   const demoUserId = '00000000-0000-4000-8000-000000000099';
@@ -49,9 +52,12 @@ describe('ResourcesController (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    app.useGlobalInterceptors(new UniversityContextInterceptor());
     await app.init();
 
-    prisma = app.get(PrismaService);
+    prisma = new PrismaClient({
+      datasources: { db: { url: process.env.DATABASE_URL } },
+    });
 
     // Create a dummy admin user in the database
     await prisma.user.upsert({
@@ -91,6 +97,7 @@ describe('ResourcesController (e2e)', () => {
         sub: demoUserId,
         email: 'demo@example.edu',
         organizationId: demoOrganizationId,
+        rootOrganizationId: demoOrganizationId,
         role: 'member',
       },
       { secret },
@@ -102,6 +109,7 @@ describe('ResourcesController (e2e)', () => {
         sub: adminUserId,
         email: 'admin@example.edu',
         organizationId: demoOrganizationId,
+        rootOrganizationId: demoOrganizationId,
         role: 'admin',
       },
       { secret },
@@ -150,6 +158,7 @@ describe('ResourcesController (e2e)', () => {
       });
       await prisma.resource.deleteMany({ where: { id: createdResourceId } });
     }
+    await prisma.$disconnect();
     await app.close();
   });
 

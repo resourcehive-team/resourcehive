@@ -13,6 +13,7 @@ export type BookingTransactionClient = Pick<
 export interface CreateConfirmedBookingInput {
   resourceSlotId: string;
   userId: string;
+  rootOrganizationId: string;
   cancellationNoticeMinutes: number;
 }
 

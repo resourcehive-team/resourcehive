@@ -46,6 +46,7 @@ describe("BookingsController (e2e)", () => {
             userId: "user-id",
             email: "user@example.edu",
             organizationId: "organization-id",
+            rootOrganizationId: "university-id",
             role: "member",
           };
           return true;

@@ -5,7 +5,14 @@ import { App } from 'supertest/types';
 import { AppModule } from '../../src/app.module';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { PrismaClient, PrismaService } from '@resourcehive/database';
+import {
+  PrismaClient,
+  UniversityContextInterceptor,
+} from '@resourcehive/database';
+
+const fixturePrisma = new PrismaClient({
+  datasources: { db: { url: process.env.DATABASE_URL } },
+});
 
 describe('MembershipsController (e2e)', () => {
   jest.setTimeout(60000);
@@ -21,6 +28,7 @@ describe('MembershipsController (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    app.useGlobalInterceptors(new UniversityContextInterceptor());
     await app.init();
 
     const configService = app.get(ConfigService);
@@ -28,7 +36,7 @@ describe('MembershipsController (e2e)', () => {
       configService.get<string>('JWT_SECRET') ||
       'development-only-resourcehive-secret-change-before-production';
     const jwtService = app.get(JwtService);
-    const prisma = app.get(PrismaService);
+    const prisma = fixturePrisma;
 
     // Ensure demo user is an ADMIN for these tests, as the routes require AdminGuard
     await prisma.organizationMembership.updateMany({
@@ -41,6 +49,7 @@ describe('MembershipsController (e2e)', () => {
         sub: demoUserId,
         email: 'demo@example.edu',
         organizationId: demoOrganizationId,
+        rootOrganizationId: demoOrganizationId,
         role: 'member',
       },
       { secret },
@@ -49,10 +58,11 @@ describe('MembershipsController (e2e)', () => {
 
   afterAll(async () => {
     await app.close();
+    await fixturePrisma.$disconnect();
   });
 
   it('gets my memberships', async () => {
-    const prisma = app.get(PrismaService);
+    const prisma = fixturePrisma;
     await prisma.$executeRawUnsafe(`SELECT 1`);
     const response = await request(app.getHttpServer())
       .get('/memberships/my-memberships')
@@ -82,7 +92,7 @@ describe('MembershipsController (e2e)', () => {
 
   it('approves a membership request', async () => {
     const targetUserId = '00000000-0000-4000-8000-000000000888';
-    const prisma = app.get(PrismaService);
+    const prisma = fixturePrisma;
 
     // Create or update a dummy user to satisfy foreign key constraints
     await prisma.user.upsert({
@@ -109,6 +119,7 @@ describe('MembershipsController (e2e)', () => {
         sub: targetUserId,
         email: 'target-approve-test@example.edu',
         organizationId: demoOrganizationId,
+        rootOrganizationId: demoOrganizationId,
         role: 'member',
       },
       { secret },
@@ -157,7 +168,7 @@ describe('MembershipsController (e2e)', () => {
   describe('Membership Administration', () => {
     it('updates a membership role (200 OK)', async () => {
       const targetUserId = '00000000-0000-4000-8000-000000000889';
-      const prisma = app.get(PrismaService);
+      const prisma = fixturePrisma;
       await prisma.user.upsert({
         where: { id: targetUserId },
         update: {},
@@ -217,7 +228,7 @@ describe('MembershipsController (e2e)', () => {
 
     it('removes a membership (200 OK)', async () => {
       const targetUserId = '00000000-0000-4000-8000-000000000890';
-      const prisma = app.get(PrismaService);
+      const prisma = fixturePrisma;
       await prisma.user.upsert({
         where: { id: targetUserId },
         update: {},
@@ -268,7 +279,9 @@ describe('MembershipsController (e2e)', () => {
   });
 
   it('denies access through a deep ancestor administrator without direct membership', async () => {
-    const freshPrisma = new PrismaClient();
+    const freshPrisma = new PrismaClient({
+      datasources: { db: { url: process.env.DATABASE_URL } },
+    });
     await freshPrisma.$connect();
 
     const deepRootId = '00000000-0000-4000-8000-000000000100';

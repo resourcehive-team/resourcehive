@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
+import { getUniversityDbContext } from "@resourcehive/database";
 import {
   BookingEventType,
   BookingEventV1,
@@ -23,6 +24,7 @@ export interface SendNotificationInput {
   title: string;
   message: string;
   channels?: Array<"IN_APP" | "PUSH">;
+  rootOrganizationId?: string;
   correlationId?: string;
 }
 
@@ -53,6 +55,7 @@ export interface SendMembershipDecisionInput {
   commandId?: string;
   recipientUserId: string;
   organizationName: string;
+  rootOrganizationId?: string;
   decision: "APPROVED" | "REJECTED";
   correlationId?: string;
 }
@@ -60,6 +63,7 @@ export interface SendMembershipDecisionInput {
 export interface PublishBookingEventInput {
   eventId?: string;
   eventType: BookingEventType;
+  rootOrganizationId?: string;
   resourceId: string;
   resourceName: string;
   organizationId: string;
@@ -88,6 +92,10 @@ export class NotificationClientService {
       commandId,
       producer: this.options.producer,
       recipient: { userId: input.recipientUserId },
+      rootOrganizationId:
+        input.rootOrganizationId ??
+        getUniversityDbContext()?.rootOrganizationId ??
+        null,
       channels: input.channels ?? ["IN_APP", "PUSH"],
       template: {
         key: NOTIFICATION_TEMPLATES.message,
@@ -182,6 +190,9 @@ export class NotificationClientService {
       commandId,
       producer: this.options.producer,
       recipient: { userId: input.recipientUserId },
+      rootOrganizationId:
+        input.rootOrganizationId ??
+        getUniversityDbContext()?.rootOrganizationId,
       channels: ["IN_APP", "PUSH"],
       template: {
         key: templateKey,
@@ -256,6 +267,10 @@ export class NotificationClientService {
       correlationId: input.correlationId ?? partitionKey,
       occurredAt: new Date().toISOString(),
       payload: {
+        rootOrganizationId:
+          input.rootOrganizationId ??
+          getUniversityDbContext()?.rootOrganizationId ??
+          "",
         resourceId: input.resourceId,
         resourceName: input.resourceName,
         organizationId: input.organizationId,

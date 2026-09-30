@@ -3,6 +3,7 @@ import { NotificationCommandService } from "./notification-command.service";
 import { NotificationTemplateService } from "./notification-template.service";
 
 describe("NotificationCommandService", () => {
+  const rootOrganizationId = "55555555-5555-4555-8555-555555555555";
   const user = {
     id: "22222222-2222-4222-8222-222222222222",
     email: "student@example.edu",
@@ -17,9 +18,11 @@ describe("NotificationCommandService", () => {
     readAt: null,
     createdAt: new Date("2026-08-31T12:00:00.000Z"),
     updatedAt: new Date("2026-08-31T12:00:00.000Z"),
+    rootOrganizationId,
   };
   const claim = jest.fn().mockResolvedValue([{ id: "processed-id" }]);
   const findUser = jest.fn().mockResolvedValue(user);
+  const findMembership = jest.fn().mockResolvedValue({ id: "membership-id" });
   const createNotification = jest.fn().mockResolvedValue(notification);
   const findSubscriptions = jest
     .fn()
@@ -28,6 +31,7 @@ describe("NotificationCommandService", () => {
   const transactionClient = {
     $queryRaw: claim,
     user: { findFirst: findUser },
+    organizationMembership: { findFirst: findMembership },
     notification: { create: createNotification },
     webPushSubscription: { findMany: findSubscriptions },
     notificationDelivery: { createMany: createDeliveries },
@@ -129,6 +133,7 @@ describe("NotificationCommandService", () => {
       commandId: "11111111-1111-4111-8111-111111111111",
       producer: "booking-service",
       recipient: { userId: user.id },
+      rootOrganizationId,
       channels: ["IN_APP", "PUSH"],
       template: {
         key: "booking.confirmed.v1",
@@ -140,7 +145,7 @@ describe("NotificationCommandService", () => {
     });
 
     expect(findSubscriptions).toHaveBeenCalledWith({
-      where: { userId: user.id, active: true },
+      where: { userId: user.id, rootOrganizationId, active: true },
       select: { token: true },
     });
     expect(createDeliveries).toHaveBeenCalledWith({
@@ -162,6 +167,7 @@ describe("NotificationCommandService", () => {
       commandId: "11111111-1111-4111-8111-111111111111",
       producer: "booking-service",
       recipient: { userId: user.id },
+      rootOrganizationId,
       channels: ["IN_APP", "PUSH"],
       template: {
         key: "booking.confirmed.v1",

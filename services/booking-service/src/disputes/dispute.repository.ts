@@ -93,10 +93,18 @@ export class DisputeRepository {
     fromStatus: string | null,
     toStatus: string,
     notes: string | undefined,
+    rootOrganizationId: string,
     client: DisputeTransactionClient,
   ): Promise<void> {
     await client.bookingDisputeEvent.create({
-      data: { disputeId, actorUserId, fromStatus, toStatus, notes },
+      data: {
+        disputeId,
+        rootOrganizationId,
+        actorUserId,
+        fromStatus,
+        toStatus,
+        notes,
+      },
     });
   }
 

@@ -12,10 +12,11 @@ export class PointLedgerRepository {
 
   async getBalance(
     userId: string,
+    rootOrganizationId: string,
     client: PointLedgerClient = this.prisma,
   ): Promise<number> {
     const result = await client.pointTransaction.aggregate({
-      where: { userId },
+      where: { userId, rootOrganizationId },
       _sum: { amount: true },
     });
     return result._sum.amount ?? 0;
@@ -44,6 +45,7 @@ export class PointLedgerRepository {
       data: {
         userId: input.userId,
         bookingId: input.bookingId,
+        rootOrganizationId: input.rootOrganizationId,
         amount: input.amount,
         transactionType,
         description: input.description,

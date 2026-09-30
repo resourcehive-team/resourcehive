@@ -33,7 +33,7 @@ model User {
   disputesReviewed        BookingDispute[]             @relation("DisputeReviewedBy")
   disputeEvents           BookingDisputeEvent[]        @relation("DisputeEventActor")
   pointTransactions       PointTransaction[]           @relation("PointTransactionUser")
-  pointBalance            UserPointBalance?
+  pointBalances           UserPointBalance[]
   emailVerificationTokens EmailVerificationToken[]
   passwordResetTokens     PasswordResetToken[]
   refreshTokens           RefreshToken[]
@@ -88,6 +88,10 @@ model Organization {
   sourcePointTransactions PointTransaction[]            @relation("PointTransactionSourceOrganization")
   disputes                BookingDispute[]              @relation("DisputeRootOrganization")
   disputesToResolve       BookingDispute[]              @relation("DisputeResolverOrganization")
+  pointBalances           UserPointBalance[]
+  tenantNotifications     Notification[]                 @relation("NotificationRoot")
+  tenantNotificationDeliveries NotificationDelivery[]    @relation("NotificationDeliveryRoot")
+  tenantPushSubscriptions WebPushSubscription[]          @relation("WebPushSubscriptionRoot")
 
   @@unique([id, rootOrganizationId], map: "organizations_id_root_unique")
   @@index([parentId], map: "organizations_parent_id_idx")
@@ -205,16 +209,19 @@ model ResourceAllowedOrganization {
 model ResourceSlot {
   id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   resourceId  String    @map("resource_id") @db.Uuid
+  rootOrganizationId String @map("root_organization_id") @db.Uuid
   startsAt    DateTime  @map("starts_at") @db.Timestamptz
   endsAt      DateTime  @map("ends_at") @db.Timestamptz
   status      String    @default("PUBLISHED")
   withdrawnAt DateTime? @map("withdrawn_at") @db.Timestamptz
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
 
-  resource Resource  @relation(fields: [resourceId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  resource Resource  @relation(fields: [resourceId, rootOrganizationId], references: [id, rootOrganizationId], onDelete: NoAction, onUpdate: NoAction)
   bookings Booking[]
 
   @@index([resourceId, startsAt], map: "resource_slots_resource_start_idx")
+  @@unique([id, rootOrganizationId], map: "resource_slots_id_root_unique")
+  @@index([rootOrganizationId, startsAt], map: "resource_slots_root_start_idx")
   @@map("resource_slots")
 }
 
@@ -222,6 +229,7 @@ model ResourceSlot {
 model Booking {
   id                        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   resourceSlotId            String    @map("resource_slot_id") @db.Uuid
+  rootOrganizationId        String    @map("root_organization_id") @db.Uuid
   userId                    String    @map("user_id") @db.Uuid
   status                    String    @default("CONFIRMED")
   createdAt                 DateTime  @default(now()) @map("created_at") @db.Timestamptz
@@ -232,13 +240,16 @@ model Booking {
   /// Snapshot of the resource's notice period at booking time (SRS 3.1.15 #13).
   cancellationNoticeMinutes Int       @default(0) @map("cancellation_notice_minutes")
 
-  resourceSlot      ResourceSlot       @relation(fields: [resourceSlotId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  resourceSlot      ResourceSlot       @relation(fields: [resourceSlotId, rootOrganizationId], references: [id, rootOrganizationId], onDelete: NoAction, onUpdate: NoAction)
   user              User               @relation("BookingUser", fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   cancelledByUser   User?              @relation("BookingCancelledBy", fields: [cancelledByUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   pointTransactions PointTransaction[]
   dispute           BookingDispute?
 
   @@unique([id, userId], map: "bookings_id_user_unique")
+  @@unique([id, rootOrganizationId], map: "bookings_id_root_unique")
+  @@unique([id, userId, rootOrganizationId], map: "bookings_id_user_root_unique")
+  @@index([rootOrganizationId, status], map: "bookings_root_status_idx")
   @@index([userId, status], map: "bookings_user_status_idx")
   @@index([userId], map: "bookings_user_id_idx")
   @@index([cancelledByUserId], map: "bookings_cancelled_by_user_id_idx")
@@ -265,16 +276,18 @@ model BookingDispute {
   updatedAt                DateTime  @updatedAt @map("updated_at") @db.Timestamptz
   resolvedAt               DateTime? @map("resolved_at") @db.Timestamptz
 
-  booking             Booking               @relation(fields: [bookingId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  booking             Booking               @relation(fields: [bookingId, rootOrganizationId], references: [id, rootOrganizationId], onDelete: NoAction, onUpdate: NoAction, map: "booking_disputes_booking_root_fk")
   rootOrganization    Organization          @relation("DisputeRootOrganization", fields: [rootOrganizationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  resolverOrganization Organization         @relation("DisputeResolverOrganization", fields: [resolverOrganizationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  resolverOrganization Organization         @relation("DisputeResolverOrganization", fields: [resolverOrganizationId, rootOrganizationId], references: [id, rootOrganizationId], onDelete: NoAction, onUpdate: NoAction, map: "booking_disputes_resolver_root_fk")
   submittedByUser     User                  @relation("DisputeSubmittedBy", fields: [submittedByUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   reviewedByUser      User?                 @relation("DisputeReviewedBy", fields: [reviewedByUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   events              BookingDisputeEvent[]
   unavailableResource Resource?             @relation("ResourceUnavailableDispute")
 
   @@index([rootOrganizationId, status], map: "booking_disputes_root_status_idx")
+  @@unique([bookingId, rootOrganizationId], map: "booking_disputes_booking_root_unique")
   @@index([resolverOrganizationId, status], map: "booking_disputes_resolver_org_status_idx")
+  @@unique([id, rootOrganizationId], map: "booking_disputes_id_root_unique")
   @@map("booking_disputes")
 }
 
@@ -282,16 +295,18 @@ model BookingDispute {
 model BookingDisputeEvent {
   id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   disputeId   String   @map("dispute_id") @db.Uuid
+  rootOrganizationId String @map("root_organization_id") @db.Uuid
   actorUserId String   @map("actor_user_id") @db.Uuid
   fromStatus  String?  @map("from_status")
   toStatus    String   @map("to_status")
   notes       String?
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  dispute BookingDispute @relation(fields: [disputeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  dispute BookingDispute @relation(fields: [disputeId, rootOrganizationId], references: [id, rootOrganizationId], onDelete: NoAction, onUpdate: NoAction)
   actor   User           @relation("DisputeEventActor", fields: [actorUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([disputeId, createdAt], map: "booking_dispute_events_dispute_created_at_idx")
+  @@index([rootOrganizationId, createdAt], map: "booking_dispute_events_root_created_at_idx")
   @@map("booking_dispute_events")
 }
 
@@ -299,6 +314,7 @@ model BookingDisputeEvent {
 model PointTransaction {
   id                   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId               String   @map("user_id") @db.Uuid
+  rootOrganizationId   String?  @map("root_organization_id") @db.Uuid
   amount               Int
   transactionType      String   @map("transaction_type")
   sourceOrganizationId String?  @map("source_organization_id") @db.Uuid
@@ -307,22 +323,27 @@ model PointTransaction {
   createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   user               User          @relation("PointTransactionUser", fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  sourceOrganization Organization? @relation("PointTransactionSourceOrganization", fields: [sourceOrganizationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  booking            Booking?      @relation(fields: [bookingId, userId], references: [id, userId], onDelete: NoAction, onUpdate: NoAction)
+  sourceOrganization Organization? @relation("PointTransactionSourceOrganization", fields: [sourceOrganizationId, rootOrganizationId], references: [id, rootOrganizationId], onDelete: NoAction, onUpdate: NoAction, map: "point_transactions_source_root_fk")
+  booking            Booking?      @relation(fields: [bookingId, userId, rootOrganizationId], references: [id, userId, rootOrganizationId], onDelete: NoAction, onUpdate: NoAction, map: "point_transactions_booking_user_root_fk")
 
   @@index([userId, createdAt], map: "point_transactions_user_created_at_idx")
+  @@index([rootOrganizationId, userId, createdAt], map: "point_transactions_root_user_created_at_idx")
   @@map("point_transactions")
 }
 
 /// Current balance projected from the append-only point transaction ledger.
 /// The database trigger owns inserts and updates for this table.
 model UserPointBalance {
-  userId          String   @id @map("user_id") @db.Uuid
+  userId          String   @map("user_id") @db.Uuid
+  rootOrganizationId String @map("root_organization_id") @db.Uuid
   availablePoints Int      @map("available_points")
   updatedAt       DateTime @default(now()) @map("updated_at") @db.Timestamptz
 
   user User @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  rootOrganization Organization @relation(fields: [rootOrganizationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
+  @@id([userId, rootOrganizationId])
+  @@index([rootOrganizationId], map: "user_point_balances_root_idx")
   @@map("user_point_balances")
 }
 
@@ -358,6 +379,7 @@ model RefreshToken {
   id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId    String    @map("user_id") @db.Uuid
   familyId  String    @map("family_id") @db.Uuid
+  activeRootOrganizationId String? @map("active_root_organization_id") @db.Uuid
   tokenHash String    @unique(map: "refresh_tokens_token_hash_unique") @map("token_hash")
   expiresAt DateTime  @map("expires_at") @db.Timestamptz
   usedAt    DateTime? @map("used_at") @db.Timestamptz
@@ -374,6 +396,7 @@ model RefreshToken {
 model Notification {
   id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId    String    @map("user_id") @db.Uuid
+  rootOrganizationId String? @map("root_organization_id") @db.Uuid
   type      String
   title     String
   message   String
@@ -383,15 +406,19 @@ model Notification {
   updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
   user       User                   @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  rootOrganization Organization? @relation("NotificationRoot", fields: [rootOrganizationId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "notifications_root_organization_fk")
   deliveries NotificationDelivery[]
 
   @@index([userId, createdAt], map: "notifications_user_created_at_idx")
+  @@index([rootOrganizationId, userId, createdAt], map: "notifications_root_user_created_at_idx")
+  @@unique([id, rootOrganizationId], map: "notifications_id_root_unique")
   @@map("notifications")
 }
 
 model NotificationDelivery {
   id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId            String    @map("user_id") @db.Uuid
+  rootOrganizationId String? @map("root_organization_id") @db.Uuid
   notificationId    String?   @map("notification_id") @db.Uuid
   channel           String
   destination       String
@@ -407,24 +434,30 @@ model NotificationDelivery {
   updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
   user         User          @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  notification Notification? @relation(fields: [notificationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  rootOrganization Organization? @relation("NotificationDeliveryRoot", fields: [rootOrganizationId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "notification_deliveries_root_organization_fk")
+  notification Notification? @relation(fields: [notificationId, rootOrganizationId], references: [id, rootOrganizationId], onDelete: NoAction, onUpdate: NoAction, map: "notification_deliveries_notification_root_fk")
 
   @@index([status, nextAttemptAt], map: "notification_deliveries_due_idx")
   @@index([userId, createdAt], map: "notification_deliveries_user_created_at_idx")
+  @@index([rootOrganizationId, status, nextAttemptAt], map: "notification_deliveries_root_due_idx")
   @@map("notification_deliveries")
 }
 
 model WebPushSubscription {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId    String   @map("user_id") @db.Uuid
-  token     String   @unique(map: "web_push_subscriptions_token_unique")
+  rootOrganizationId String? @map("root_organization_id") @db.Uuid
+  token     String
   active    Boolean  @default(true)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   user User @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  rootOrganization Organization? @relation("WebPushSubscriptionRoot", fields: [rootOrganizationId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "web_push_subscriptions_root_organization_fk")
 
   @@index([userId, active], map: "web_push_subscriptions_user_active_idx")
+  @@unique([rootOrganizationId, token], map: "web_push_subscriptions_root_token_unique")
+  @@index([rootOrganizationId, userId, active], map: "web_push_subscriptions_root_user_active_idx")
   @@map("web_push_subscriptions")
 }
 

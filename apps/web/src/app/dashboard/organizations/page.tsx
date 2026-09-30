@@ -1,4 +1,4 @@
-import { RootOrganizationList } from "@/components/root-organization-list";
+import { OrganizationsPageContent } from "@/components/organizations-page-content";
 import { ScreenHeading } from "@/components/screen-heading";
 import { SiteHeader } from "@/components/site-header";
 
@@ -12,7 +12,7 @@ export default function OrganizationsPage() {
           title="Organizations"
           description="Explore the schools, departments, clubs, and communities connected through ResourceHive."
         />
-        <RootOrganizationList />
+        <OrganizationsPageContent />
       </main>
     </>
   );

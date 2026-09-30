@@ -79,6 +79,7 @@ export class DisputeService {
           null,
           dispute.status,
           "Dispute opened",
+          dispute.rootOrganizationId,
           transaction,
         );
         return dispute;
@@ -161,6 +162,7 @@ export class DisputeService {
             dispute.status,
             dto.status,
             dto.resolutionNotes,
+            dispute.rootOrganizationId,
             transaction,
           );
         }

@@ -12,6 +12,7 @@ interface CreateRefreshTokenRequest {
     familyId: string;
     tokenHash: string;
     expiresAt: Date;
+    activeRootOrganizationId?: string;
   };
 }
 
@@ -81,6 +82,7 @@ describe('AuthService refresh sessions', () => {
     membership.findFirst.mockResolvedValue({
       organizationId: 'organization-id',
       role: 'MEMBER',
+      organization: { rootOrganizationId: 'university-id' },
     });
     refreshToken.create.mockResolvedValue({ id: 'refresh-token-id' });
     refreshToken.updateMany.mockResolvedValue({ count: 1 });
@@ -149,6 +151,7 @@ describe('AuthService refresh sessions', () => {
     refreshToken.findUnique.mockResolvedValue({
       id: 'refresh-token-id',
       familyId: 'family-id',
+      activeRootOrganizationId: 'university-id',
       expiresAt,
       usedAt: null,
       revokedAt: null,
@@ -168,11 +171,48 @@ describe('AuthService refresh sessions', () => {
     expect(claimRequest.where.revokedAt).toBeNull();
     const createRequest = transactionRefreshToken.create.mock.calls[0][0];
     expect(createRequest.data.familyId).toBe('family-id');
+    expect(createRequest.data.activeRootOrganizationId).toBe('university-id');
     expect(createRequest.data.expiresAt).toBe(expiresAt);
     expect(createRequest.data.tokenHash).toBe(
       createHash('sha256').update(result.refreshToken).digest('hex'),
     );
     expect(result.refreshToken).not.toBe('current-refresh-token');
+  });
+
+  it('switches the active university for the full refresh-token family', async () => {
+    membership.findFirst.mockResolvedValue({
+      organizationId: 'second-organization-id',
+      role: 'MEMBER',
+      organization: { rootOrganizationId: 'second-university-id' },
+    });
+    refreshToken.findUnique.mockResolvedValue({
+      id: 'refresh-token-id',
+      familyId: 'family-id',
+      userId: 'user-id',
+      expiresAt: new Date(Date.now() + 60_000),
+      revokedAt: null,
+      usedAt: null,
+    });
+    user.findUnique.mockResolvedValue({
+      id: 'user-id',
+      email: 'alex@example.edu',
+    });
+
+    const result = await service.switchActiveUniversity(
+      'user-id',
+      'second-university-id',
+      'current-refresh-token',
+    );
+
+    expect(refreshToken.updateMany).toHaveBeenCalledWith({
+      where: { familyId: 'family-id', revokedAt: null },
+      data: { activeRootOrganizationId: 'second-university-id' },
+    });
+    const claims = await jwtService.verifyAsync<{ rootOrganizationId: string }>(
+      result.accessToken,
+      { secret: process.env.JWT_SECRET },
+    );
+    expect(claims.rootOrganizationId).toBe('second-university-id');
   });
 
   it('revokes the token family when a used token is replayed', async () => {

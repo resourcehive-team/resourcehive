@@ -159,6 +159,7 @@ describe('OrganizationsService', () => {
         data: [
           {
             userId: 'user1',
+            rootOrganizationId: 'root-org',
             amount: 500,
             transactionType: 'SEMESTER_ALLOCATION',
             sourceOrganizationId: 'target-org',
@@ -166,6 +167,7 @@ describe('OrganizationsService', () => {
           },
           {
             userId: 'user2',
+            rootOrganizationId: 'root-org',
             amount: 500,
             transactionType: 'SEMESTER_ALLOCATION',
             sourceOrganizationId: 'target-org',

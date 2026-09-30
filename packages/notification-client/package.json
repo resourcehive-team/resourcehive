@@ -15,6 +15,7 @@
     "test": "jest --runInBand"
   },
   "dependencies": {
+    "@resourcehive/database": "workspace:*",
     "@nestjs/common": "^11.0.1",
     "class-validator": "^0.14.4",
     "kafkajs": "2.2.4",

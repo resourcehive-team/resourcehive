@@ -55,12 +55,14 @@ describeWithDatabase("PointLedgerRepository integration", () => {
             data: [
               {
                 userId,
+                rootOrganizationId: organizationId,
                 amount: 100,
                 transactionType: "JOIN_BONUS",
                 sourceOrganizationId: organizationId,
               },
               {
                 userId: otherUserId,
+                rootOrganizationId: organizationId,
                 amount: 500,
                 transactionType: "JOIN_BONUS",
                 sourceOrganizationId: organizationId,
@@ -69,10 +71,10 @@ describeWithDatabase("PointLedgerRepository integration", () => {
           });
 
           await expect(
-            repository.getBalance(userId, transaction),
+            repository.getBalance(userId, organizationId, transaction),
           ).resolves.toBe(100);
           await expect(
-            repository.getBalance(otherUserId, transaction),
+            repository.getBalance(otherUserId, organizationId, transaction),
           ).resolves.toBe(500);
 
           throw rollbackFixture;

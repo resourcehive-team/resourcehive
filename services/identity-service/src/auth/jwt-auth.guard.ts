@@ -12,6 +12,7 @@ import { Request } from 'express';
 export interface AuthenticatedUser {
   userId: string;
   tenantId: string | null;
+  rootOrganizationId: string | null;
   role: string | null;
   email: string;
   firstName: string;
@@ -30,6 +31,8 @@ export type AuthenticatedRequest = Request & {
 interface AccessTokenPayload {
   sub: string;
   email: string;
+  organizationId?: string | null;
+  rootOrganizationId?: string | null;
 }
 
 @Injectable()
@@ -84,18 +87,38 @@ export class JwtAuthGuard implements CanActivate {
         where: {
           userId: user.id,
           status: 'APPROVED',
+          ...(payload.rootOrganizationId
+            ? {
+                organization: {
+                  rootOrganizationId: payload.rootOrganizationId,
+                  status: 'ACTIVE',
+                },
+              }
+            : payload.organizationId
+              ? { organizationId: payload.organizationId }
+              : {}),
         },
         // A user can hold several memberships (e.g. MEMBER of the tenant
         // and ADMIN of a department). Prefer an ADMIN membership so that
         // role-gated features (bookings/disputes/analytics review
         // sections) see the user's administrative context instead of an
         // arbitrary earlier-joined non-admin one.
-        orderBy: [{ role: 'asc' }, { joinedAt: 'asc' }],
+        orderBy: [{ role: 'asc' }, { joinedAt: 'asc' }, { id: 'asc' }],
+        select: {
+          organizationId: true,
+          role: true,
+          organization: { select: { rootOrganizationId: true } },
+        },
       });
+
+      if (payload.rootOrganizationId && !membership) {
+        throw new Error('Active university membership is no longer valid');
+      }
 
       request.user = {
         userId: user.id,
         tenantId: membership?.organizationId ?? null,
+        rootOrganizationId: membership?.organization.rootOrganizationId ?? null,
         role: membership?.role.toLowerCase() ?? null,
         email: user.email,
         firstName: user.firstName,

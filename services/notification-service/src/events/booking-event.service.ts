@@ -36,6 +36,7 @@ export class BookingEventService {
       commandId: event.eventId,
       producer: "booking-service",
       recipient: { userId: event.payload.userId, email: event.payload.email },
+      rootOrganizationId: event.payload.rootOrganizationId,
       channels: ["IN_APP", "PUSH"],
       template: { key, version: 1, variables: { ...event.payload } },
       correlationId: event.correlationId,

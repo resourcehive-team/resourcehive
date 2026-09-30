@@ -7,6 +7,7 @@ describe("NotificationRepository integration", () => {
   const repository = new NotificationRepository(prisma);
   const firstUserId = randomUUID();
   const secondUserId = randomUUID();
+  const rootOrganizationId = randomUUID();
 
   beforeAll(async () => {
     process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
@@ -29,17 +30,28 @@ describe("NotificationRepository integration", () => {
         },
       ],
     });
+    await prisma.organization.create({
+      data: {
+        id: rootOrganizationId,
+        name: "Notification integration university",
+        type: "UNIVERSITY",
+        rootOrganizationId,
+        createdBy: firstUserId,
+      },
+    });
   });
 
   it("persists notifications and isolates reads by recipient", async () => {
     const created = await repository.create({
       userId: firstUserId,
+      rootOrganizationId,
       type: "BOOKING_CREATED",
       title: "New booking",
       message: "A student created a booking.",
     });
     await repository.create({
       userId: secondUserId,
+      rootOrganizationId,
       type: "BOOKING_CREATED",
       title: "Another booking",
       message: "This belongs to another recipient.",
@@ -49,11 +61,16 @@ describe("NotificationRepository integration", () => {
       repository.findByIdForUser({
         notificationId: created.id,
         userId: secondUserId,
+        rootOrganizationId,
       }),
     ).resolves.toBeNull();
 
     await expect(
-      repository.findManyForUser({ userId: firstUserId, unreadOnly: true }),
+      repository.findManyForUser({
+        userId: firstUserId,
+        rootOrganizationId,
+        unreadOnly: true,
+      }),
     ).resolves.toEqual([
       expect.objectContaining({
         id: created.id,
@@ -65,12 +82,17 @@ describe("NotificationRepository integration", () => {
     const markedRead = await repository.markReadForUser({
       notificationId: created.id,
       userId: firstUserId,
+      rootOrganizationId,
     });
     expect(markedRead?.id).toBe(created.id);
     expect(markedRead?.readAt).toBeInstanceOf(Date);
 
     await expect(
-      repository.findManyForUser({ userId: firstUserId, unreadOnly: true }),
+      repository.findManyForUser({
+        userId: firstUserId,
+        rootOrganizationId,
+        unreadOnly: true,
+      }),
     ).resolves.toEqual([]);
   });
 
@@ -78,6 +100,7 @@ describe("NotificationRepository integration", () => {
     await prisma.notification.deleteMany({
       where: { userId: { in: [firstUserId, secondUserId] } },
     });
+    await prisma.organization.delete({ where: { id: rootOrganizationId } });
     await prisma.user.deleteMany({
       where: { id: { in: [firstUserId, secondUserId] } },
     });

@@ -87,6 +87,7 @@ export class SlotRepository {
         return transaction.resourceSlot.create({
           data: {
             resourceId: resource.id,
+            rootOrganizationId: input.rootOrganizationId,
             startsAt: input.startsAt,
             endsAt: input.endsAt,
           },

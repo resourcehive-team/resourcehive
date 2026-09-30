@@ -162,6 +162,7 @@ export class OrganizationsService {
         for (const membership of uniqueMemberships) {
           data.push({
             userId: membership.userId,
+            rootOrganizationId: organizationId,
             amount,
             transactionType: 'SEMESTER_ALLOCATION',
             sourceOrganizationId: membership.organizationId, // attribute to their actual org
