@@ -93,7 +93,9 @@ export class NotificationClientService {
       producer: this.options.producer,
       recipient: { userId: input.recipientUserId },
       rootOrganizationId:
-        input.rootOrganizationId ?? getUniversityDbContext()?.rootOrganizationId ?? null,
+        input.rootOrganizationId ??
+        getUniversityDbContext()?.rootOrganizationId ??
+        null,
       channels: input.channels ?? ["IN_APP", "PUSH"],
       template: {
         key: NOTIFICATION_TEMPLATES.message,
@@ -189,7 +191,8 @@ export class NotificationClientService {
       producer: this.options.producer,
       recipient: { userId: input.recipientUserId },
       rootOrganizationId:
-        input.rootOrganizationId ?? getUniversityDbContext()?.rootOrganizationId,
+        input.rootOrganizationId ??
+        getUniversityDbContext()?.rootOrganizationId,
       channels: ["IN_APP", "PUSH"],
       template: {
         key: templateKey,
@@ -265,7 +268,9 @@ export class NotificationClientService {
       occurredAt: new Date().toISOString(),
       payload: {
         rootOrganizationId:
-          input.rootOrganizationId ?? getUniversityDbContext()?.rootOrganizationId ?? "",
+          input.rootOrganizationId ??
+          getUniversityDbContext()?.rootOrganizationId ??
+          "",
         resourceId: input.resourceId,
         resourceName: input.resourceName,
         organizationId: input.organizationId,
