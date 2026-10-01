@@ -97,13 +97,14 @@ describe('MembershipsController (e2e)', () => {
     // Create or update a dummy user to satisfy foreign key constraints
     await prisma.user.upsert({
       where: { id: targetUserId },
-      update: {},
+      update: { emailVerifiedAt: new Date() },
       create: {
         id: targetUserId,
         email: 'target-approve-test@example.edu',
         passwordHash: 'dummyhash',
         firstName: 'Target',
         lastName: 'User',
+        emailVerifiedAt: new Date(),
       },
     });
 
