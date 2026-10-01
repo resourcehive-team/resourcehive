@@ -83,7 +83,7 @@ jobs:
           DATABASE_URL: ${{ env.CI_DATABASE_URL }}
           DATABASE_URL_UNPOOLED: ${{ env.CI_DATABASE_URL }}
 
-      - name: Verify university row security with restricted roles
+      - name: Verify university isolation, email rules, and join bonuses with restricted roles
         run: node db/schema/tests/rls-test.cjs
         env:
           DATABASE_URL: ${{ env.CI_DATABASE_URL }}
@@ -277,7 +277,7 @@ jobs:
         env:
           APP_DATABASE_URL: ${{ env.CI_AUTH_DATABASE_URL }}
 
-      - name: Run Resource Service e2e tests
+      - name: Run Resource Service e2e tests, including child organization and email rules
         run: pnpm --filter resource-service run test:e2e
 
       - name: Run Booking Service e2e tests

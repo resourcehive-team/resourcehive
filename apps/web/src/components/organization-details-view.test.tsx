@@ -16,7 +16,12 @@ import {
   getCurrentUserMemberships,
   getOrganizationMembers,
 } from "@/lib/resource-service/membership-api";
-import { getOrganizationDetails } from "@/lib/resource-service/organization-api";
+import {
+  createChildOrganization,
+  getOrganizationDetails,
+  getOrganizationEmailDomains,
+  updateOrganizationEmailDomain,
+} from "@/lib/resource-service/organization-api";
 import { getAccessibleResources } from "@/lib/resource-service/resource-api";
 import type {
   MembershipWithOrganization,
@@ -50,6 +55,15 @@ vi.mock("@/lib/resource-service/membership-api", () => ({
 
 vi.mock("@/lib/resource-service/organization-api", () => ({
   getOrganizationDetails: vi.fn(),
+  getRootOrganizationDescendants: vi.fn().mockResolvedValue([]),
+  createChildOrganization: vi.fn(),
+  getOrganizationEmailDomains: vi.fn().mockResolvedValue([]),
+  addOrganizationEmailDomain: vi.fn(),
+  updateOrganizationEmailDomain: vi.fn(),
+  removeOrganizationEmailDomain: vi.fn(),
+  getOrganizationAllowlist: vi.fn().mockResolvedValue([]),
+  addOrganizationAllowlistEmail: vi.fn(),
+  removeOrganizationAllowlistEmail: vi.fn(),
 }));
 
 vi.mock("@/lib/resource-service/resource-api", () => ({
@@ -65,6 +79,9 @@ vi.mock("@/components/allocate-points-dialog", () => ({
 const currentUserMock = vi.mocked(getCurrentUser);
 const currentMembershipsMock = vi.mocked(getCurrentUserMemberships);
 const organizationDetailsMock = vi.mocked(getOrganizationDetails);
+const createChildMock = vi.mocked(createChildOrganization);
+const domainsMock = vi.mocked(getOrganizationEmailDomains);
+const updateDomainMock = vi.mocked(updateOrganizationEmailDomain);
 const organizationMembersMock = vi.mocked(getOrganizationMembers);
 const accessibleResourcesMock = vi.mocked(getAccessibleResources);
 
@@ -147,6 +164,9 @@ describe("OrganizationDetailsView", () => {
     currentUserMock.mockReset().mockResolvedValue(account());
     currentMembershipsMock.mockReset().mockResolvedValue([]);
     organizationDetailsMock.mockReset().mockResolvedValue(organization);
+    createChildMock.mockReset();
+    domainsMock.mockReset().mockResolvedValue([]);
+    updateDomainMock.mockReset();
     organizationMembersMock.mockReset().mockResolvedValue([]);
     accessibleResourcesMock.mockReset().mockResolvedValue(emptyResourcePage);
   });
@@ -158,6 +178,8 @@ describe("OrganizationDetailsView", () => {
       await screen.findByRole("button", { name: "Request membership" }),
     ).toBeDefined();
     expect(screen.queryByText("Semester Points")).toBeNull();
+    expect(screen.queryByLabelText("Child organization name")).toBeNull();
+    expect(screen.queryByText("Email domains")).toBeNull();
   });
 
   it("shows a membership summary instead of a duplicate request action", async () => {
@@ -228,6 +250,86 @@ describe("OrganizationDetailsView", () => {
     expect(
       await screen.findByRole("button", { name: "Allocate Semester Points" }),
     ).toBeDefined();
+  });
+
+  it("lets an approved organization admin create a child and assigns its first admin", async () => {
+    currentMembershipsMock.mockResolvedValueOnce([
+      membership("APPROVED", "ADMIN"),
+    ]);
+    createChildMock.mockResolvedValueOnce({
+      organization: {
+        ...organization,
+        id: "faculty-1",
+        name: "Faculty of Engineering",
+        type: "FACULTY",
+        parentId: organization.id,
+      },
+      administrator: { email: "admin@example.edu" },
+    });
+
+    render(<OrganizationDetailsView organizationId={organization.id} />);
+    fireEvent.change(await screen.findByLabelText("Child organization name"), {
+      target: { value: "Faculty of Engineering" },
+    });
+    fireEvent.change(screen.getByLabelText("First admin email"), {
+      target: { value: "admin@example.edu" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Create organization" }));
+
+    expect((await screen.findByRole("status")).textContent).toContain(
+      "Faculty of Engineering created; admin@example.edu is its admin.",
+    );
+    expect(createChildMock).toHaveBeenCalledWith(organization.id, {
+      name: "Faculty of Engineering",
+      type: "FACULTY",
+      adminEmail: "admin@example.edu",
+    });
+  });
+
+  it("keeps child organization inputs when creation fails", async () => {
+    currentMembershipsMock.mockResolvedValueOnce([
+      membership("APPROVED", "ADMIN"),
+    ]);
+    createChildMock.mockRejectedValueOnce(new Error("Admin is not in this university"));
+
+    render(<OrganizationDetailsView organizationId={organization.id} />);
+    const name = await screen.findByLabelText("Child organization name");
+    const email = screen.getByLabelText("First admin email");
+    fireEvent.change(name, { target: { value: "Faculty of Science" } });
+    fireEvent.change(email, { target: { value: "outside@example.edu" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create organization" }));
+
+    expect((await screen.findByRole("alert")).textContent).toContain(
+      "Admin is not in this university",
+    );
+    expect((name as HTMLInputElement).value).toBe("Faculty of Science");
+    expect((email as HTMLInputElement).value).toBe("outside@example.edu");
+  });
+
+  it("shows domain rules and lets admins change automatic approval", async () => {
+    currentMembershipsMock.mockResolvedValueOnce([
+      membership("APPROVED", "ADMIN"),
+    ]);
+    domainsMock.mockResolvedValueOnce([
+      {
+        id: "domain-rule-1",
+        organizationId: organization.id,
+        domain: "uom.lk",
+        autoJoin: false,
+      },
+    ]);
+
+    render(<OrganizationDetailsView organizationId={organization.id} />);
+
+    expect(await screen.findByText("uom.lk")).toBeDefined();
+    fireEvent.click(screen.getAllByRole("checkbox")[1]);
+    await waitFor(() => {
+      expect(updateDomainMock).toHaveBeenCalledWith(
+        organization.id,
+        "domain-rule-1",
+        true,
+      );
+    });
   });
 
   it("does not show semester points for an ordinary member or a different organization", async () => {

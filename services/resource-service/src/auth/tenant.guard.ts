@@ -77,13 +77,6 @@ export class TenantGuard implements CanActivate {
         ? directMembership
         : null;
 
-    // If the direct membership is ADMIN, they have the highest access, so return immediately
-    if (bestMembership && bestMembership.role === 'ADMIN') {
-      request.membership = bestMembership;
-      return true;
-    }
-
-    // Otherwise, check inherited admin access up to the root
     const targetOrg = await transaction.organization.findUnique({
       where: { id: organizationId },
     });
@@ -96,6 +89,18 @@ export class TenantGuard implements CanActivate {
       throw new ForbiddenException(
         'You do not have access to this organization.',
       );
+    }
+
+    if (targetOrg.status !== 'ACTIVE') {
+      throw new ForbiddenException(
+        'This organization is suspended and cannot be accessed.',
+      );
+    }
+
+    // If the direct membership is ADMIN, they have the highest access.
+    if (bestMembership && bestMembership.role === 'ADMIN') {
+      request.membership = bestMembership;
+      return true;
     }
 
     // Trace ancestors up to the root to find an inherited ADMIN membership

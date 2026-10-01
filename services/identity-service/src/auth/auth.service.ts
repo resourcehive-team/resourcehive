@@ -1069,6 +1069,8 @@ export class AuthService {
                 id: true,
                 name: true,
                 status: true,
+                parentId: true,
+                rootOrganizationId: true,
               },
             },
           },
@@ -1101,10 +1103,11 @@ export class AuthService {
       const allowlistEntries =
         await transaction.organizationEmailAllowlist.findMany({
           where: {
-            email: verificationToken.user.email,
+            email: verificationToken.user.email.trim().toLowerCase(),
             usedAt: null,
             organization: {
-              rootOrganizationId: domainConfiguration.organizationId,
+              rootOrganizationId:
+                domainConfiguration.organization.rootOrganizationId,
               status: 'ACTIVE',
             },
           },
@@ -1123,18 +1126,71 @@ export class AuthService {
         string,
         { id: string; name: string }
       >();
+      const organizationTree = await transaction.organization.findMany({
+        where: {
+          rootOrganizationId:
+            domainConfiguration.organization.rootOrganizationId,
+        },
+        select: {
+          id: true,
+          name: true,
+          parentId: true,
+          rootOrganizationId: true,
+          status: true,
+        },
+      });
+      const organizationById = new Map(
+        organizationTree.map((organization) => [organization.id, organization]),
+      );
+      const matchedOrganizationIds = new Set(
+        allowlistEntries.map((entry) => entry.organization.id),
+      );
       if (domainConfiguration.autoJoin) {
-        organizationsToJoin.set(domainConfiguration.organization.id, {
-          id: domainConfiguration.organization.id,
-          name: domainConfiguration.organization.name,
-        });
+        matchedOrganizationIds.add(domainConfiguration.organization.id);
       }
-      for (const entry of allowlistEntries) {
-        organizationsToJoin.set(entry.organization.id, entry.organization);
+      const consumedAllowlistIds = new Set<string>();
+      for (const matchedId of matchedOrganizationIds) {
+        const path: string[] = [];
+        let currentId: string | null = matchedId;
+        let reachedRoot = false;
+        while (currentId) {
+          const current = organizationById.get(currentId);
+          if (!current || current.status !== 'ACTIVE') {
+            path.length = 0;
+            break;
+          }
+          path.push(current.id);
+          if (current.id === current.rootOrganizationId) {
+            reachedRoot = true;
+            break;
+          }
+          currentId = current.parentId;
+        }
+        if (!reachedRoot) continue;
+        for (const entry of allowlistEntries) {
+          if (entry.organization.id === matchedId) {
+            consumedAllowlistIds.add(entry.id);
+          }
+        }
+        for (const organizationId of path.reverse()) {
+          const organization = organizationById.get(organizationId);
+          if (organization) {
+            organizationsToJoin.set(organization.id, {
+              id: organization.id,
+              name: organization.name,
+            });
+          }
+        }
       }
 
+      const resultingMemberships: {
+        id: string;
+        name: string;
+        role: string;
+        status: string;
+      }[] = [];
       for (const organization of organizationsToJoin.values()) {
-        await transaction.organizationMembership.upsert({
+        const membership = await transaction.organizationMembership.upsert({
           where: {
             userId_organizationId: {
               userId: verificationToken.user.id,
@@ -1148,19 +1204,19 @@ export class AuthService {
             status: 'APPROVED',
           },
           update: {
-            role: 'MEMBER',
-            status: 'APPROVED',
-            reviewedBy: null,
+            // Keep existing approved, pending, rejected, or admin memberships unchanged.
           },
+        });
+        resultingMemberships.push({
+          ...organization,
+          role: membership?.role ?? 'MEMBER',
+          status: membership?.status ?? 'APPROVED',
         });
       }
 
-      if (allowlistEntries.length > 0) {
+      if (consumedAllowlistIds.size > 0) {
         await transaction.organizationEmailAllowlist.updateMany({
-          where: {
-            id: { in: allowlistEntries.map((entry) => entry.id) },
-            usedAt: null,
-          },
+          where: { id: { in: [...consumedAllowlistIds] }, usedAt: null },
           data: { usedAt: now },
         });
       }
@@ -1183,13 +1239,7 @@ export class AuthService {
         user: {
           ...user,
           emailVerified: true,
-          organizations: [...organizationsToJoin.values()].map(
-            (organization) => ({
-              ...organization,
-              role: 'MEMBER',
-              status: 'APPROVED',
-            }),
-          ),
+          organizations: resultingMemberships,
         },
       };
     });
@@ -1239,7 +1289,10 @@ export class AuthService {
     if (separatorIndex <= 0 || separatorIndex === email.length - 1) {
       throw new BadRequestException('Enter a valid email address');
     }
-    return email.slice(separatorIndex + 1);
+    return email
+      .slice(separatorIndex + 1)
+      .trim()
+      .toLowerCase();
   }
 
   private getBcryptRounds(): number {

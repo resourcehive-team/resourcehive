@@ -20,39 +20,139 @@ export class MembershipsService {
   ) {}
 
   async requestMembership(userId: string, organizationId: string) {
-    const [user, organization, existing] = await Promise.all([
-      this.prisma.user.findUnique({
-        where: { id: userId },
-        select: { status: true, platformRole: true },
-      }),
-      this.prisma.organization.findUnique({
-        where: { id: organizationId },
-        select: { id: true, status: true },
-      }),
-      this.prisma.organizationMembership.findUnique({
-        where: { userId_organizationId: { userId, organizationId } },
-      }),
-    ]);
+    return this.prisma.$transaction(async (transaction) => {
+      const [user, organization, existing] = await Promise.all([
+        transaction.user.findUnique({
+          where: { id: userId },
+          select: {
+            email: true,
+            emailVerifiedAt: true,
+            status: true,
+            platformRole: true,
+          },
+        }),
+        transaction.organization.findUnique({
+          where: { id: organizationId },
+          select: { id: true, status: true, rootOrganizationId: true },
+        }),
+        transaction.organizationMembership.findUnique({
+          where: { userId_organizationId: { userId, organizationId } },
+        }),
+      ]);
 
-    this.assertRegularUser(user);
-    if (!organization || organization.status !== 'ACTIVE') {
-      throw new NotFoundException('Organization not found');
-    }
-    if (existing) {
-      throw new ConflictException(
-        existing.status === 'REJECTED'
-          ? 'This membership request was rejected. Contact an organization administrator for reconsideration.'
-          : 'Membership request already exists',
+      this.assertRegularUser(user);
+      if (!user.emailVerifiedAt) {
+        throw new ForbiddenException(
+          'Verify your email before requesting membership.',
+        );
+      }
+      if (!organization || organization.status !== 'ACTIVE') {
+        throw new NotFoundException('Organization not found');
+      }
+      if (existing) {
+        throw new ConflictException(
+          existing.status === 'REJECTED'
+            ? 'This membership request was rejected. Contact an organization administrator for reconsideration.'
+            : 'Membership request already exists',
+        );
+      }
+
+      const [domainRule, allowlist, organizations] = await Promise.all([
+        transaction.organizationEmailDomain.findUnique({
+          where: {
+            domain: user.email
+              .slice(user.email.lastIndexOf('@') + 1)
+              .toLowerCase(),
+          },
+          select: { organizationId: true, autoJoin: true },
+        }),
+        transaction.organizationEmailAllowlist.findMany({
+          where: {
+            email: user.email.toLowerCase(),
+            usedAt: null,
+            organization: {
+              rootOrganizationId: organization.rootOrganizationId,
+            },
+          },
+          select: { id: true, organizationId: true },
+        }),
+        transaction.organization.findMany({
+          where: { rootOrganizationId: organization.rootOrganizationId },
+          select: {
+            id: true,
+            parentId: true,
+            rootOrganizationId: true,
+            status: true,
+            name: true,
+          },
+        }),
+      ]);
+
+      const organizationById = new Map(
+        organizations.map((item) => [item.id, item]),
       );
-    }
+      const matchedRuleIds = new Set(
+        allowlist.map((entry) => entry.organizationId),
+      );
+      if (domainRule?.autoJoin) matchedRuleIds.add(domainRule.organizationId);
+      const membershipsToApprove = new Set<string>();
+      const consumedAllowlistIds = new Set<string>();
+      for (const ruleOrganizationId of matchedRuleIds) {
+        const path: string[] = [];
+        let currentId: string | null = ruleOrganizationId;
+        let reachedRoot = false;
+        while (currentId) {
+          const current = organizationById.get(currentId);
+          if (!current || current.status !== 'ACTIVE') {
+            path.length = 0;
+            break;
+          }
+          path.push(current.id);
+          if (current.id === current.rootOrganizationId) {
+            reachedRoot = true;
+            break;
+          }
+          currentId = current.parentId;
+        }
+        if (!reachedRoot || !path.includes(organizationId)) continue;
+        for (const entry of allowlist) {
+          if (entry.organizationId === ruleOrganizationId) {
+            consumedAllowlistIds.add(entry.id);
+          }
+        }
+        for (const id of path) membershipsToApprove.add(id);
+      }
 
-    return this.prisma.organizationMembership.create({
-      data: {
-        userId,
-        organizationId,
-        status: 'PENDING',
-        role: 'MEMBER',
-      },
+      let requestedMembership;
+      if (membershipsToApprove.has(organizationId)) {
+        for (const id of membershipsToApprove) {
+          const membership = await transaction.organizationMembership.upsert({
+            where: { userId_organizationId: { userId, organizationId: id } },
+            create: {
+              userId,
+              organizationId: id,
+              role: 'MEMBER',
+              status: 'APPROVED',
+            },
+            update: {},
+          });
+          if (id === organizationId) requestedMembership = membership;
+        }
+        if (consumedAllowlistIds.size > 0) {
+          await transaction.organizationEmailAllowlist.updateMany({
+            where: {
+              id: { in: [...consumedAllowlistIds] },
+              usedAt: null,
+            },
+            data: { usedAt: new Date() },
+          });
+        }
+        return requestedMembership;
+      }
+
+      return transaction.organizationMembership.create({
+        data: { userId, organizationId, status: 'PENDING', role: 'MEMBER' },
+      });
     });
   }
 

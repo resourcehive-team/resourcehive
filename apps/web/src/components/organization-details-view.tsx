@@ -22,6 +22,16 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ApiAuthenticationError, ApiError } from "@/lib/api-client";
 import {
   AuthenticationRequiredError,
@@ -32,7 +42,20 @@ import {
   formatOrganizationLabel,
   formatOrganizationPoints,
 } from "@/lib/resource-service/organization-format";
-import { getOrganizationDetails } from "@/lib/resource-service/organization-api";
+import {
+  addOrganizationAllowlistEmail,
+  addOrganizationEmailDomain,
+  createChildOrganization,
+  getOrganizationAllowlist,
+  getOrganizationDetails,
+  getOrganizationEmailDomains,
+  getRootOrganizationDescendants,
+  removeOrganizationAllowlistEmail,
+  removeOrganizationEmailDomain,
+  updateOrganizationEmailDomain,
+  type OrganizationEmailAllowlistEntry,
+  type OrganizationEmailDomain,
+} from "@/lib/resource-service/organization-api";
 import {
   getCurrentUserMemberships,
   getOrganizationMembers,
@@ -58,7 +81,7 @@ type DetailsState =
 
 type ViewerState =
   | { status: "loading" }
-  | { status: "loaded"; platformRole: string; membership: Membership | null }
+  | { status: "loaded"; platformRole: string; membership: Membership | null; canAdminister: boolean }
   | { status: "error"; error: unknown };
 
 export function OrganizationDetailsView({
@@ -166,15 +189,36 @@ export function OrganizationDetailsView({
     Promise.all([
       getCurrentUser(controller.signal),
       getCurrentUserMemberships(controller.signal),
+      getOrganizationDetails(organizationId, controller.signal),
     ])
-      .then(([account, memberships]) => {
+      .then(async ([account, memberships, organization]) => {
         if (controller.signal.aborted) {
           return;
         }
 
+        const descendants = account.organizationContext.rootOrganizationId
+          ? await getRootOrganizationDescendants(
+              account.organizationContext.rootOrganizationId,
+            )
+          : [];
+        const parentById = new Map(descendants.map((item) => [item.id, item.parentId]));
+        let currentId: string | null = organization?.id ?? organizationId;
+        const ancestorIds = new Set<string>();
+        while (currentId && !ancestorIds.has(currentId)) {
+          ancestorIds.add(currentId);
+          currentId = parentById.get(currentId) ?? null;
+        }
+        const canAdminister = memberships.some(
+          (item) =>
+            ancestorIds.has(item.organizationId) &&
+            item.role.toUpperCase() === "ADMIN" &&
+            item.status.toUpperCase() === "APPROVED",
+        );
+
         setViewerState({
           status: "loaded",
           platformRole: account.user.platformRole,
+          canAdminister,
           membership:
             memberships.find(
               (membership) => membership.organizationId === organizationId,
@@ -255,6 +299,26 @@ export function OrganizationDetailsView({
       <div className="lg:col-span-12">
         <ChildOrganizationList organizations={state.organization.children} />
       </div>
+      {viewerState.status === "loaded" && viewerState.canAdminister ? (
+        <div className="lg:col-span-12">
+          <OrganizationAdminPanel
+            organization={state.organization}
+            onChildCreated={(child) =>
+              setState((currentState) =>
+                currentState.status === "loaded" && currentState.organization
+                  ? {
+                      ...currentState,
+                      organization: {
+                        ...currentState.organization,
+                        children: [...currentState.organization.children, child],
+                      },
+                    }
+                  : currentState,
+              )
+            }
+          />
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -288,9 +352,7 @@ function OrganizationActionPanel({
   const isPlatformAdmin = viewerState.platformRole.toUpperCase() === "PLATFORM_ADMIN";
   const isApprovedRootAdmin =
     organization.parentId === null &&
-    membership?.organizationId === organization.id &&
-    membership.status.toUpperCase() === "APPROVED" &&
-    membership.role.toUpperCase() === "ADMIN";
+    viewerState.canAdminister;
 
   return (
     <div className="flex flex-col gap-4">
@@ -299,7 +361,7 @@ function OrganizationActionPanel({
           organizationName={organization.name}
           membership={membership}
         />
-      ) : isPlatformAdmin ? null : (
+      ) : isPlatformAdmin || viewerState.canAdminister ? null : (
         <MembershipRequestCard
           organizationId={organization.id}
           organizationName={organization.name}
@@ -512,6 +574,209 @@ function ChildOrganizationList({
         </div>
       )}
     </section>
+  );
+}
+
+function OrganizationAdminPanel({
+  organization,
+  onChildCreated,
+}: {
+  organization: OrganizationDetails;
+  onChildCreated: (organization: Organization) => void;
+}) {
+  const router = useRouter();
+  const [domains, setDomains] = React.useState<OrganizationEmailDomain[]>([]);
+  const [allowlist, setAllowlist] = React.useState<OrganizationEmailAllowlistEntry[]>([]);
+  const [name, setName] = React.useState("");
+  const [type, setType] = React.useState("FACULTY");
+  const [adminEmail, setAdminEmail] = React.useState("");
+  const [domain, setDomain] = React.useState("");
+  const [autoJoin, setAutoJoin] = React.useState(false);
+  const [email, setEmail] = React.useState("");
+  const [saving, setSaving] = React.useState(false);
+  const [message, setMessage] = React.useState("");
+  const [error, setError] = React.useState("");
+
+  const reloadRules = React.useCallback(async () => {
+    const [nextDomains, nextAllowlist] = await Promise.all([
+      getOrganizationEmailDomains(organization.id),
+      getOrganizationAllowlist(organization.id),
+    ]);
+    setDomains(nextDomains);
+    setAllowlist(nextAllowlist);
+  }, [organization.id]);
+
+  React.useEffect(() => {
+    let active = true;
+    Promise.all([
+      getOrganizationEmailDomains(organization.id),
+      getOrganizationAllowlist(organization.id),
+    ])
+      .then(([nextDomains, nextAllowlist]) => {
+        if (!active) return;
+        setDomains(nextDomains);
+        setAllowlist(nextAllowlist);
+      })
+      .catch(() => {
+        if (active) setError("Could not load email rules.");
+      });
+    return () => {
+      active = false;
+    };
+  }, [organization.id]);
+
+  async function perform(action: () => Promise<void>) {
+    setSaving(true);
+    setError("");
+    setMessage("");
+    try {
+      await action();
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Request failed. Try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Organization administration</CardTitle>
+        <CardDescription>
+          Create a child organization and manage who can join {organization.name}.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-8">
+        <form
+          className="grid gap-4 md:grid-cols-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void perform(async () => {
+              const result = await createChildOrganization(organization.id, {
+                name,
+                type,
+                adminEmail,
+              });
+              onChildCreated(result.organization);
+              setName("");
+              setAdminEmail("");
+              setMessage(`${result.organization.name} created; ${result.administrator.email} is its admin.`);
+              router.refresh();
+            });
+          }}
+        >
+          <div className="space-y-2">
+            <Label htmlFor="child-organization-name">Child organization name</Label>
+            <Input id="child-organization-name" value={name} onChange={(event) => setName(event.target.value)} required maxLength={200} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="child-organization-type">Type</Label>
+            <Select
+              value={type}
+              onValueChange={(value) => {
+                if (typeof value === "string") setType(value);
+              }}
+            >
+              <SelectTrigger id="child-organization-type" className="w-full">
+                <SelectValue placeholder="Choose organization type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="FACULTY">Faculty</SelectItem>
+                <SelectItem value="DEPARTMENT">Department</SelectItem>
+                <SelectItem value="CLUB">Club</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="child-organization-admin">First admin email</Label>
+            <Input id="child-organization-admin" type="email" value={adminEmail} onChange={(event) => setAdminEmail(event.target.value)} required />
+          </div>
+          <div className="flex items-end">
+            <Button type="submit" disabled={saving}>{saving ? "Creating…" : "Create organization"}</Button>
+          </div>
+        </form>
+
+        <div className="grid gap-8 lg:grid-cols-2">
+          <section aria-labelledby="organization-domains-heading" className="space-y-4">
+            <div>
+              <h3 id="organization-domains-heading" className="font-medium">Email domains</h3>
+              <p className="text-sm text-muted-foreground">Add exact domains. Turn on automatic approval to approve membership at this organization and its parents.</p>
+            </div>
+            <form className="space-y-3" onSubmit={(event) => {
+              event.preventDefault();
+              void perform(async () => {
+                await addOrganizationEmailDomain(organization.id, domain, autoJoin);
+                setDomain("");
+                setAutoJoin(false);
+                await reloadRules();
+                setMessage("Email domain added.");
+              });
+            }}>
+              <Label htmlFor="organization-domain">Domain</Label>
+              <Input id="organization-domain" value={domain} onChange={(event) => setDomain(event.target.value)} placeholder="cse.mrt.ac.lk" required />
+              <label className="flex items-center gap-2 text-sm">
+                <Checkbox checked={autoJoin} onCheckedChange={(checked) => setAutoJoin(checked === true)} />
+                Automatically approve membership
+              </label>
+              <Button type="submit" variant="outline" disabled={saving}>Add domain</Button>
+            </form>
+            <ul className="space-y-2">
+              {domains.map((item) => (
+                <li key={item.id} className="flex flex-wrap items-center justify-between gap-3 border border-border p-3 text-sm">
+                  <span>{item.domain}</span>
+                  <div className="flex items-center gap-3">
+                    <label className="flex items-center gap-2">
+                      <Checkbox checked={item.autoJoin} disabled={saving} onCheckedChange={(checked) => void perform(async () => {
+                        await updateOrganizationEmailDomain(organization.id, item.id, checked === true);
+                        await reloadRules();
+                      })} />
+                      Auto approve
+                    </label>
+                    <Button type="button" variant="ghost" size="sm" disabled={saving} onClick={() => void perform(async () => {
+                      await removeOrganizationEmailDomain(organization.id, item.id);
+                      await reloadRules();
+                    })}>Remove</Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          <section aria-labelledby="organization-allowlist-heading" className="space-y-4">
+            <div>
+              <h3 id="organization-allowlist-heading" className="font-medium">Email allowlist</h3>
+              <p className="text-sm text-muted-foreground">Allow one verified account to join this organization and its parents.</p>
+            </div>
+            <form className="space-y-3" onSubmit={(event) => {
+              event.preventDefault();
+              void perform(async () => {
+                await addOrganizationAllowlistEmail(organization.id, email);
+                setEmail("");
+                await reloadRules();
+                setMessage("Email added to allowlist.");
+              });
+            }}>
+              <Label htmlFor="organization-allowlist-email">Email address</Label>
+              <Input id="organization-allowlist-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
+              <Button type="submit" variant="outline" disabled={saving}>Add email</Button>
+            </form>
+            <ul className="space-y-2">
+              {allowlist.map((item) => (
+                <li key={item.id} className="flex items-center justify-between gap-3 border border-border p-3 text-sm">
+                  <span>{item.email}{item.usedAt ? " · used" : ""}</span>
+                  <Button type="button" variant="ghost" size="sm" disabled={saving} onClick={() => void perform(async () => {
+                    await removeOrganizationAllowlistEmail(organization.id, item.id);
+                    await reloadRules();
+                  })}>Remove</Button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        </div>
+        {message ? <p role="status" className="text-sm text-primary">{message}</p> : null}
+        {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+      </CardContent>
+    </Card>
   );
 }
 
