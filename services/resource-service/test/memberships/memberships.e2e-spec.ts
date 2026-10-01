@@ -92,18 +92,20 @@ describe('MembershipsController (e2e)', () => {
 
   it('approves a membership request', async () => {
     const targetUserId = '00000000-0000-4000-8000-000000000888';
+    const targetEmail = 'target-approve-test@unconfigured.invalid';
     const prisma = fixturePrisma;
 
     // Create or update a dummy user to satisfy foreign key constraints
     await prisma.user.upsert({
       where: { id: targetUserId },
-      update: {},
+      update: { email: targetEmail, emailVerifiedAt: new Date() },
       create: {
         id: targetUserId,
-        email: 'target-approve-test@example.edu',
+        email: targetEmail,
         passwordHash: 'dummyhash',
         firstName: 'Target',
         lastName: 'User',
+        emailVerifiedAt: new Date(),
       },
     });
 
@@ -117,7 +119,7 @@ describe('MembershipsController (e2e)', () => {
     const targetJwtToken = jwtService.sign(
       {
         sub: targetUserId,
-        email: 'target-approve-test@example.edu',
+        email: targetEmail,
         organizationId: demoOrganizationId,
         rootOrganizationId: demoOrganizationId,
         role: 'member',
@@ -131,10 +133,13 @@ describe('MembershipsController (e2e)', () => {
     });
 
     // Target user requests membership
-    await request(app.getHttpServer())
+    const membershipRequest = await request(app.getHttpServer())
       .post(`/memberships/${demoOrganizationId}/request`)
       .set('Authorization', `Bearer ${targetJwtToken}`)
       .expect(201);
+    expect(membershipRequest.body).toEqual(
+      expect.objectContaining({ status: 'PENDING' }),
+    );
 
     // Ensure the approving user (demoUserId) has ADMIN role in DB
     await prisma.organizationMembership.update({

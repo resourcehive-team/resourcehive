@@ -10,10 +10,13 @@ describe('MembershipsService', () => {
   const prisma = {
     user: { findUnique: jest.fn() },
     organization: { findUnique: jest.fn(), findMany: jest.fn() },
+    organizationEmailDomain: { findUnique: jest.fn() },
+    organizationEmailAllowlist: { findMany: jest.fn(), updateMany: jest.fn() },
     organizationMembership: {
       findUnique: jest.fn(),
       findMany: jest.fn(),
       create: jest.fn(),
+      upsert: jest.fn(),
       update: jest.fn(),
       updateMany: jest.fn(),
       delete: jest.fn(),
@@ -30,6 +33,12 @@ describe('MembershipsService', () => {
       (callback: (transaction: typeof prisma) => Promise<unknown>) =>
         callback(prisma),
     );
+    prisma.organizationEmailDomain.findUnique.mockResolvedValue(null);
+    prisma.organizationEmailAllowlist.findMany.mockResolvedValue([]);
+    prisma.organizationEmailAllowlist.updateMany.mockResolvedValue({
+      count: 0,
+    });
+    prisma.organization.findMany.mockResolvedValue([]);
     notifications.sendMembershipDecision.mockResolvedValue(undefined);
 
     const module: TestingModule = await Test.createTestingModule({
@@ -44,12 +53,15 @@ describe('MembershipsService', () => {
 
   it('creates a pending membership request for an active regular user', async () => {
     prisma.user.findUnique.mockResolvedValue({
+      email: 'user@example.edu',
+      emailVerifiedAt: new Date(),
       status: 'ACTIVE',
       platformRole: 'USER',
     });
     prisma.organization.findUnique.mockResolvedValue({
       id: 'org',
       status: 'ACTIVE',
+      rootOrganizationId: 'root',
     });
     prisma.organizationMembership.findUnique.mockResolvedValue(null);
     prisma.organizationMembership.create.mockResolvedValue({
@@ -69,6 +81,71 @@ describe('MembershipsService', () => {
     });
   });
 
+  it('auto-approves a department request and creates memberships up to university, without siblings', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      email: 'student@cse.mrt.ac.lk',
+      emailVerifiedAt: new Date(),
+      status: 'ACTIVE',
+      platformRole: 'USER',
+    });
+    prisma.organization.findUnique.mockResolvedValue({
+      id: 'cse',
+      status: 'ACTIVE',
+      rootOrganizationId: 'uom',
+    });
+    prisma.organizationEmailDomain.findUnique.mockResolvedValue({
+      organizationId: 'cse',
+      autoJoin: true,
+    });
+    prisma.organization.findMany.mockResolvedValue([
+      {
+        id: 'uom',
+        parentId: null,
+        rootOrganizationId: 'uom',
+        status: 'ACTIVE',
+      },
+      {
+        id: 'engineering',
+        parentId: 'uom',
+        rootOrganizationId: 'uom',
+        status: 'ACTIVE',
+      },
+      {
+        id: 'cse',
+        parentId: 'engineering',
+        rootOrganizationId: 'uom',
+        status: 'ACTIVE',
+      },
+      {
+        id: 'entc',
+        parentId: 'engineering',
+        rootOrganizationId: 'uom',
+        status: 'ACTIVE',
+      },
+    ]);
+    prisma.organizationMembership.findUnique.mockResolvedValue(null);
+    prisma.organizationMembership.upsert.mockResolvedValue({
+      organizationId: 'cse',
+      status: 'APPROVED',
+    });
+
+    const result = await service.requestMembership('student', 'cse');
+
+    expect(result).toMatchObject({ organizationId: 'cse', status: 'APPROVED' });
+    expect(prisma.organizationMembership.upsert).toHaveBeenCalledTimes(3);
+    const upsertCalls = prisma.organizationMembership.upsert.mock
+      .calls as unknown as Array<
+      [{ where: { userId_organizationId: { organizationId: string } } }]
+    >;
+    const organizationIds = upsertCalls.map(
+      ([input]) => input.where.userId_organizationId.organizationId,
+    );
+    expect(organizationIds).toEqual(
+      expect.arrayContaining(['cse', 'engineering', 'uom']),
+    );
+    expect(organizationIds).not.toContain('entc');
+  });
+
   it('blocks platform administrators and resubmission after rejection', async () => {
     prisma.user.findUnique.mockResolvedValue({
       status: 'ACTIVE',
@@ -79,6 +156,8 @@ describe('MembershipsService', () => {
     );
 
     prisma.user.findUnique.mockResolvedValue({
+      email: 'user@example.edu',
+      emailVerifiedAt: new Date(),
       status: 'ACTIVE',
       platformRole: 'USER',
     });

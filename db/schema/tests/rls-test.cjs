@@ -88,6 +88,34 @@ async function createFixtures() {
 
   const universityA = await createUniversity(`RLS University A ${randomUUID()}`);
   const universityB = await createUniversity(`RLS University B ${randomUUID()}`);
+  const domainA = await owner.organizationEmailDomain.create({
+    data: {
+      organizationId: universityA.firstDepartment.id,
+      domain: `cse-${randomUUID()}.example.test`,
+      autoJoin: true,
+    },
+  });
+  const domainB = await owner.organizationEmailDomain.create({
+    data: {
+      organizationId: universityB.firstDepartment.id,
+      domain: `entc-${randomUUID()}.example.test`,
+      autoJoin: false,
+    },
+  });
+  const allowlistA = await owner.organizationEmailAllowlist.create({
+    data: {
+      organizationId: universityA.firstDepartment.id,
+      email: sharedUser.email,
+      addedBy: creator.id,
+    },
+  });
+  const allowlistB = await owner.organizationEmailAllowlist.create({
+    data: {
+      organizationId: universityB.firstDepartment.id,
+      email: sharedUser.email,
+      addedBy: creator.id,
+    },
+  });
   for (const department of [
     universityA.firstDepartment,
     universityB.firstDepartment,
@@ -145,16 +173,72 @@ async function createFixtures() {
     ],
   });
 
-  return { sharedUser, universityA, universityB, resource };
+  return {
+    sharedUser,
+    universityA,
+    universityB,
+    resource,
+    domainA,
+    domainB,
+    allowlistA,
+    allowlistB,
+  };
 }
 
 async function main() {
   const fixtures = await createFixtures();
-  const { sharedUser, universityA, universityB, resource } = fixtures;
+  const {
+    sharedUser,
+    universityA,
+    universityB,
+    resource,
+    domainA,
+    domainB,
+    allowlistA,
+    allowlistB,
+  } = fixtures;
   const contextFor = (university) => ({
     rootOrganizationId: university.root.id,
     userId: sharedUser.id,
   });
+
+  // Existing memberships stay untouched when an organization configures a
+  // joining bonus. Only memberships first approved after this change qualify.
+  await owner.organization.update({
+    where: { id: universityA.root.id },
+    data: { joinBonusPoints: 7 },
+  });
+  await owner.organization.update({
+    where: { id: universityA.firstDepartment.id },
+    data: { joinBonusPoints: 11 },
+  });
+  await owner.organization.update({
+    where: { id: universityB.root.id },
+    data: { joinBonusPoints: 13 },
+  });
+  await owner.organization.update({
+    where: { id: universityB.firstDepartment.id },
+    data: { joinBonusPoints: 17 },
+  });
+  const bonusUsers = {};
+  for (const label of [
+    'verified',
+    'automatic',
+    'manual',
+    'administrator',
+    'rejected',
+    'zero-bonus',
+    'rollback',
+  ]) {
+    bonusUsers[label] = await owner.user.create({
+      data: {
+        email: `join-bonus-${label}-${randomUUID()}@example.test`,
+        firstName: 'Join Bonus',
+        lastName: label,
+        emailVerifiedAt: new Date(),
+      },
+    });
+  }
 
   const [appIdentity] = await app.$queryRaw`
     SELECT current_user AS role, rolsuper AS superuser, rolbypassrls AS bypass_rls,
@@ -203,6 +287,7 @@ async function main() {
 
   const tenantTables = [
     'organizations', 'organization_memberships', 'organization_membership_audits',
+    'organization_email_domains', 'organization_email_allowlist',
     'resources', 'resource_allowed_organizations', 'resource_slots', 'bookings',
     'booking_disputes', 'booking_dispute_events', 'point_transactions',
     'user_point_balances', 'notifications', 'notification_deliveries',
@@ -214,6 +299,7 @@ async function main() {
     WHERE relnamespace = 'public'::regnamespace
       AND relname = ANY(ARRAY[
         'organizations', 'organization_memberships', 'organization_membership_audits',
+        'organization_email_domains', 'organization_email_allowlist',
         'resources', 'resource_allowed_organizations', 'resource_slots', 'bookings',
         'booking_disputes', 'booking_dispute_events', 'point_transactions',
         'user_point_balances', 'notifications', 'notification_deliveries',
@@ -284,6 +370,264 @@ async function main() {
   assert.equal(contextCountsA, 1, 'async context helper scopes University A queries');
   assert.equal(contextCountsB, 0, 'concurrent context helper isolates University B');
   assert.equal(getUniversityDbContext(), undefined, 'async context is cleared after parallel work');
+
+  const emailRulesA = await app.withUniversity(contextFor(universityA), async (transaction) => ({
+    domains: await transaction.organizationEmailDomain.findMany(),
+    allowlist: await transaction.organizationEmailAllowlist.findMany(),
+  }));
+  const emailRulesB = await app.withUniversity(contextFor(universityB), async (transaction) => ({
+    domains: await transaction.organizationEmailDomain.findMany(),
+    allowlist: await transaction.organizationEmailAllowlist.findMany(),
+  }));
+  assert.deepEqual(emailRulesA.domains.map((entry) => entry.id), [domainA.id]);
+  assert.deepEqual(emailRulesA.allowlist.map((entry) => entry.id), [allowlistA.id]);
+  assert.deepEqual(emailRulesB.domains.map((entry) => entry.id), [domainB.id]);
+  assert.deepEqual(emailRulesB.allowlist.map((entry) => entry.id), [allowlistB.id]);
+  await assert.rejects(
+    app.withUniversity(contextFor(universityA), (transaction) =>
+      transaction.organizationEmailDomain.create({
+        data: {
+          organizationId: universityB.firstDepartment.id,
+          domain: `blocked-${randomUUID()}.example.test`,
+          autoJoin: true,
+        },
+      }),
+    ),
+    /row-level security/i,
+    'tenant email rules cannot be created for another university',
+  );
+
+  const bonusUser = (label) => bonusUsers[label].id;
+  const bonusLedger = (userId, rootOrganizationId) =>
+    owner.pointTransaction.findMany({
+      where: {
+        userId,
+        rootOrganizationId,
+        transactionType: 'JOIN_BONUS',
+      },
+      select: { amount: true, sourceOrganizationId: true },
+      orderBy: { sourceOrganizationId: 'asc' },
+    });
+
+  // Email verification uses the restricted authentication role to insert an
+  // approved membership. The database trigger awards the configured bonus.
+  await auth.organizationMembership.create({
+    data: {
+      userId: bonusUser('verified'),
+      organizationId: universityB.firstDepartment.id,
+      role: 'MEMBER',
+      status: 'APPROVED',
+    },
+  });
+  assert.deepEqual(
+    await bonusLedger(bonusUser('verified'), universityB.root.id),
+    [{ amount: 17, sourceOrganizationId: universityB.firstDepartment.id }],
+  );
+
+  // Automatic enrollment creates an approved membership for the selected
+  // department and each ancestor, so each organization's bonus is credited.
+  await app.withUniversity(contextFor(universityA), async (transaction) => {
+    await transaction.organizationMembership.create({
+      data: {
+        userId: bonusUser('automatic'),
+        organizationId: universityA.root.id,
+        role: 'MEMBER',
+        status: 'APPROVED',
+      },
+    });
+    await transaction.organizationMembership.create({
+      data: {
+        userId: bonusUser('automatic'),
+        organizationId: universityA.firstDepartment.id,
+        role: 'MEMBER',
+        status: 'APPROVED',
+      },
+    });
+    await transaction.organizationMembership.create({
+      data: {
+        userId: bonusUser('automatic'),
+        organizationId: universityA.secondDepartment.id,
+        role: 'MEMBER',
+        status: 'APPROVED',
+      },
+    });
+  });
+  assert.deepEqual(
+    await bonusLedger(bonusUser('automatic'), universityA.root.id),
+    [
+      { amount: 7, sourceOrganizationId: universityA.root.id },
+      { amount: 11, sourceOrganizationId: universityA.firstDepartment.id },
+    ].sort((left, right) =>
+      left.sourceOrganizationId.localeCompare(right.sourceOrganizationId),
+    ),
+  );
+
+  // A pending request earns nothing until an administrator approves it.
+  await app.withUniversity(contextFor(universityA), async (transaction) => {
+    const pending = await transaction.organizationMembership.create({
+      data: {
+        userId: bonusUser('manual'),
+        organizationId: universityA.firstDepartment.id,
+        role: 'MEMBER',
+        status: 'PENDING',
+      },
+    });
+    assert.deepEqual(
+      await transaction.pointTransaction.findMany({
+        where: { userId: bonusUser('manual'), transactionType: 'JOIN_BONUS' },
+      }),
+      [],
+    );
+    await transaction.organizationMembership.update({
+      where: { id: pending.id },
+      data: { status: 'APPROVED' },
+    });
+  });
+  assert.deepEqual(
+    await bonusLedger(bonusUser('manual'), universityA.root.id),
+    [{ amount: 11, sourceOrganizationId: universityA.firstDepartment.id }],
+  );
+
+  await app.withUniversity(contextFor(universityA), (transaction) =>
+    transaction.organizationMembership.create({
+      data: {
+        userId: bonusUser('rejected'),
+        organizationId: universityA.firstDepartment.id,
+        role: 'MEMBER',
+        status: 'REJECTED',
+      },
+    }),
+  );
+  assert.deepEqual(
+    await bonusLedger(bonusUser('rejected'), universityA.root.id),
+    [],
+    'rejected membership requests do not receive joining bonuses',
+  );
+
+  // Assigning an administrator creates an approved membership too.
+  await app.withUniversity(contextFor(universityA), (transaction) =>
+    transaction.organizationMembership.create({
+      data: {
+        userId: bonusUser('administrator'),
+        organizationId: universityA.root.id,
+        role: 'ADMIN',
+        status: 'APPROVED',
+      },
+    }),
+  );
+  assert.deepEqual(
+    await bonusLedger(bonusUser('administrator'), universityA.root.id),
+    [{ amount: 7, sourceOrganizationId: universityA.root.id }],
+  );
+
+  // Zero bonus organizations do not create a ledger entry.
+  await app.withUniversity(contextFor(universityA), (transaction) =>
+    transaction.organizationMembership.create({
+      data: {
+        userId: bonusUser('zero-bonus'),
+        organizationId: universityA.secondDepartment.id,
+        role: 'MEMBER',
+        status: 'APPROVED',
+      },
+    }),
+  );
+  assert.deepEqual(
+    await bonusLedger(bonusUser('zero-bonus'), universityA.root.id),
+    [],
+  );
+
+  // If any later write in the same transaction fails, membership, ledger,
+  // and balance changes from the trigger all roll back together.
+  await assert.rejects(
+    app.withUniversity(contextFor(universityA), async (transaction) => {
+      await transaction.organizationMembership.create({
+        data: {
+          userId: bonusUser('rollback'),
+          organizationId: universityA.firstDepartment.id,
+          role: 'MEMBER',
+          status: 'APPROVED',
+        },
+      });
+      throw new Error('rollback join-bonus transaction');
+    }),
+    /rollback join-bonus transaction/,
+  );
+  assert.equal(
+    await owner.organizationMembership.count({
+      where: {
+        userId: bonusUser('rollback'),
+        organizationId: universityA.firstDepartment.id,
+      },
+    }),
+    0,
+  );
+  assert.deepEqual(
+    await bonusLedger(bonusUser('rollback'), universityA.root.id),
+    [],
+  );
+
+  // Rejoining the same organization cannot award the same bonus twice.
+  await app.withUniversity(contextFor(universityA), async (transaction) => {
+    await transaction.organizationMembership.delete({
+      where: {
+        userId_organizationId: {
+          userId: bonusUser('automatic'),
+          organizationId: universityA.firstDepartment.id,
+        },
+      },
+    });
+    await transaction.organizationMembership.create({
+      data: {
+        userId: bonusUser('automatic'),
+        organizationId: universityA.firstDepartment.id,
+        role: 'MEMBER',
+        status: 'APPROVED',
+      },
+    });
+  });
+  assert.equal(
+    (await bonusLedger(bonusUser('automatic'), universityA.root.id)).filter(
+      (entry) => entry.sourceOrganizationId === universityA.firstDepartment.id,
+    ).length,
+    1,
+  );
+
+  // The same user has independent balances in each university; the trigger
+  // also uses each source organization's actual university root.
+  await app.withUniversity(contextFor(universityB), (transaction) =>
+    transaction.organizationMembership.create({
+      data: {
+        userId: bonusUser('automatic'),
+        organizationId: universityB.root.id,
+        role: 'MEMBER',
+        status: 'APPROVED',
+      },
+    }),
+  );
+  const automaticBalances = await owner.userPointBalance.findMany({
+    where: { userId: bonusUser('automatic') },
+    orderBy: { rootOrganizationId: 'asc' },
+  });
+  assert.deepEqual(
+    automaticBalances.map((balance) => ({
+      rootOrganizationId: balance.rootOrganizationId,
+      availablePoints: balance.availablePoints,
+    })),
+    [
+      { rootOrganizationId: universityA.root.id, availablePoints: 18 },
+      { rootOrganizationId: universityB.root.id, availablePoints: 13 },
+    ].sort((left, right) =>
+      left.rootOrganizationId.localeCompare(right.rootOrganizationId),
+    ),
+  );
+
+  assert.equal(
+    await owner.pointTransaction.count({
+      where: { userId: sharedUser.id, transactionType: 'JOIN_BONUS' },
+    }),
+    0,
+    'pre-existing approved memberships are not credited retroactively',
+  );
 
   await assert.rejects(
     app.withUniversity(contextFor(universityA), (transaction) =>
@@ -436,6 +780,18 @@ async function main() {
     crossUniversityWrite: 'rejected',
     departmentSharing: 'allowed within one university',
     separateBalancesAndNotifications: true,
+    joinBonusScenarios: {
+      authVerifiedMembership: 17,
+      automaticEnrollmentAncestors: 18,
+      manualApproval: 11,
+      adminAssignment: 7,
+      rejectedMembership: 0,
+      zeroBonus: 0,
+      repeatJoinDuplicatePrevented: true,
+      rollbackAtomic: true,
+      perUniversityBalances: true,
+      noRetroactiveAwards: true,
+    },
     workerRole: 'tenant notifications accessible',
     platformReportRole: 'cross-university read accessible',
     contextCleanup: 'verified after commit and rollback',

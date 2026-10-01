@@ -56,6 +56,9 @@ describe('AuthService email verification', () => {
     user: {
       update: updateUser,
     },
+    organization: {
+      findMany: jest.fn(),
+    },
   };
   const runTransaction = jest.fn(
     async (callback: (client: typeof transaction) => Promise<unknown>) =>
@@ -98,8 +101,26 @@ describe('AuthService email verification', () => {
         id: 'root-organization-id',
         name: 'Example University',
         status: 'ACTIVE',
+        parentId: null,
+        rootOrganizationId: 'root-organization-id',
       },
     });
+    transaction.organization.findMany.mockResolvedValue([
+      {
+        id: 'root-organization-id',
+        name: 'Example University',
+        parentId: null,
+        rootOrganizationId: 'root-organization-id',
+        status: 'ACTIVE',
+      },
+      {
+        id: 'department-id',
+        name: 'Computer Science',
+        parentId: 'root-organization-id',
+        rootOrganizationId: 'root-organization-id',
+        status: 'ACTIVE',
+      },
+    ]);
     claimVerificationToken.mockResolvedValue({ count: 1 });
     findAllowlistEntries.mockResolvedValue([
       {

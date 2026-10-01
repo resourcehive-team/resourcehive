@@ -9,8 +9,10 @@ describe('OrganizationsService', () => {
     organization: {
       findMany: jest.fn(),
       findUnique: jest.fn(),
+      create: jest.fn(),
       update: jest.fn(),
     },
+    user: { findUnique: jest.fn() },
     organizationEmailDomain: {
       findMany: jest.fn(),
       create: jest.fn(),
@@ -22,8 +24,11 @@ describe('OrganizationsService', () => {
       delete: jest.fn(),
     },
     organizationMembership: {
+      findFirst: jest.fn(),
       findMany: jest.fn(),
+      create: jest.fn(),
     },
+    organizationMembershipAudit: { create: jest.fn() },
     pointTransaction: {
       createMany: jest.fn(),
       findFirst: jest.fn(),
@@ -80,6 +85,125 @@ describe('OrganizationsService', () => {
     });
   });
 
+  describe('createChildOrganization', () => {
+    it('creates a child and assigns its first admin with an audit entry', async () => {
+      mockPrismaService.organization.findUnique.mockResolvedValue({
+        id: 'faculty',
+        rootOrganizationId: 'university',
+        status: 'ACTIVE',
+      });
+      mockPrismaService.organization.findMany.mockResolvedValue([
+        { id: 'university', parentId: null, status: 'ACTIVE' },
+        { id: 'faculty', parentId: 'university', status: 'ACTIVE' },
+      ]);
+      mockPrismaService.organizationMembership.findFirst
+        .mockResolvedValueOnce({ role: 'ADMIN', status: 'APPROVED' })
+        .mockResolvedValueOnce({ role: 'MEMBER', status: 'APPROVED' });
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        id: 'admin-user',
+        email: 'first.admin@example.edu',
+        status: 'ACTIVE',
+        platformRole: 'USER',
+        emailVerifiedAt: new Date(),
+      });
+      mockPrismaService.organization.create.mockResolvedValue({
+        id: 'department',
+        name: 'Computer Science',
+        type: 'DEPARTMENT',
+        parentId: 'faculty',
+        rootOrganizationId: 'university',
+      });
+      mockPrismaService.organizationMembership.create.mockResolvedValue({
+        id: 'new-membership',
+      });
+
+      const result = await service.createChildOrganization(
+        'faculty',
+        {
+          name: ' Computer Science ',
+          type: 'DEPARTMENT',
+          adminEmail: ' FIRST.ADMIN@EXAMPLE.EDU ',
+        },
+        'faculty-admin',
+      );
+
+      expect(result.administrator.email).toBe('first.admin@example.edu');
+      expect(mockPrismaService.organization.create).toHaveBeenCalled();
+      expect(
+        mockPrismaService.organizationMembership.create,
+      ).toHaveBeenCalled();
+      expect(
+        mockPrismaService.organizationMembershipAudit.create,
+      ).toHaveBeenCalledWith({
+        data: {
+          membershipId: 'new-membership',
+          actorUserId: 'faculty-admin',
+          action: 'ADMIN_GRANTED',
+        },
+      });
+    });
+
+    it('rejects an assignee who is not already an approved member of the university', async () => {
+      mockPrismaService.organization.findUnique.mockResolvedValue({
+        id: 'faculty',
+        rootOrganizationId: 'university',
+        status: 'ACTIVE',
+      });
+      mockPrismaService.organization.findMany.mockResolvedValue([
+        { id: 'university', parentId: null, status: 'ACTIVE' },
+        { id: 'faculty', parentId: 'university', status: 'ACTIVE' },
+      ]);
+      mockPrismaService.organizationMembership.findFirst
+        .mockResolvedValueOnce({ role: 'ADMIN', status: 'APPROVED' })
+        .mockResolvedValueOnce(null);
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        id: 'outside-user',
+        email: 'outside@example.edu',
+        status: 'ACTIVE',
+        platformRole: 'USER',
+        emailVerifiedAt: new Date(),
+      });
+
+      await expect(
+        service.createChildOrganization(
+          'faculty',
+          {
+            name: 'Department',
+            type: 'DEPARTMENT',
+            adminEmail: 'outside@example.edu',
+          },
+          'faculty-admin',
+        ),
+      ).rejects.toThrow('approved member of this university');
+      expect(mockPrismaService.organization.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects creation when an ancestor is inactive', async () => {
+      mockPrismaService.organization.findUnique.mockResolvedValue({
+        id: 'faculty',
+        rootOrganizationId: 'university',
+        status: 'ACTIVE',
+      });
+      mockPrismaService.organization.findMany.mockResolvedValue([
+        { id: 'university', parentId: null, status: 'SUSPENDED' },
+        { id: 'faculty', parentId: 'university', status: 'ACTIVE' },
+      ]);
+
+      await expect(
+        service.createChildOrganization(
+          'faculty',
+          {
+            name: 'Department',
+            type: 'DEPARTMENT',
+            adminEmail: 'first.admin@example.edu',
+          },
+          'faculty-admin',
+        ),
+      ).rejects.toThrow('parent organization hierarchy must be active');
+      expect(mockPrismaService.organization.create).not.toHaveBeenCalled();
+    });
+  });
+
   // Minimal tests for other domains to ensure coverage without being exhaustive
   describe('addEmailDomain', () => {
     it('should add an email domain', async () => {
@@ -88,9 +212,9 @@ describe('OrganizationsService', () => {
         result,
       );
 
-      expect(await service.addEmailDomain('org1', 'example.com', true)).toEqual(
-        result,
-      );
+      expect(
+        await service.addEmailDomain('org1', ' Example.COM ', true),
+      ).toEqual(result);
       expect(
         mockPrismaService.organizationEmailDomain.create,
       ).toHaveBeenCalledWith({

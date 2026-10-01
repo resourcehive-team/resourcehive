@@ -25,6 +25,10 @@ import { TenantGuard } from '../auth/tenant.guard';
 import { AdminGuard } from '../auth/admin.guard';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
 import { AllocateSemesterPointsDto } from './dto/allocate-semester-points.dto';
+import { CreateChildOrganizationDto } from './dto/create-child-organization.dto';
+import { AddEmailDomainDto } from './dto/add-email-domain.dto';
+import { AddEmailAllowlistDto } from './dto/add-email-allowlist.dto';
+import { UpdateEmailDomainDto } from './dto/update-email-domain.dto';
 import {
   CountResponseDto,
   OrganizationAllowlistResponseDto,
@@ -71,6 +75,18 @@ export class OrganizationsController {
   }
 
   @UseGuards(TenantGuard, AdminGuard)
+  @Post(':organizationId/children')
+  @ApiOperation({ summary: 'Create a child organization and assign its admin' })
+  @ApiCreatedResponse({ description: 'Child organization created.' })
+  createChild(
+    @Param('organizationId') parentId: string,
+    @Body() dto: CreateChildOrganizationDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.orgsService.createChildOrganization(parentId, dto, user.userId);
+  }
+
+  @UseGuards(TenantGuard, AdminGuard)
   @Get(':organizationId/email-domains')
   @ApiOperation({ summary: 'Get email domains for an organization' })
   @ApiOkResponse({
@@ -106,10 +122,23 @@ export class OrganizationsController {
   })
   addEmailDomain(
     @Param('organizationId') orgId: string,
-    @Body('domain') domain: string,
-    @Body('autoJoin') autoJoin?: boolean,
+    @Body() dto: AddEmailDomainDto,
   ) {
-    return this.orgsService.addEmailDomain(orgId, domain, autoJoin);
+    return this.orgsService.addEmailDomain(orgId, dto.domain, dto.autoJoin);
+  }
+
+  @UseGuards(TenantGuard, AdminGuard)
+  @Patch(':organizationId/email-domains/:domainId')
+  @ApiOperation({
+    summary: 'Update automatic membership approval for a domain',
+  })
+  @ApiOkResponse({ type: OrganizationEmailDomainResponseDto })
+  updateEmailDomain(
+    @Param('organizationId') orgId: string,
+    @Param('domainId') domainId: string,
+    @Body() dto: UpdateEmailDomainDto,
+  ) {
+    return this.orgsService.updateEmailDomain(orgId, domainId, dto.autoJoin);
   }
 
   @UseGuards(TenantGuard, AdminGuard)
@@ -168,10 +197,10 @@ export class OrganizationsController {
   })
   addToAllowlist(
     @Param('organizationId') orgId: string,
-    @Body('email') email: string,
+    @Body() dto: AddEmailAllowlistDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.orgsService.addToAllowlist(orgId, email, user.userId);
+    return this.orgsService.addToAllowlist(orgId, dto.email, user.userId);
   }
 
   @UseGuards(TenantGuard, AdminGuard)
