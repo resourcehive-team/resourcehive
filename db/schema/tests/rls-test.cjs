@@ -745,6 +745,61 @@ async function main() {
   );
   assert.equal(updatedBalance.availablePoints, 22, 'ledger trigger updates the selected university balance');
 
+  const bookingSlot = await app.withUniversity(contextFor(universityA), (transaction) =>
+    transaction.resourceSlot.create({
+      data: {
+        resourceId: resource.id,
+        rootOrganizationId: universityA.root.id,
+        startsAt: new Date('2035-01-01T10:00:00Z'),
+        endsAt: new Date('2035-01-01T11:00:00Z'),
+      },
+    }),
+  );
+  await app.withUniversity(contextFor(universityA), async (transaction) => {
+    const booking = await transaction.booking.create({
+      data: {
+        resourceSlotId: bookingSlot.id,
+        rootOrganizationId: universityA.root.id,
+        userId: sharedUser.id,
+      },
+    });
+    await transaction.pointTransaction.create({
+      data: {
+        userId: sharedUser.id,
+        rootOrganizationId: universityA.root.id,
+        bookingId: booking.id,
+        amount: -5,
+        transactionType: 'BOOKING',
+      },
+    });
+  });
+  const balanceAfterBooking = await app.withUniversity(
+    contextFor(universityA),
+    (transaction) => transaction.userPointBalance.findUnique({
+      where: {
+        userId_rootOrganizationId: {
+          userId: sharedUser.id,
+          rootOrganizationId: universityA.root.id,
+        },
+      },
+      select: { availablePoints: true },
+    }),
+  );
+  assert.equal(balanceAfterBooking.availablePoints, 17, 'booking deduction reduces the university balance');
+  const otherUniversityBalance = await app.withUniversity(
+    contextFor(universityB),
+    (transaction) => transaction.userPointBalance.findUnique({
+      where: {
+        userId_rootOrganizationId: {
+          userId: sharedUser.id,
+          rootOrganizationId: universityB.root.id,
+        },
+      },
+      select: { availablePoints: true },
+    }),
+  );
+  assert.equal(otherUniversityBalance.availablePoints, 43, 'booking deduction leaves other universities unchanged');
+
   const [workerNotifications] = await worker.$queryRaw`
     SELECT COUNT(*)::int AS count FROM notifications
     WHERE user_id = ${sharedUser.id}::uuid AND type = 'RLS_TEST'
