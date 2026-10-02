@@ -87,7 +87,13 @@ async function main(): Promise<void> {
         `DO $role$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${role.expectedRole}') THEN CREATE ROLE "${role.expectedRole}" LOGIN; END IF; END $role$`,
       );
       await owner.$executeRawUnsafe(
-        `ALTER ROLE "${role.expectedRole}" LOGIN PASSWORD ${quoteLiteral(role.password)} NOSUPERUSER NOCREATEDB NOCREATEROLE INHERIT NOBYPASSRLS`,
+        `DO $security$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${role.expectedRole}' AND (rolsuper OR rolbypassrls OR rolreplication)) THEN RAISE EXCEPTION 'Runtime role ${role.expectedRole} has forbidden elevated privileges'; END IF; END $security$`,
+      );
+      // Managed database owners cannot ALTER SUPERUSER or BYPASSRLS, even
+      // to set them to false. CREATE ROLE defaults are safe; reject existing
+      // elevated roles above instead of attempting a privileged alteration.
+      await owner.$executeRawUnsafe(
+        `ALTER ROLE "${role.expectedRole}" LOGIN PASSWORD ${quoteLiteral(role.password)} NOCREATEDB NOCREATEROLE INHERIT`,
       );
       await owner.$executeRawUnsafe(`
         DO $membership$
@@ -123,6 +129,9 @@ async function main(): Promise<void> {
           rolcanlogin: boolean;
           rolsuper: boolean;
           rolbypassrls: boolean;
+          rolcreatedb: boolean;
+          rolcreaterole: boolean;
+          rolreplication: boolean;
           capability_granted: boolean;
           only_capability_granted: boolean;
           database_matches: boolean;
@@ -133,6 +142,9 @@ async function main(): Promise<void> {
           role.rolcanlogin,
           role.rolsuper,
           role.rolbypassrls,
+          role.rolcreatedb,
+          role.rolcreaterole,
+          role.rolreplication,
           pg_has_role(role.oid, ${role.capability}, 'member') AS capability_granted,
           NOT EXISTS (
             SELECT 1
@@ -152,6 +164,9 @@ async function main(): Promise<void> {
         !actual.rolcanlogin ||
         actual.rolsuper ||
         actual.rolbypassrls ||
+        actual.rolcreatedb ||
+        actual.rolcreaterole ||
+        actual.rolreplication ||
         !actual.capability_granted ||
         !actual.only_capability_granted ||
         !actual.database_matches
