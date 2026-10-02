@@ -317,6 +317,8 @@ jobs:
 
       - name: Run Notification Service concurrency tests
         run: pnpm --filter notification-service run test:concurrency
+        env:
+          APP_DATABASE_URL: ${{ env.CI_DATABASE_URL }}
 
       - name: Seed the presentation dataset and verify its repeat guard
         run: |
