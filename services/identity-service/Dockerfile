@@ -20,6 +20,9 @@ RUN --mount=type=cache,id=resourcehive-pnpm,target=/pnpm/store \
 
 COPY db db
 COPY packages/database packages/database
+RUN printf '%s\n' \
+    'DATABASE_URL=postgresql://build:build@127.0.0.1:5432/build' \
+    'DATABASE_URL_UNPOOLED=postgresql://build:build@127.0.0.1:5432/build' > .env
 RUN pnpm --filter @resourcehive/database run build
 
 RUN --mount=type=cache,id=resourcehive-pnpm,target=/pnpm/store \
@@ -34,6 +37,17 @@ RUN pnpm --filter @resourcehive/notification-client run build
 
 COPY services/identity-service services/identity-service
 RUN pnpm --filter identity-service run build
+RUN pnpm --filter identity-service exec tsc \
+    --target ES2021 \
+    --module commonjs \
+    --moduleResolution node \
+    --esModuleInterop \
+    --skipLibCheck \
+    --strictNullChecks false \
+    --noImplicitAny false \
+    --outDir dist/scripts \
+    --rootDir scripts \
+    scripts/seed-university.ts scripts/setup-runtime-roles.ts
 
 RUN --mount=type=cache,id=resourcehive-pnpm,target=/pnpm/store \
     pnpm --prefer-offline --filter identity-service --prod deploy /prod/service

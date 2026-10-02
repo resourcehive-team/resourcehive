@@ -11,6 +11,7 @@
     "db:migrate:dev": "pnpm -F @resourcehive/database run migrate:dev",
     "db:migrate:status": "pnpm -F @resourcehive/database run migrate:status",
     "db:seed:demo": "pnpm -F identity-service run seed:demo",
+    "db:seed:university": "pnpm -F identity-service run seed:university",
     "db:studio": "pnpm -F @resourcehive/database run studio",
     "db:test": "bash db/schema/tests/run.sh",
     "db:validate": "pnpm -F @resourcehive/database run validate",
