@@ -63,6 +63,10 @@ describeWithDatabase("Dispute routing integration", () => {
 
   beforeAll(async () => {
     await Promise.all([owner.$connect(), app.$connect()]);
+    const [runtimeRole] = await app.$queryRaw<
+      { rolsuper: boolean; rolbypassrls: boolean }[]
+    >`SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user`;
+    expect(runtimeRole).toEqual({ rolsuper: false, rolbypassrls: false });
     await owner.user.createMany({
       data: [
         [ids.submitter, "submitter"],
@@ -81,35 +85,43 @@ describeWithDatabase("Dispute routing integration", () => {
 
     await owner.organization.createMany({
       data: [
-        [ids.rootA, "Dispute University A", "UNIVERSITY", null, ids.rootA],
-        [
-          ids.ownerOrganization,
-          "Resource Owner Department",
-          "DEPARTMENT",
-          ids.rootA,
-          ids.rootA,
-        ],
-        [
-          ids.siblingOrganization,
-          "Submitter Department",
-          "DEPARTMENT",
-          ids.rootA,
-          ids.rootA,
-        ],
-        [ids.rootB, "Dispute University B", "UNIVERSITY", null, ids.rootB],
-        [
-          ids.otherOrganization,
-          "Other University Department",
-          "DEPARTMENT",
-          ids.rootB,
-          ids.rootB,
-        ],
-      ].map(([id, name, type, parentId, rootOrganizationId]) => ({
-        id,
-        name,
-        type,
-        parentId,
-        rootOrganizationId,
+        {
+          id: ids.rootA,
+          name: "Dispute University A",
+          type: "UNIVERSITY",
+          parentId: null,
+          rootOrganizationId: ids.rootA,
+        },
+        {
+          id: ids.ownerOrganization,
+          name: "Resource Owner Department",
+          type: "DEPARTMENT",
+          parentId: ids.rootA,
+          rootOrganizationId: ids.rootA,
+        },
+        {
+          id: ids.siblingOrganization,
+          name: "Submitter Department",
+          type: "DEPARTMENT",
+          parentId: ids.rootA,
+          rootOrganizationId: ids.rootA,
+        },
+        {
+          id: ids.rootB,
+          name: "Dispute University B",
+          type: "UNIVERSITY",
+          parentId: null,
+          rootOrganizationId: ids.rootB,
+        },
+        {
+          id: ids.otherOrganization,
+          name: "Other University Department",
+          type: "DEPARTMENT",
+          parentId: ids.rootB,
+          rootOrganizationId: ids.rootB,
+        },
+      ].map((organization) => ({
+        ...organization,
         createdBy: ids.ownerAdmin,
       })),
     });
@@ -167,6 +179,7 @@ describeWithDatabase("Dispute routing integration", () => {
         rootOrganizationId: ids.rootA,
         userId: ids.submitter,
         status: "COMPLETED",
+        completedAt: new Date("2035-05-01T11:00:00Z"),
       },
     });
   });
