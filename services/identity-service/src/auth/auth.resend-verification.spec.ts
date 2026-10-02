@@ -48,7 +48,7 @@ describe('AuthService resend verification', () => {
   } as unknown as PrismaService;
   const sendVerificationEmail = jest.fn<
     Promise<{ developmentVerificationUrl?: string }>,
-    [string, string]
+    [string, string, string]
   >();
   const emailService = {
     sendVerificationEmail,
@@ -87,7 +87,8 @@ describe('AuthService resend verification', () => {
     );
     const createRequest =
       transactionEmailVerificationToken.create.mock.calls[0][0];
-    const emailedToken = sendVerificationEmail.mock.calls[0][1];
+    const emailedToken = sendVerificationEmail.mock.calls[0][2];
+    expect(sendVerificationEmail.mock.calls[0][0]).toBe('user-id');
     expect(createRequest.data.tokenHash).toBe(
       createHash('sha256').update(emailedToken).digest('hex'),
     );

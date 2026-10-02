@@ -136,6 +136,20 @@ function MembershipCard({
               </time>
             </dd>
           </div>
+          {normalizedStatus === "REJECTED" ? (
+            <div className="border border-destructive/30 bg-destructive/5 p-3 text-sm">
+              <p className="font-medium">Self-service resubmission is closed</p>
+              <p className="mt-1 text-muted-foreground">
+                Contact an administrator for this organization if you believe
+                the decision should be reconsidered.
+              </p>
+              {membership.reviewNote ? (
+                <p className="mt-2 text-muted-foreground">
+                  Reason: {membership.reviewNote}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
         </dl>
       </CardContent>
       <CardFooter className="gap-2">

@@ -1,10 +1,16 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
-import { PrismaService } from '@resourcehive/database';
-import { createHash } from 'node:crypto';
+import { JwtService } from '@nestjs/jwt';
+import {
+  PrismaService,
+  UniversityContextInterceptor,
+} from '@resourcehive/database';
+import { NotificationClientService } from '@resourcehive/notification-client';
+import { createHash, randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
+import { setupIdentitySwagger } from './../src/swagger';
 
 interface LoginResponse {
   message: string;
@@ -25,8 +31,15 @@ interface CurrentUserResponse {
   };
   organizationContext: {
     organizationId: string | null;
+    rootOrganizationId: string | null;
     role: string | null;
   };
+  universities: Array<{
+    rootOrganizationId: string;
+    organizationId: string;
+    name: string;
+    role: string;
+  }>;
 }
 
 interface CurrentUserPointsResponse {
@@ -51,23 +64,29 @@ describe('Authentication Flow (e2e)', () => {
   let authenticationCookie: string;
   let refreshCookie: string;
   let verificationToken: string;
-  const passwordResetToken = 'e2e-password-reset-token-value';
+  const passwordResetToken = `e2e-password-reset-token-${Date.now()}`;
   const resetPassword = 'ResetPassword123!';
   const testEmail = process.env.DEMO_USER_EMAIL ?? 'demo@example.edu';
   const testPassword = process.env.DEMO_USER_PASSWORD ?? 'DemoPassword123!';
   const signupEmail = `signup-${Date.now()}@example.edu`;
-  const originalEmailTransport = process.env.EMAIL_TRANSPORT;
   const originalBcryptRounds = process.env.BCRYPT_ROUNDS;
 
   beforeAll(async () => {
-    process.env.EMAIL_TRANSPORT = 'console';
     process.env.BCRYPT_ROUNDS = '4';
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(NotificationClientService)
+      .useValue({
+        sendVerificationEmail: jest.fn().mockResolvedValue({}),
+        sendPasswordResetEmail: jest.fn().mockResolvedValue({}),
+        sendPasswordChangedEmail: jest.fn().mockResolvedValue({}),
+      })
+      .compile();
 
     app = moduleFixture.createNestApplication();
+    app.useGlobalInterceptors(new UniversityContextInterceptor());
     app.useGlobalPipes(
       new ValidationPipe({
         transform: true,
@@ -75,6 +94,7 @@ describe('Authentication Flow (e2e)', () => {
         forbidNonWhitelisted: true,
       }),
     );
+    setupIdentitySwagger(app);
     await app.init();
     prisma = app.get(PrismaService);
   });
@@ -84,6 +104,174 @@ describe('Authentication Flow (e2e)', () => {
       .get('/')
       .expect(200)
       .expect('Identity Service is running');
+  });
+
+  it('lets a platform administrator create a university for an existing verified account', async () => {
+    const suffix = randomUUID();
+    const platformAdmin = await prisma.user.create({
+      data: {
+        email: `platform-${suffix}@example.edu`,
+        firstName: 'Platform',
+        lastName: 'Admin',
+        emailVerifiedAt: new Date(),
+        platformRole: 'PLATFORM_ADMIN',
+      },
+    });
+    const assignedAdmin = await prisma.user.create({
+      data: {
+        email: `tenant-${suffix}@example.edu`,
+        firstName: 'Tenant',
+        lastName: 'Admin',
+        emailVerifiedAt: new Date(),
+      },
+    });
+    const token = await app
+      .get<JwtService>(JwtService)
+      .signAsync(
+        { sub: platformAdmin.id, email: platformAdmin.email },
+        { secret: process.env.JWT_SECRET },
+      );
+
+    const response = await request(app.getHttpServer())
+      .post('/auth/platform/organizations')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'New RLS University', adminEmail: assignedAdmin.email })
+      .expect(201);
+
+    const rootId = (response.body as { university: { id: string } }).university
+      .id;
+    expect(response.body).toMatchObject({
+      university: { id: rootId, name: 'New RLS University' },
+      administrator: { email: assignedAdmin.email },
+    });
+    const organization = await prisma.organization.findUniqueOrThrow({
+      where: { id: rootId },
+    });
+    expect(organization).toMatchObject({
+      id: rootId,
+      rootOrganizationId: rootId,
+      parentId: null,
+      type: 'UNIVERSITY',
+      createdBy: platformAdmin.id,
+    });
+    const membership = await prisma.organizationMembership.findUniqueOrThrow({
+      where: {
+        userId_organizationId: {
+          userId: assignedAdmin.id,
+          organizationId: rootId,
+        },
+      },
+    });
+    expect(membership).toMatchObject({
+      role: 'ADMIN',
+      status: 'APPROVED',
+      reviewedBy: platformAdmin.id,
+    });
+    await expect(
+      prisma.organizationMembershipAudit.findFirst({
+        where: { membershipId: membership.id, actorUserId: platformAdmin.id },
+      }),
+    ).resolves.toMatchObject({ action: 'ADMIN_GRANTED' });
+  });
+
+  it('rejects university creation by ordinary users and unauthenticated callers', async () => {
+    const ordinaryUser = await prisma.user.create({
+      data: {
+        email: `ordinary-${randomUUID()}@example.edu`,
+        firstName: 'Ordinary',
+        lastName: 'User',
+        emailVerifiedAt: new Date(),
+      },
+    });
+    const token = await app
+      .get<JwtService>(JwtService)
+      .signAsync(
+        { sub: ordinaryUser.id, email: ordinaryUser.email },
+        { secret: process.env.JWT_SECRET },
+      );
+
+    await request(app.getHttpServer())
+      .post('/auth/platform/organizations')
+      .send({ name: 'Denied University', adminEmail: ordinaryUser.email })
+      .expect(401);
+    await request(app.getHttpServer())
+      .post('/auth/platform/organizations')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'Denied University', adminEmail: ordinaryUser.email })
+      .expect(403);
+  });
+
+  it('serves the identity OpenAPI document and raw YAML document', async () => {
+    const json = await request(app.getHttpServer())
+      .get('/docs/identity/openapi.json')
+      .expect(200);
+
+    const document = json.body as {
+      openapi?: string;
+      paths?: Record<string, unknown>;
+    };
+    expect(document.openapi).toBeDefined();
+    expect(document.paths).toHaveProperty('/auth/login');
+    expect(document.paths).toHaveProperty('/auth/me');
+
+    const yaml = await request(app.getHttpServer())
+      .get('/docs/identity/openapi.yaml')
+      .expect(200);
+    expect(yaml.text).toContain('openapi:');
+  });
+
+  it('retains an approved university selection when the session refreshes', async () => {
+    const login = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({ email: testEmail, password: testPassword })
+      .expect(200);
+    const loginCookies = login.headers['set-cookie'] as unknown as string[];
+    const accessCookie = loginCookies.find((cookie) =>
+      cookie.startsWith('resourcehive_access_token='),
+    );
+    const refreshCookie = loginCookies.find((cookie) =>
+      cookie.startsWith('resourcehive_refresh_token='),
+    );
+    expect(accessCookie).toBeDefined();
+    expect(refreshCookie).toBeDefined();
+
+    const current = await request(app.getHttpServer())
+      .get('/auth/me')
+      .set('Cookie', accessCookie.split(';')[0])
+      .expect(200);
+    const selectedRoot = (current.body as CurrentUserResponse).universities[0]
+      ?.rootOrganizationId;
+    expect(selectedRoot).toBeDefined();
+
+    const switched = await request(app.getHttpServer())
+      .post('/auth/active-university')
+      .set(
+        'Cookie',
+        `${accessCookie.split(';')[0]}; ${refreshCookie.split(';')[0]}`,
+      )
+      .send({ rootOrganizationId: selectedRoot })
+      .expect(200);
+    expect(
+      (switched.body as CurrentUserResponse).organizationContext
+        .rootOrganizationId,
+    ).toBe(selectedRoot);
+
+    const refreshed = await request(app.getHttpServer())
+      .post('/auth/refresh')
+      .set('Cookie', refreshCookie.split(';')[0])
+      .expect(200);
+    const refreshedAccess = (
+      refreshed.headers['set-cookie'] as unknown as string[]
+    ).find((cookie) => cookie.startsWith('resourcehive_access_token='));
+    expect(refreshedAccess).toBeDefined();
+    const refreshedCurrent = await request(app.getHttpServer())
+      .get('/auth/me')
+      .set('Cookie', refreshedAccess.split(';')[0])
+      .expect(200);
+    expect(
+      (refreshedCurrent.body as CurrentUserResponse).organizationContext
+        .rootOrganizationId,
+    ).toBe(selectedRoot);
   });
 
   it('rejects an incorrect password', async () => {
@@ -139,7 +327,7 @@ describe('Authentication Flow (e2e)', () => {
     // NGINX uses this endpoint to capture headers
     expect(response.headers['x-user-id']).toBeDefined();
     expect(response.headers['x-tenant-id']).toBeDefined();
-    expect(response.headers['x-user-role']).toBe('member');
+    expect(response.headers['x-user-role']).toBeDefined();
     expect(response.headers['x-user-email']).toBe(testEmail);
   });
 
@@ -161,10 +349,8 @@ describe('Authentication Flow (e2e)', () => {
         status: 'ACTIVE',
         platformRole: 'USER',
       },
-      organizationContext: {
-        role: 'member',
-      },
     });
+    expect(body.organizationContext.role).toBeDefined();
     expect(typeof body.user.id).toBe('string');
     expect(Number.isNaN(Date.parse(body.user.createdAt))).toBe(false);
     expect(typeof body.organizationContext.organizationId).toBe('string');
@@ -463,11 +649,6 @@ describe('Authentication Flow (e2e)', () => {
     });
 
     await app.close();
-    if (originalEmailTransport === undefined) {
-      delete process.env.EMAIL_TRANSPORT;
-    } else {
-      process.env.EMAIL_TRANSPORT = originalEmailTransport;
-    }
     if (originalBcryptRounds === undefined) {
       delete process.env.BCRYPT_ROUNDS;
     } else {

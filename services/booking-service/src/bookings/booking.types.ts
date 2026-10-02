@@ -13,6 +13,19 @@ export type BookingTransactionClient = Pick<
 export interface CreateConfirmedBookingInput {
   resourceSlotId: string;
   userId: string;
+  rootOrganizationId: string;
+  cancellationNoticeMinutes: number;
+}
+
+export interface ValidatedBookingContext {
+  userId: string;
+  rootOrganizationId: string;
+  resourceId: string;
+  resourceSlotId: string;
+  pointCost: number;
+  cancellationNoticeMinutes: number;
+  startsAt: Date;
+  endsAt: Date;
 }
 
 export interface BookingRecord {
@@ -21,6 +34,7 @@ export interface BookingRecord {
   userId: string;
   status: string;
   createdAt: Date;
+  cancellationNoticeMinutes: number;
   resourceSlot: {
     startsAt: Date;
     endsAt: Date;
@@ -28,6 +42,7 @@ export interface BookingRecord {
       id: string;
       name: string;
       pointCost: number;
+      ownerOrganizationId: string;
     };
   };
 }
@@ -37,6 +52,7 @@ export interface OrganizationBookingRecord extends BookingRecord {
     firstName: string;
     lastName: string;
     email: string;
+    avatarUrl: string | null;
     status: string;
     emailVerifiedAt: Date | null;
     createdAt: Date;
@@ -46,6 +62,8 @@ export interface OrganizationBookingRecord extends BookingRecord {
 export interface CancelledBookingRecord extends OrganizationBookingRecord {
   refundPoints: number;
   slotStatus: string;
+  cancelledByUser: boolean;
+  cancellationReason: string | null;
 }
 
 export interface CreatedBooking {
@@ -53,6 +71,7 @@ export interface CreatedBooking {
   resourceSlotId: string;
   resourceId: string;
   resourceName: string;
+  ownerOrganizationId: string;
   userId: string;
   status: string;
   startsAt: Date;

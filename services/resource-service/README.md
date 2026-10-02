@@ -54,8 +54,10 @@ $ npx dotenv-cli -e ../../.env -- pnpm run test:cov
 ```
 ## API Documentation
 
-The Resource Service exposes a Swagger UI for its REST endpoints. When running locally, you can view the interactive API documentation at:
-- `http://localhost:3004/api/docs` (assuming default port)
+The Resource Service exposes a Swagger UI for its REST endpoints. Through the
+local gateway, view the interactive documentation at
+`http://localhost:8088/docs/resource`. Raw documents are available at
+`/docs/resource/openapi.json` and `/docs/resource/openapi.yaml`.
 
 Here you will find documentation for Organizations, Memberships, and Resources endpoints. 
 
@@ -63,7 +65,7 @@ Here you will find documentation for Organizations, Memberships, and Resources e
 
 The Resource Service is not meant to be accessed directly from the frontend. All traffic should route through the central Caddy API gateway.
 
-- **Internal Port**: 3004
+- **Internal Port**: 3004 (not publicly exposed by Compose)
 - **Gateway Prefix**: Typically routed under `/resources/`, `/organizations/`, and `/memberships/`. 
 
 Ensure that the Caddy configuration proxies resource-management requests to the

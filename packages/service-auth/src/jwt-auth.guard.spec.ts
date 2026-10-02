@@ -43,6 +43,7 @@ describe("JwtAuthGuard", () => {
       userId: "561d85d2-8ada-44f7-8743-2719c3905dc5",
       email: "member@example.edu",
       organizationId: "ca1892ee-8552-408a-9b20-fdbed7152ddd",
+      rootOrganizationId: null,
       role: "member",
     });
   });
@@ -60,6 +61,7 @@ describe("JwtAuthGuard", () => {
     await expect(guard.canActivate(context)).resolves.toBe(true);
     expect(request.user).toMatchObject({
       organizationId: null,
+      rootOrganizationId: null,
       role: null,
     });
   });

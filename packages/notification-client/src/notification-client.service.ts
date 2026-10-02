@@ -1,0 +1,301 @@
+import { randomUUID } from "node:crypto";
+import { Inject, Injectable } from "@nestjs/common";
+import { getUniversityDbContext } from "@resourcehive/database";
+import {
+  BookingEventType,
+  BookingEventV1,
+  parseBookingEvent,
+} from "./booking-event";
+import {
+  NOTIFICATION_TEMPLATES,
+  NOTIFICATION_TOPICS,
+  NotificationCommandV1,
+} from "./contracts";
+import { parseNotificationCommand } from "./contract-validator";
+import { KafkaNotificationTransport } from "./kafka-notification.transport";
+import {
+  NOTIFICATION_CLIENT_OPTIONS,
+  NotificationKafkaOptions,
+} from "./notification-client.options";
+
+export interface SendNotificationInput {
+  commandId?: string;
+  recipientUserId: string;
+  title: string;
+  message: string;
+  channels?: Array<"IN_APP" | "PUSH">;
+  rootOrganizationId?: string;
+  correlationId?: string;
+}
+
+export interface SendVerificationEmailInput {
+  commandId?: string;
+  recipientUserId: string;
+  email: string;
+  verificationUrl: string;
+  correlationId?: string;
+}
+
+export interface SendPasswordResetEmailInput {
+  commandId?: string;
+  recipientUserId: string;
+  email: string;
+  resetUrl: string;
+  correlationId?: string;
+}
+
+export interface SendPasswordChangedEmailInput {
+  commandId?: string;
+  recipientUserId: string;
+  email: string;
+  correlationId?: string;
+}
+
+export interface SendMembershipDecisionInput {
+  commandId?: string;
+  recipientUserId: string;
+  organizationName: string;
+  rootOrganizationId?: string;
+  decision: "APPROVED" | "REJECTED";
+  correlationId?: string;
+}
+
+export interface PublishBookingEventInput {
+  eventId?: string;
+  eventType: BookingEventType;
+  rootOrganizationId?: string;
+  resourceId: string;
+  resourceName: string;
+  organizationId: string;
+  startsAt: string | Date;
+  endsAt?: string | Date;
+  bookingId?: string;
+  slotId?: string;
+  userId?: string;
+  email?: string;
+  refundPoints?: number;
+  correlationId?: string;
+}
+
+@Injectable()
+export class NotificationClientService {
+  constructor(
+    @Inject(NOTIFICATION_CLIENT_OPTIONS)
+    private readonly options: NotificationKafkaOptions,
+    private readonly transport: KafkaNotificationTransport,
+  ) {}
+
+  async send(input: SendNotificationInput): Promise<NotificationCommandV1> {
+    const commandId = input.commandId ?? randomUUID();
+    const command = parseNotificationCommand({
+      kind: "notification.command",
+      commandId,
+      producer: this.options.producer,
+      recipient: { userId: input.recipientUserId },
+      rootOrganizationId:
+        input.rootOrganizationId ??
+        getUniversityDbContext()?.rootOrganizationId ??
+        null,
+      channels: input.channels ?? ["IN_APP", "PUSH"],
+      template: {
+        key: NOTIFICATION_TEMPLATES.message,
+        version: 1,
+        variables: { title: input.title, message: input.message },
+      },
+      correlationId: input.correlationId ?? commandId,
+      occurredAt: new Date().toISOString(),
+    });
+    await this.transport.publish(
+      NOTIFICATION_TOPICS.commands,
+      input.recipientUserId,
+      command,
+    );
+    return command;
+  }
+
+  async sendVerificationEmail(
+    input: SendVerificationEmailInput,
+  ): Promise<NotificationCommandV1> {
+    if (this.options.producer !== "identity-service") {
+      throw new Error(
+        "Only Identity Service may publish verification email commands",
+      );
+    }
+    const commandId = input.commandId ?? randomUUID();
+    const command = parseNotificationCommand({
+      kind: "notification.command",
+      commandId,
+      producer: this.options.producer,
+      recipient: {
+        userId: input.recipientUserId,
+        email: input.email,
+      },
+      channels: ["EMAIL"],
+      template: {
+        key: NOTIFICATION_TEMPLATES.identityVerifyEmail,
+        version: 1,
+        variables: { verificationUrl: input.verificationUrl },
+      },
+      correlationId: input.correlationId ?? commandId,
+      occurredAt: new Date().toISOString(),
+    });
+    await this.transport.publish(
+      NOTIFICATION_TOPICS.identityCommands,
+      input.recipientUserId,
+      command,
+    );
+    return command;
+  }
+
+  async sendPasswordResetEmail(
+    input: SendPasswordResetEmailInput,
+  ): Promise<NotificationCommandV1> {
+    return this.sendIdentityEmail({
+      ...input,
+      template: {
+        key: NOTIFICATION_TEMPLATES.identityPasswordReset,
+        variables: { resetUrl: input.resetUrl },
+      },
+    });
+  }
+
+  async sendPasswordChangedEmail(
+    input: SendPasswordChangedEmailInput,
+  ): Promise<NotificationCommandV1> {
+    return this.sendIdentityEmail({
+      ...input,
+      template: {
+        key: NOTIFICATION_TEMPLATES.identityPasswordChanged,
+        variables: {},
+      },
+    });
+  }
+
+  async sendMembershipDecision(
+    input: SendMembershipDecisionInput,
+  ): Promise<NotificationCommandV1> {
+    if (this.options.producer !== "resource-service") {
+      throw new Error(
+        "Only Resource Service may publish membership decision notifications",
+      );
+    }
+
+    const commandId = input.commandId ?? randomUUID();
+    const templateKey =
+      input.decision === "APPROVED"
+        ? NOTIFICATION_TEMPLATES.membershipApproved
+        : NOTIFICATION_TEMPLATES.membershipRejected;
+    const command = parseNotificationCommand({
+      kind: "notification.command",
+      commandId,
+      producer: this.options.producer,
+      recipient: { userId: input.recipientUserId },
+      rootOrganizationId:
+        input.rootOrganizationId ??
+        getUniversityDbContext()?.rootOrganizationId,
+      channels: ["IN_APP", "PUSH"],
+      template: {
+        key: templateKey,
+        version: 1,
+        variables: { organizationName: input.organizationName },
+      },
+      correlationId: input.correlationId ?? commandId,
+      occurredAt: new Date().toISOString(),
+    });
+    await this.transport.publish(
+      NOTIFICATION_TOPICS.commands,
+      input.recipientUserId,
+      command,
+    );
+    return command;
+  }
+
+  private async sendIdentityEmail(input: {
+    commandId?: string;
+    recipientUserId: string;
+    email: string;
+    template: {
+      key:
+        | typeof NOTIFICATION_TEMPLATES.identityPasswordReset
+        | typeof NOTIFICATION_TEMPLATES.identityPasswordChanged;
+      variables: Record<string, string>;
+    };
+    correlationId?: string;
+  }): Promise<NotificationCommandV1> {
+    if (this.options.producer !== "identity-service") {
+      throw new Error("Only Identity Service may publish identity emails");
+    }
+    const commandId = input.commandId ?? randomUUID();
+    const command = parseNotificationCommand({
+      kind: "notification.command",
+      commandId,
+      producer: this.options.producer,
+      recipient: {
+        userId: input.recipientUserId,
+        email: input.email,
+      },
+      channels: ["EMAIL"],
+      template: {
+        key: input.template.key,
+        version: 1,
+        variables: input.template.variables,
+      },
+      correlationId: input.correlationId ?? commandId,
+      occurredAt: new Date().toISOString(),
+    });
+    await this.transport.publish(
+      NOTIFICATION_TOPICS.identityCommands,
+      input.recipientUserId,
+      command,
+    );
+    return command;
+  }
+
+  async publishBookingEvent(
+    input: PublishBookingEventInput,
+  ): Promise<BookingEventV1> {
+    if (this.options.producer !== "booking-service") {
+      throw new Error("Only Booking Service may publish booking events");
+    }
+    const partitionKey = input.bookingId ?? input.slotId ?? randomUUID();
+    const event = parseBookingEvent({
+      kind: "booking.event",
+      eventId: input.eventId ?? randomUUID(),
+      eventType: input.eventType,
+      eventVersion: 1,
+      producer: "booking-service",
+      correlationId: input.correlationId ?? partitionKey,
+      occurredAt: new Date().toISOString(),
+      payload: {
+        rootOrganizationId:
+          input.rootOrganizationId ??
+          getUniversityDbContext()?.rootOrganizationId ??
+          "",
+        resourceId: input.resourceId,
+        resourceName: input.resourceName,
+        organizationId: input.organizationId,
+        startsAt: toIsoString(input.startsAt),
+        ...(input.bookingId ? { bookingId: input.bookingId } : {}),
+        ...(input.slotId ? { slotId: input.slotId } : {}),
+        ...(input.userId ? { userId: input.userId } : {}),
+        ...(input.email ? { email: input.email } : {}),
+        ...(input.endsAt === undefined
+          ? {}
+          : { endsAt: toIsoString(input.endsAt) }),
+        ...(input.refundPoints === undefined
+          ? {}
+          : { refundPoints: input.refundPoints }),
+      },
+    });
+    await this.transport.publish(
+      NOTIFICATION_TOPICS.bookingEvents,
+      partitionKey,
+      event,
+    );
+    return event;
+  }
+}
+
+function toIsoString(value: string | Date): string {
+  return value instanceof Date ? value.toISOString() : value;
+}

@@ -4,10 +4,13 @@ import {
   Injectable,
   InternalServerErrorException,
   Logger,
+  NotFoundException,
+  Optional,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '@resourcehive/database';
+import { getUniversityDbContext } from '@resourcehive/database';
 import * as bcrypt from 'bcrypt';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { EmailService } from '../email/email.service';
@@ -16,6 +19,7 @@ import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { ResendVerificationDto } from './dto/resend-verification.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { GoogleOAuthFlow, GoogleOAuthService } from './google-oauth.service';
 
 const DEFAULT_BCRYPT_ROUNDS = 12;
 const DEFAULT_VERIFICATION_TOKEN_LIFETIME = '24h';
@@ -39,11 +43,17 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly emailService: EmailService,
+    @Optional()
+    private readonly googleOAuth: GoogleOAuthService = new GoogleOAuthService(),
   ) {}
 
   async getCurrentUserPoints(userId: string) {
+    const rootOrganizationId = getUniversityDbContext()?.rootOrganizationId;
+    if (!rootOrganizationId) {
+      return { userId, availablePoints: 0, updatedAt: null };
+    }
     const balance = await this.prisma.userPointBalance.findUnique({
-      where: { userId },
+      where: { userId_rootOrganizationId: { userId, rootOrganizationId } },
       select: {
         availablePoints: true,
         updatedAt: true,
@@ -57,12 +67,94 @@ export class AuthService {
     };
   }
 
+  async createPlatformUniversity(
+    name: string,
+    adminEmail: string,
+    actorUserId: string,
+  ) {
+    const admin = await this.prisma.user.findUnique({
+      where: { email: adminEmail.trim().toLowerCase() },
+      select: {
+        id: true,
+        email: true,
+        status: true,
+        platformRole: true,
+        emailVerifiedAt: true,
+      },
+    });
+    if (!admin)
+      throw new NotFoundException('No account exists for that email.');
+    if (
+      admin.status !== 'ACTIVE' ||
+      !admin.emailVerifiedAt ||
+      admin.platformRole !== 'USER'
+    ) {
+      throw new ConflictException(
+        'The administrator must be an active, verified user account.',
+      );
+    }
+
+    const organizationId = randomUUID();
+    return this.prisma.$transaction(async (transaction) => {
+      const organization = await transaction.organization.create({
+        data: {
+          id: organizationId,
+          name: name.trim(),
+          type: 'UNIVERSITY',
+          parentId: null,
+          rootOrganizationId: organizationId,
+          joinBonusPoints: 0,
+          status: 'ACTIVE',
+          createdBy: actorUserId,
+        },
+        select: { id: true, name: true },
+      });
+      const membership = await transaction.organizationMembership.create({
+        data: {
+          userId: admin.id,
+          organizationId,
+          role: 'ADMIN',
+          status: 'APPROVED',
+          reviewedBy: actorUserId,
+          reviewedAt: new Date(),
+        },
+        select: { id: true },
+      });
+      await transaction.organizationMembershipAudit.create({
+        data: {
+          membershipId: membership.id,
+          actorUserId,
+          action: 'ADMIN_GRANTED',
+        },
+      });
+
+      return {
+        university: organization,
+        administrator: { email: admin.email },
+      };
+    });
+  }
+
   private getJwtSecret() {
     const secret = process.env.JWT_SECRET;
     if (!secret || secret === 'change_me') {
       throw new InternalServerErrorException('JWT_SECRET must be configured');
     }
     return secret;
+  }
+
+  async uploadAvatar(userId: string, avatarUrl: string | null) {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { avatarUrl },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        avatarUrl: true,
+      },
+    });
   }
 
   async register(registration: RegisterDto) {
@@ -142,6 +234,7 @@ export class AuthService {
       return createdUser;
     });
     const emailResult = await this.emailService.sendVerificationEmail(
+      user.id,
       email,
       verificationToken,
     );
@@ -176,6 +269,7 @@ export class AuthService {
     if (
       !user ||
       user.status !== 'ACTIVE' ||
+      !user.passwordHash ||
       !(await bcrypt.compare(password, user.passwordHash))
     ) {
       throw new UnauthorizedException('Invalid email or password');
@@ -188,14 +282,255 @@ export class AuthService {
       });
     }
 
-    const accessToken = await this.issueAccessToken(user);
-    const refreshToken = await this.issueRefreshToken(user.id);
+    const session = await this.createSessionForUser(user);
 
     return {
       message: 'user login successfully',
-      accessToken,
-      ...refreshToken,
+      ...session,
     };
+  }
+
+  getAuthProviders() {
+    return { google: { enabled: this.googleOAuth.isEnabled() } };
+  }
+
+  async beginGoogleLogin(next: string) {
+    const flow = this.googleOAuth.createAuthorizationUrl('LOGIN', next);
+    const flowToken = await this.jwtService.signAsync(flow.flow, {
+      secret: this.getJwtSecret(),
+      expiresIn: '10m',
+    });
+    return { authorizationUrl: flow.url, flowToken };
+  }
+
+  async beginGoogleConnection(userId: string, password: string) {
+    await this.verifyPassword(userId, password);
+    const flow = this.googleOAuth.createAuthorizationUrl(
+      'CONNECT',
+      '/dashboard/account',
+      userId,
+    );
+    const flowToken = await this.jwtService.signAsync(flow.flow, {
+      secret: this.getJwtSecret(),
+      expiresIn: '10m',
+    });
+    return { authorizationUrl: flow.url, flowToken };
+  }
+
+  async completeGoogleCallback(code: string, state: string, flowToken: string) {
+    let flow: GoogleOAuthFlow;
+    try {
+      flow = await this.jwtService.verifyAsync<GoogleOAuthFlow>(flowToken, {
+        secret: this.getJwtSecret(),
+      });
+    } catch {
+      throw new UnauthorizedException(
+        'The Google sign-in attempt is invalid or expired',
+      );
+    }
+    if (!flow.state || flow.state !== state || !flow.purpose) {
+      throw new UnauthorizedException(
+        'The Google sign-in attempt is invalid or expired',
+      );
+    }
+
+    const identity = await this.googleOAuth.exchangeAndVerify(code, flow);
+    const existingIdentity = await this.prisma.externalIdentity.findUnique({
+      where: {
+        provider_providerSubject: {
+          provider: 'GOOGLE',
+          providerSubject: identity.subject,
+        },
+      },
+      include: { user: true },
+    });
+
+    if (flow.purpose === 'CONNECT') {
+      if (!flow.userId)
+        throw new UnauthorizedException(
+          'The Google sign-in attempt is invalid or expired',
+        );
+      if (existingIdentity && existingIdentity.userId !== flow.userId) {
+        throw new ConflictException(
+          'This Google account is already connected to another ResourceHive account',
+        );
+      }
+      const user = await this.prisma.user.findUnique({
+        where: { id: flow.userId },
+      });
+      if (!user || user.status !== 'ACTIVE' || !user.passwordHash) {
+        throw new UnauthorizedException('Your session is no longer valid');
+      }
+      const alreadyConnected = await this.prisma.externalIdentity.findFirst({
+        where: { userId: flow.userId, provider: 'GOOGLE' },
+      });
+      if (
+        alreadyConnected &&
+        alreadyConnected.providerSubject !== identity.subject
+      ) {
+        throw new ConflictException('Only one Google account can be connected');
+      }
+      await this.prisma.externalIdentity.upsert({
+        where: {
+          provider_providerSubject: {
+            provider: 'GOOGLE',
+            providerSubject: identity.subject,
+          },
+        },
+        create: {
+          userId: flow.userId,
+          provider: 'GOOGLE',
+          providerSubject: identity.subject,
+          providerEmail: identity.email,
+        },
+        update: { providerEmail: identity.email, lastUsedAt: new Date() },
+      });
+      return { redirectPath: '/dashboard/account?google=connected' };
+    }
+
+    if (existingIdentity) {
+      if (existingIdentity.user.status !== 'ACTIVE') {
+        throw new UnauthorizedException('This account is unavailable');
+      }
+      await this.prisma.externalIdentity.update({
+        where: { id: existingIdentity.id },
+        data: { providerEmail: identity.email, lastUsedAt: new Date() },
+      });
+      const session = await this.createSessionForUser(existingIdentity.user);
+      const membership = await this.prisma.organizationMembership.count({
+        where: { userId: existingIdentity.userId, status: 'APPROVED' },
+      });
+      return {
+        ...session,
+        redirectPath: membership
+          ? this.safeNext(flow.next)
+          : '/dashboard/onboarding/membership',
+      };
+    }
+
+    const emailOwner = await this.prisma.user.findUnique({
+      where: { email: identity.email },
+    });
+    if (emailOwner) {
+      throw new ConflictException(
+        'An account with this email already exists. Sign in with email and password, then connect Google from Account Settings.',
+      );
+    }
+
+    let user: { id: string; email: string };
+    try {
+      user = await this.prisma.$transaction(async (transaction) => {
+        const created = await transaction.user.create({
+          data: {
+            email: identity.email,
+            passwordHash: null,
+            firstName: identity.firstName,
+            lastName: identity.lastName,
+            emailVerifiedAt: new Date(),
+            status: 'ACTIVE',
+            platformRole: 'USER',
+          },
+        });
+        await transaction.externalIdentity.create({
+          data: {
+            userId: created.id,
+            provider: 'GOOGLE',
+            providerSubject: identity.subject,
+            providerEmail: identity.email,
+          },
+        });
+        return created;
+      });
+    } catch {
+      const racedIdentity = await this.prisma.externalIdentity.findUnique({
+        where: {
+          provider_providerSubject: {
+            provider: 'GOOGLE',
+            providerSubject: identity.subject,
+          },
+        },
+        include: { user: true },
+      });
+      if (!racedIdentity || racedIdentity.user.status !== 'ACTIVE')
+        throw new ConflictException('Unable to create the Google account');
+      await this.prisma.externalIdentity.update({
+        where: { id: racedIdentity.id },
+        data: { providerEmail: identity.email, lastUsedAt: new Date() },
+      });
+      const session = await this.createSessionForUser(racedIdentity.user);
+      return { ...session, redirectPath: '/dashboard/onboarding/membership' };
+    }
+    const session = await this.createSessionForUser(user);
+    return { ...session, redirectPath: '/dashboard/onboarding/membership' };
+  }
+
+  async getAuthenticationMethods(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        passwordHash: true,
+        externalIdentities: {
+          where: { provider: 'GOOGLE' },
+          select: { providerEmail: true, createdAt: true },
+        },
+      },
+    });
+    const google = user?.externalIdentities[0];
+    return {
+      password: Boolean(user?.passwordHash),
+      google: {
+        enabled: this.googleOAuth.isEnabled(),
+        connected: Boolean(google),
+        email: google?.providerEmail ?? null,
+        connectedAt: google?.createdAt.toISOString() ?? null,
+      },
+    };
+  }
+
+  async verifyPassword(userId: string, password: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { passwordHash: true, status: true },
+    });
+    if (
+      !user ||
+      user.status !== 'ACTIVE' ||
+      !user.passwordHash ||
+      !(await bcrypt.compare(password, user.passwordHash))
+    ) {
+      throw new UnauthorizedException('Invalid password');
+    }
+  }
+
+  async disconnectGoogle(userId: string, password: string) {
+    await this.verifyPassword(userId, password);
+    const identity = await this.prisma.externalIdentity.findFirst({
+      where: { userId, provider: 'GOOGLE' },
+    });
+    if (!identity) throw new BadRequestException('Google is not connected');
+    await this.prisma.externalIdentity.delete({ where: { id: identity.id } });
+    return { message: 'Google disconnected successfully' };
+  }
+
+  async requestPasswordSetup(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        email: true,
+        passwordHash: true,
+        status: true,
+        emailVerifiedAt: true,
+      },
+    });
+    if (
+      !user ||
+      user.status !== 'ACTIVE' ||
+      !user.emailVerifiedAt ||
+      user.passwordHash
+    ) {
+      return { message: PASSWORD_RESET_REQUEST_MESSAGE };
+    }
+    return this.requestPasswordReset({ email: user.email });
   }
 
   async resendVerificationEmail(request: ResendVerificationDto) {
@@ -254,7 +589,7 @@ export class AuthService {
     });
 
     try {
-      await this.emailService.sendVerificationEmail(user.email, token);
+      await this.emailService.sendVerificationEmail(user.id, user.email, token);
     } catch (error) {
       this.logger.error(
         `Unable to resend verification email for user ${user.id}`,
@@ -276,6 +611,7 @@ export class AuthService {
       select: {
         id: true,
         familyId: true,
+        activeRootOrganizationId: true,
         expiresAt: true,
         usedAt: true,
         revokedAt: true,
@@ -309,7 +645,23 @@ export class AuthService {
       throw new UnauthorizedException('Invalid or expired session');
     }
 
-    const accessToken = await this.issueAccessToken(storedToken.user);
+    if (
+      storedToken.activeRootOrganizationId &&
+      !(await this.resolveUniversityContext(
+        storedToken.user.id,
+        storedToken.activeRootOrganizationId,
+      ))
+    ) {
+      await this.revokeRefreshTokenFamily(storedToken.familyId, now);
+      throw new UnauthorizedException(
+        'The active university membership is no longer valid',
+      );
+    }
+
+    const accessToken = await this.issueAccessToken(
+      storedToken.user,
+      storedToken.activeRootOrganizationId,
+    );
     const nextToken = randomBytes(32).toString('base64url');
 
     await this.prisma.$transaction(async (transaction) => {
@@ -333,6 +685,7 @@ export class AuthService {
           familyId: storedToken.familyId,
           tokenHash: this.hashToken(nextToken),
           expiresAt: storedToken.expiresAt,
+          activeRootOrganizationId: storedToken.activeRootOrganizationId,
         },
       });
     });
@@ -355,6 +708,111 @@ export class AuthService {
     if (!storedToken) return;
 
     await this.revokeRefreshTokenFamily(storedToken.familyId, new Date());
+  }
+
+  async listUserUniversities(userId: string) {
+    const memberships = await this.prisma.organizationMembership.findMany({
+      where: {
+        userId,
+        status: 'APPROVED',
+        organization: {
+          status: 'ACTIVE',
+          rootOrganization: { status: 'ACTIVE' },
+        },
+      },
+      select: {
+        organizationId: true,
+        role: true,
+        organization: {
+          select: {
+            rootOrganizationId: true,
+            rootOrganization: { select: { name: true } },
+          },
+        },
+      },
+      orderBy: [{ joinedAt: 'asc' }, { id: 'asc' }],
+    });
+    const roots = new Map<
+      string,
+      {
+        rootOrganizationId: string;
+        organizationId: string;
+        name: string;
+        role: string;
+      }
+    >();
+    for (const membership of memberships) {
+      const organization = membership.organization;
+      if (!roots.has(organization.rootOrganizationId)) {
+        roots.set(organization.rootOrganizationId, {
+          rootOrganizationId: organization.rootOrganizationId,
+          organizationId: membership.organizationId,
+          name: organization.rootOrganization.name,
+          role: membership.role,
+        });
+      }
+    }
+    return [...roots.values()];
+  }
+
+  async switchActiveUniversity(
+    userId: string,
+    rootOrganizationId: string,
+    rawRefreshToken: string | null,
+  ) {
+    const context = await this.resolveUniversityContext(
+      userId,
+      rootOrganizationId,
+    );
+    if (!context) {
+      throw new UnauthorizedException(
+        'An approved university membership is required',
+      );
+    }
+
+    if (!rawRefreshToken) {
+      throw new UnauthorizedException('An active refresh session is required');
+    }
+    {
+      const token = await this.prisma.refreshToken.findUnique({
+        where: { tokenHash: this.hashToken(rawRefreshToken) },
+        select: {
+          id: true,
+          familyId: true,
+          userId: true,
+          expiresAt: true,
+          revokedAt: true,
+          usedAt: true,
+        },
+      });
+      if (
+        !token ||
+        token.userId !== userId ||
+        token.expiresAt <= new Date() ||
+        token.revokedAt ||
+        token.usedAt
+      ) {
+        throw new UnauthorizedException(
+          'The active refresh session is invalid',
+        );
+      }
+      await this.prisma.refreshToken.updateMany({
+        where: { familyId: token.familyId, revokedAt: null },
+        data: { activeRootOrganizationId: rootOrganizationId },
+      });
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true },
+    });
+    if (!user) throw new UnauthorizedException('The account is unavailable');
+
+    return {
+      accessToken: await this.issueAccessToken(user, rootOrganizationId),
+      organizationId: context.organizationId,
+      rootOrganizationId: context.rootOrganizationId,
+    };
   }
 
   async requestPasswordReset(request: ForgotPasswordDto) {
@@ -412,7 +870,11 @@ export class AuthService {
     });
 
     try {
-      await this.emailService.sendPasswordResetEmail(user.email, token);
+      await this.emailService.sendPasswordResetEmail(
+        user.id,
+        user.email,
+        token,
+      );
     } catch (error) {
       this.logger.error(
         `Unable to send password reset email for user ${user.id}`,
@@ -454,7 +916,11 @@ export class AuthService {
     }
 
     if (
-      await bcrypt.compare(reset.password, passwordResetToken.user.passwordHash)
+      passwordResetToken.user.passwordHash &&
+      (await bcrypt.compare(
+        reset.password,
+        passwordResetToken.user.passwordHash,
+      ))
     ) {
       throw new BadRequestException(
         'New password must be different from your current password.',
@@ -467,13 +933,16 @@ export class AuthService {
     );
 
     await this.prisma.$transaction(async (transaction) => {
+      const [{ currentTime: databaseNow }] = await transaction.$queryRaw<
+        Array<{ currentTime: Date }>
+      >`SELECT CURRENT_TIMESTAMP AS "currentTime"`;
       const claimedToken = await transaction.passwordResetToken.updateMany({
         where: {
           id: passwordResetToken.id,
           usedAt: null,
-          expiresAt: { gt: now },
+          expiresAt: { gt: databaseNow },
         },
-        data: { usedAt: now },
+        data: { usedAt: databaseNow },
       });
 
       if (claimedToken.count !== 1) {
@@ -488,21 +957,22 @@ export class AuthService {
         where: {
           userId: passwordResetToken.user.id,
           usedAt: null,
-          expiresAt: { gt: now },
+          expiresAt: { gt: databaseNow },
         },
-        data: { usedAt: now },
+        data: { usedAt: databaseNow },
       });
       await transaction.refreshToken.updateMany({
         where: {
           userId: passwordResetToken.user.id,
           revokedAt: null,
         },
-        data: { revokedAt: now },
+        data: { revokedAt: databaseNow },
       });
     });
 
     try {
       await this.emailService.sendPasswordChangedEmail(
+        passwordResetToken.user.id,
         passwordResetToken.user.email,
       );
     } catch (error) {
@@ -599,6 +1069,8 @@ export class AuthService {
                 id: true,
                 name: true,
                 status: true,
+                parentId: true,
+                rootOrganizationId: true,
               },
             },
           },
@@ -631,10 +1103,11 @@ export class AuthService {
       const allowlistEntries =
         await transaction.organizationEmailAllowlist.findMany({
           where: {
-            email: verificationToken.user.email,
+            email: verificationToken.user.email.trim().toLowerCase(),
             usedAt: null,
             organization: {
-              rootOrganizationId: domainConfiguration.organizationId,
+              rootOrganizationId:
+                domainConfiguration.organization.rootOrganizationId,
               status: 'ACTIVE',
             },
           },
@@ -653,18 +1126,71 @@ export class AuthService {
         string,
         { id: string; name: string }
       >();
+      const organizationTree = await transaction.organization.findMany({
+        where: {
+          rootOrganizationId:
+            domainConfiguration.organization.rootOrganizationId,
+        },
+        select: {
+          id: true,
+          name: true,
+          parentId: true,
+          rootOrganizationId: true,
+          status: true,
+        },
+      });
+      const organizationById = new Map(
+        organizationTree.map((organization) => [organization.id, organization]),
+      );
+      const matchedOrganizationIds = new Set(
+        allowlistEntries.map((entry) => entry.organization.id),
+      );
       if (domainConfiguration.autoJoin) {
-        organizationsToJoin.set(domainConfiguration.organization.id, {
-          id: domainConfiguration.organization.id,
-          name: domainConfiguration.organization.name,
-        });
+        matchedOrganizationIds.add(domainConfiguration.organization.id);
       }
-      for (const entry of allowlistEntries) {
-        organizationsToJoin.set(entry.organization.id, entry.organization);
+      const consumedAllowlistIds = new Set<string>();
+      for (const matchedId of matchedOrganizationIds) {
+        const path: string[] = [];
+        let currentId: string | null = matchedId;
+        let reachedRoot = false;
+        while (currentId) {
+          const current = organizationById.get(currentId);
+          if (!current || current.status !== 'ACTIVE') {
+            path.length = 0;
+            break;
+          }
+          path.push(current.id);
+          if (current.id === current.rootOrganizationId) {
+            reachedRoot = true;
+            break;
+          }
+          currentId = current.parentId;
+        }
+        if (!reachedRoot) continue;
+        for (const entry of allowlistEntries) {
+          if (entry.organization.id === matchedId) {
+            consumedAllowlistIds.add(entry.id);
+          }
+        }
+        for (const organizationId of path.reverse()) {
+          const organization = organizationById.get(organizationId);
+          if (organization) {
+            organizationsToJoin.set(organization.id, {
+              id: organization.id,
+              name: organization.name,
+            });
+          }
+        }
       }
 
+      const resultingMemberships: {
+        id: string;
+        name: string;
+        role: string;
+        status: string;
+      }[] = [];
       for (const organization of organizationsToJoin.values()) {
-        await transaction.organizationMembership.upsert({
+        const membership = await transaction.organizationMembership.upsert({
           where: {
             userId_organizationId: {
               userId: verificationToken.user.id,
@@ -678,19 +1204,19 @@ export class AuthService {
             status: 'APPROVED',
           },
           update: {
-            role: 'MEMBER',
-            status: 'APPROVED',
-            approvedBy: null,
+            // Keep existing approved, pending, rejected, or admin memberships unchanged.
           },
+        });
+        resultingMemberships.push({
+          ...organization,
+          role: membership?.role ?? 'MEMBER',
+          status: membership?.status ?? 'APPROVED',
         });
       }
 
-      if (allowlistEntries.length > 0) {
+      if (consumedAllowlistIds.size > 0) {
         await transaction.organizationEmailAllowlist.updateMany({
-          where: {
-            id: { in: allowlistEntries.map((entry) => entry.id) },
-            usedAt: null,
-          },
+          where: { id: { in: [...consumedAllowlistIds] }, usedAt: null },
           data: { usedAt: now },
         });
       }
@@ -713,13 +1239,7 @@ export class AuthService {
         user: {
           ...user,
           emailVerified: true,
-          organizations: [...organizationsToJoin.values()].map(
-            (organization) => ({
-              ...organization,
-              role: 'MEMBER',
-              status: 'APPROVED',
-            }),
-          ),
+          organizations: resultingMemberships,
         },
       };
     });
@@ -769,7 +1289,10 @@ export class AuthService {
     if (separatorIndex <= 0 || separatorIndex === email.length - 1) {
       throw new BadRequestException('Enter a valid email address');
     }
-    return email.slice(separatorIndex + 1);
+    return email
+      .slice(separatorIndex + 1)
+      .trim()
+      .toLowerCase();
   }
 
   private getBcryptRounds(): number {
@@ -840,21 +1363,89 @@ export class AuthService {
     return createHash('sha256').update(token).digest('hex');
   }
 
-  private async issueAccessToken(user: { id: string; email: string }) {
+  private safeNext(next: string | undefined): string {
+    if (!next || !next.startsWith('/') || next.startsWith('//'))
+      return '/dashboard';
+    try {
+      const parsed = new URL(
+        next,
+        process.env.APP_URL ?? 'http://localhost:3000',
+      );
+      return parsed.origin ===
+        new URL(process.env.APP_URL ?? 'http://localhost:3000').origin
+        ? `${parsed.pathname}${parsed.search}${parsed.hash}`
+        : '/dashboard';
+    } catch {
+      return '/dashboard';
+    }
+  }
+
+  private async createSessionForUser(user: { id: string; email: string }) {
+    const context = await this.resolveUniversityContext(user.id);
+    const accessToken = await this.issueAccessToken(
+      user,
+      context?.rootOrganizationId,
+    );
+    const refreshToken = await this.issueRefreshToken(
+      user.id,
+      context?.rootOrganizationId ?? null,
+    );
+    return { accessToken, ...refreshToken };
+  }
+
+  private async resolveUniversityContext(
+    userId: string,
+    requestedRootId?: string | null,
+  ) {
     const membership = await this.prisma.organizationMembership.findFirst({
       where: {
-        userId: user.id,
+        userId,
         status: 'APPROVED',
+        organization: {
+          status: 'ACTIVE',
+          rootOrganization: { status: 'ACTIVE' },
+        },
+        ...(requestedRootId
+          ? {
+              organization: {
+                rootOrganizationId: requestedRootId,
+                status: 'ACTIVE',
+                rootOrganization: { status: 'ACTIVE' },
+              },
+            }
+          : {}),
       },
-      orderBy: { joinedAt: 'asc' },
+      orderBy: [{ joinedAt: 'asc' }, { id: 'asc' }],
+      select: {
+        organizationId: true,
+        role: true,
+        organization: { select: { rootOrganizationId: true } },
+      },
     });
+    return membership
+      ? {
+          organizationId: membership.organizationId,
+          role: membership.role,
+          rootOrganizationId: membership.organization.rootOrganizationId,
+        }
+      : null;
+  }
+
+  private async issueAccessToken(
+    user: { id: string; email: string },
+    rootOrganizationId?: string | null,
+  ) {
+    const context = rootOrganizationId
+      ? await this.resolveUniversityContext(user.id, rootOrganizationId)
+      : await this.resolveUniversityContext(user.id);
 
     return this.jwtService.signAsync(
       {
         sub: user.id,
         email: user.email,
-        organizationId: membership?.organizationId ?? null,
-        role: membership?.role.toLowerCase() ?? null,
+        organizationId: context?.organizationId ?? null,
+        rootOrganizationId: context?.rootOrganizationId ?? null,
+        role: context?.role.toLowerCase() ?? null,
       },
       {
         secret: this.getJwtSecret(),
@@ -863,7 +1454,10 @@ export class AuthService {
     );
   }
 
-  private async issueRefreshToken(userId: string) {
+  private async issueRefreshToken(
+    userId: string,
+    rootOrganizationId: string | null,
+  ) {
     const token = randomBytes(32).toString('base64url');
     const expiresAt = new Date(Date.now() + this.getRefreshTokenLifetimeMs());
 
@@ -871,6 +1465,7 @@ export class AuthService {
       data: {
         userId,
         familyId: randomUUID(),
+        activeRootOrganizationId: rootOrganizationId,
         tokenHash: this.hashToken(token),
         expiresAt,
       },

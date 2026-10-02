@@ -11,19 +11,39 @@ place.
 - Application: <https://app.resourcehive.thisismalindu.com>
 - API health: <https://api.resourcehive.thisismalindu.com/health>
 
+## Swagger / OpenAPI
+
+The API gateway exposes interactive Swagger UI for each private NestJS service
+under a consistent public path. The service API paths themselves are unchanged:
+
+| Service      | Interactive docs     | JSON                              | YAML                              |
+| ------------ | -------------------- | --------------------------------- | --------------------------------- |
+| Identity     | `/docs/identity`     | `/docs/identity/openapi.json`     | `/docs/identity/openapi.yaml`     |
+| Resource     | `/docs/resource`     | `/docs/resource/openapi.json`     | `/docs/resource/openapi.yaml`     |
+| Booking      | `/docs/booking`      | `/docs/booking/openapi.json`      | `/docs/booking/openapi.yaml`      |
+| Notification | `/docs/notification` | `/docs/notification/openapi.json` | `/docs/notification/openapi.yaml` |
+
+Locally, replace the path with `http://localhost:8088`. In production, use the
+same paths under the API hostname, for example
+`https://api.resourcehive.thisismalindu.com/docs/booking`. The pages are
+interactive and support the existing HttpOnly cookie session or a bearer token;
+the gateway remains the only public backend entry point.
+
 ## Architecture
 
 ResourceHive is a pnpm monorepo with a Next.js frontend and four NestJS backend
 services.
 
-| Component | Technology | Production host |
-| --- | --- | --- |
-| Frontend | Next.js, React, Tailwind CSS | Vercel |
-| API gateway | Caddy | Linode |
-| Identity, Resource, Booking, Notification | NestJS microservices | Docker on Linode |
-| Database | PostgreSQL with Prisma | Neon |
-| Container registry | GHCR | GitHub |
-| CI/CD | GitHub Actions | GitHub |
+| Component                                 | Technology                   | Production host                               |
+| ----------------------------------------- | ---------------------------- | --------------------------------------------- |
+| Frontend                                  | Next.js, React, Tailwind CSS | Vercel                                        |
+| API gateway                               | Caddy                        | Linode                                        |
+| Identity, Resource, Booking, Notification | NestJS microservices         | Docker on Linode                              |
+| Event transport                           | Apache Kafka                 | Aiven-managed broker                          |
+| Browser notifications                     | Firebase Cloud Messaging     | Firebase                                      |
+| Database                                  | PostgreSQL with Prisma       | Neon                                          |
+| Container registry                        | GHCR                         | GitHub                                        |
+| CI/CD                                     | GitHub Actions               | GitHub                                        |
 
 Only Caddy exposes public backend ports. The four services communicate over a
 private Docker network.
@@ -44,12 +64,21 @@ db/                             Prisma schema, migrations, and tests
 
 ### Requirements
 
-- Node.js 20 or newer
+- Node.js 22 or newer
 - pnpm 10.34.5
 - Docker with Docker Compose
 - Access to a PostgreSQL 15 database
 
 Run commands from the repository root unless stated otherwise.
+
+### Performance and Lighthouse checks
+
+Use the isolated synthetic-data runbook in [perf/README.md](perf/README.md).
+The seed script requires a separately supplied `PERF_DATABASE_URL` and an
+explicit nonproduction confirmation; never run it against production or a
+database containing real user data. The runbook includes the k6 suite,
+Lighthouse comparison method, and instructions for observing Neon, Redis,
+Kafka, and container behavior.
 
 ### First-time setup
 
@@ -81,8 +110,9 @@ when the provider does not offer separate connections.
 Set these values in `apps/web/.env.local`:
 
 ```env
-NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_API_URL=http://localhost:8088
 JWT_SECRET=replace-with-the-same-secret-used-in-the-root-env
+NEXT_PUBLIC_MARKETING_URL=http://localhost:5173
 ```
 
 The two `JWT_SECRET` values must match.
@@ -95,46 +125,189 @@ pnpm run dev:setup
 
 ### Local email
 
-Local development uses the console email transport by default:
+Local development keeps Resend disabled by default. Email commands still travel
+through Kafka, and Notification Service acknowledges them with its console
+provider:
 
 ```env
-EMAIL_TRANSPORT=console
+KAFKA_ENABLED=true
+RESEND_ENABLED=false
 ```
 
-Verification and password-reset links are printed in the Identity Service
-logs instead of being emailed. Follow them with:
+For real local delivery, set `RESEND_ENABLED=true`, provide
+`RESEND_API_KEY`, and use a verified sender in `RESEND_FROM_EMAIL`. Confirm
+the Aiven Kafka credentials are configured and start all services before
+testing email flows. The Resend key is
+passed only to Notification Service.
+
+Inspect queued email status with:
 
 ```bash
-docker compose logs -f identity-service
+docker compose logs -f notification-service
 ```
 
-To test real email locally, change `EMAIL_TRANSPORT` to `smtp` and configure
-the SMTP variables described in the production section.
+### Google sign-in (OAuth/OIDC)
+
+Google sign-in is disabled by default. It is implemented as a server-side
+OAuth 2.0 Authorization Code flow with PKCE and OpenID Connect nonce/state;
+Google tokens are verified by Identity Service and are never stored. A new
+Google account is created without a password or organization membership and is
+sent to the membership-request onboarding flow. Organization access still
+requires administrator approval. Existing password users can connect Google
+from **Account → Sign-in methods** after confirming their password.
+
+To enable it locally:
+
+1. In [Google Cloud Console](https://console.cloud.google.com/), create or
+   select a project, configure the OAuth consent screen, and create an OAuth
+   client of type **Web application**.
+2. Add `http://localhost:8088/auth/google/callback` as an authorized redirect
+   URI. Keep the URI exact; path, scheme, host, and port must match.
+3. Put the client values in the root `.env` (Identity Service only reads these
+   variables):
+
+   ```env
+   GOOGLE_OAUTH_ENABLED=true
+   GOOGLE_OAUTH_CLIENT_ID=your-client-id.apps.googleusercontent.com
+   GOOGLE_OAUTH_CLIENT_SECRET=your-client-secret
+   GOOGLE_OAUTH_CALLBACK_URL=http://localhost:8088/auth/google/callback
+   ```
+
+4. Apply the migration and regenerate the shared Prisma client, then rebuild
+   Identity Service:
+
+   ```bash
+   pnpm db:migrate
+   pnpm db:generate
+   docker compose up --build -d identity-service api-gateway
+   ```
+
+The frontend discovers availability through `GET /auth/providers`, so email
+and password login remains usable if discovery fails or Google is disabled.
+For production, register the exact HTTPS callback URL used by the deployment
+and set the equivalent values in `.env.production`; never commit the client
+secret. See Google’s [web-server flow](https://developers.google.com/identity/protocols/oauth2/web-server)
+and [OIDC reference](https://developers.google.com/identity/openid-connect/reference)
+for provider-console details.
+
+### Local browser notifications
+
+Browser notifications use two Firebase configurations from the same Firebase
+project:
+
+- a private service-account JSON file for Notification Service;
+- public Web App values and a public VAPID key for the frontend.
+
+In the [Firebase Console](https://console.firebase.google.com/):
+
+1. Create or select a development project.
+2. Open **Project settings > Service accounts**, select **Generate new private
+   key**, and download the JSON file.
+3. Store the JSON outside this repository, for example at
+   `C:/Users/YOUR_NAME/.secrets/resourcehive-firebase-adminsdk.json`.
+4. Add a Web App from **Project settings > General** and copy its
+   `firebaseConfig` values.
+5. Open **Project settings > Cloud Messaging > Web Push certificates**,
+   generate a key pair, and copy the public key.
+
+Never commit the service-account JSON or place its contents in an environment
+file.
+
+Add the private backend configuration to the root `.env`:
+
+```env
+FCM_ENABLED=true
+FIREBASE_PROJECT_ID=your-firebase-project-id
+GOOGLE_APPLICATION_CREDENTIALS=C:/Users/YOUR_NAME/.secrets/resourcehive-firebase-adminsdk.json
+WEB_APP_URL=http://localhost:3000
+```
+
+Add the public Web App values to `apps/web/.env.local`:
+
+```env
+NEXT_PUBLIC_FIREBASE_API_KEY=your-web-api-key
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=your-firebase-project-id
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your-sender-id
+NEXT_PUBLIC_FIREBASE_APP_ID=your-web-app-id
+NEXT_PUBLIC_FIREBASE_VAPID_KEY=your-public-vapid-key
+```
+
+The project IDs must match. Restart the frontend after changing these values.
+If you use Brave, enable **Use Google Services for Push Messaging** in
+`brave://settings/privacy`.
+
+Firebase is optional. If it is not needed, keep `FCM_ENABLED=false` and leave
+the Firebase values empty.
 
 ### Run the application
 
-Build and start the backend for the first time:
+The normal local stack uses the base Compose file. It starts the API gateway
+and all four Nest services. Kafka is an external, Aiven-managed broker; set
+`KAFKA_BROKERS`, `KAFKA_SASL_USERNAME`, and `KAFKA_SASL_PASSWORD` in the root
+`.env` before starting the stack, and create the required topics on the Aiven
+service ahead of time (see below).
 
 ```bash
 docker compose up --build -d
 ```
 
-For later starts:
+To start the same stack with Firebase Cloud Messaging/browser notifications,
+include the FCM override:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.fcm.yml up --build -d
+```
+
+Google OAuth does not use a separate Compose file. Configure its variables in
+the root `.env`; they are passed to Identity Service by the base Compose file.
+The `docker-compose.fcm.yml` override is only for Firebase browser-push
+credentials and the Notification Service service-account mount.
+
+For later starts, use the same command without `--build`:
 
 ```bash
 docker compose up -d
+# or, with Firebase browser notifications:
+docker compose -f docker-compose.yml -f docker-compose.fcm.yml up -d
+```
+
+Start the frontend separately:
+
+```bash
+pnpm run dev:web
+```
+
+The first build can take several minutes. The Dockerfiles cache dependency
+installation separately from the source code, so later builds reuse that work
+unless a package file or lockfile changed. The final service images contain
+only the compiled application and its production dependencies.
+
+Kafka runs on Aiven for both local development and production; there is no
+local broker container. Every environment (`KAFKA_BROKERS`, `KAFKA_SSL=true`,
+`KAFKA_SASL_USERNAME`, `KAFKA_SASL_PASSWORD`) points at the same managed
+service unless you provision a separate Aiven service per environment. Create
+the four required topics listed in the
+[notification event contracts](services/notification-service/docs/event-contracts.md)
+on the Aiven service before starting the stack; the application does not
+create topics itself.
+
+Email commands still require Kafka even when `RESEND_ENABLED=false`; the
+console provider is selected only after Notification Service consumes the
+command. Kafka is not involved in the **Send test** browser-push action.
+
+When using Docker Compose, Identity Service applies committed database
+migrations automatically before it starts. For development without Docker,
+apply them manually after pulling changes:
+
+```bash
+pnpm run db:migrate
 ```
 
 Confirm that the containers are running:
 
 ```bash
 docker compose ps
-```
-
-Start the frontend in a separate terminal:
-
-```bash
-pnpm run dev:web
 ```
 
 Open <http://localhost:3000> and sign in with:
@@ -147,7 +320,7 @@ Password: DemoPassword123!
 The demo seed creates a user, an approved membership, and a demo organization.
 It does not create resources.
 
-The API gateway runs at <http://localhost:8000>. If port 8000 is unavailable,
+The API gateway runs at <http://localhost:8088>. If port 8088 is unavailable,
 change both values:
 
 ```env
@@ -161,7 +334,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8088
 `API_PORT` is the host port. The service ports inside Docker do not need to be
 changed.
 
-### Logs, rebuilds, and shutdown
+### Logs, targeted rebuilds, and shutdown
 
 Follow all backend logs:
 
@@ -172,14 +345,72 @@ docker compose logs -f
 Follow selected services:
 
 ```bash
-docker compose logs -f api-gateway resource-service
+docker compose logs -f api-gateway notification-service
 ```
 
-Rebuild after backend source or dependency changes:
+When the stack is already running, rebuild and recreate only the service you
+changed:
 
 ```bash
-docker compose up --build -d
+docker compose up -d --build --no-deps identity-service
+docker compose up -d --build --no-deps resource-service
+docker compose up -d --build --no-deps booking-service
+docker compose up -d --build --no-deps notification-service
 ```
+
+If Firebase browser notifications are enabled, use the FCM override for the
+Notification Service command:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.fcm.yml up --build --no-deps -d notification-service
+```
+
+The targeted command has three separate operations available:
+
+```bash
+# Build an image without replacing its running container.
+docker compose build identity-service
+
+# Restart the existing container/image without rebuilding source code.
+docker compose restart identity-service
+
+# Rebuild and recreate the changed service in one step.
+docker compose up -d --build --no-deps identity-service
+```
+
+Replace `identity-service` with `resource-service`, `booking-service`, or
+`notification-service` as needed. The `--no-deps` form assumes the Aiven
+Kafka credentials are configured and the other service dependencies are
+already running. For a cold stack, omit `--no-deps` or use one of the full
+startup commands above.
+
+The API gateway uses the pulled Caddy image rather than a local Dockerfile.
+Local Compose starts Caddy with configuration watching enabled, so valid edits
+to `services/api-gateway/Caddyfile` are reloaded without recreating the
+container. If the gateway container was created before this watcher was added,
+recreate it once so the new command is applied:
+
+```bash
+docker compose up -d --no-deps --force-recreate api-gateway
+```
+
+For a manual restart without changing the container command, use
+`docker compose restart api-gateway`.
+
+`docker compose up --build` does not necessarily recreate the gateway when only
+the bind-mounted Caddyfile changes. On production deployments, the deployment
+workflow explicitly recreates only `api-gateway` after updating the Caddyfile,
+then waits for its health check. This makes routes such as `/disputes/*` and
+`/analytics/*` take effect without unnecessarily replacing the application
+services.
+
+`docker compose up --build` evaluates every application service with a
+`build` section. BuildKit normally reuses cached layers for unchanged services,
+so a source-only Identity change rebuilds and recreates Identity while the
+other service images and containers remain unchanged. Changes to the lockfile,
+database package, shared authentication package, notification client, Compose
+configuration, or another shared build input can invalidate more than one
+service image.
 
 Stop and remove the local containers:
 
@@ -295,6 +526,12 @@ DNS-only unless the active Cloudflare certificate covers the full hostname.
 
 ### 4. Create `.env.production`
 
+Create a separate production Firebase project when possible. Register its Web
+App, generate its Web Push certificate, and download its service-account JSON
+using the same Firebase Console steps from the local setup. The public values
+go to Vercel; the complete private JSON goes to the GitHub secret described
+below.
+
 Copy `.env.production.example` to the server:
 
 ```bash
@@ -332,13 +569,22 @@ APP_URL=https://app.resourcehive.thisismalindu.com
 EMAIL_VERIFICATION_TOKEN_EXPIRES_IN=24h
 PASSWORD_RESET_TOKEN_EXPIRES_IN=1h
 
-EMAIL_TRANSPORT=smtp
-EMAIL_FROM="ResourceHive <no-reply@thisismalindu.com>"
-SMTP_HOST=smtp.example.com
-SMTP_PORT=587
-SMTP_SECURE=false
-SMTP_USER=replace_with_smtp_username
-SMTP_PASSWORD=replace_with_smtp_password
+# Notification providers. Kafka must be reachable for queued email delivery.
+DELIVERY_POLL_INTERVAL_MS=5000
+KAFKA_ENABLED=true
+KAFKA_BROKERS=kafka.example.com:9093
+KAFKA_CLIENT_ID=notification-service
+KAFKA_CONSUMER_GROUP=notification-service-v1-production
+KAFKA_SSL=true
+KAFKA_SASL_USERNAME=replace_with_managed_kafka_username
+KAFKA_SASL_PASSWORD=replace_with_managed_kafka_password
+
+RESEND_API_KEY=
+RESEND_FROM_EMAIL="ResourceHive <notifications@thisismalindu.com>"
+
+FCM_ENABLED=true
+FIREBASE_PROJECT_ID=your-production-firebase-project-id
+WEB_APP_URL=https://app.resourcehive.thisismalindu.com
 ```
 
 Generate a production JWT secret with:
@@ -347,10 +593,19 @@ Generate a production JWT secret with:
 openssl rand -base64 48
 ```
 
-For email, use credentials from any SMTP provider. Use port 587 with
-`SMTP_SECURE=false` for STARTTLS, or port 465 with `SMTP_SECURE=true`. The
-address in `EMAIL_FROM` must be accepted by the provider, which usually means
-verifying the sender address or domain.
+For email, create a Resend API key and verify the sending domain used by
+`RESEND_FROM_EMAIL`. Production Compose enables Resend and requires both
+values in `.env.production`. Identity Service publishes email commands to
+Kafka; Notification Service persists, retries, and sends them through Resend.
+
+`DELIVERY_POLL_INTERVAL_MS=5000` is suitable for normal use. Provision the four
+Kafka topics listed in the
+[notification event contracts](services/notification-service/docs/event-contracts.md)
+on the managed broker and configure its broker address, TLS, and SASL credentials. Use a Resend API
+key and an address on a verified sending domain.
+
+Do not set `GOOGLE_APPLICATION_CREDENTIALS` in `.env.production`. The
+deployment workflow installs and mounts the Firebase service-account JSON.
 
 Never commit `.env.production`, SMTP credentials, database URLs, or private
 keys.
@@ -359,33 +614,47 @@ keys.
 
 Import this repository into Vercel and configure:
 
-| Setting | Value |
-| --- | --- |
-| Root Directory | `apps/web` |
-| Production Branch | `main` |
-| Domain | `app.resourcehive.thisismalindu.com` |
+| Setting           | Value                                |
+| ----------------- | ------------------------------------ |
+| Root Directory    | `apps/web`                           |
+| Production Branch | `main`                               |
+| Domain            | `app.resourcehive.thisismalindu.com` |
 
 Add these production environment variables:
 
 ```env
 NEXT_PUBLIC_API_URL=https://api.resourcehive.thisismalindu.com
+NEXT_PUBLIC_MARKETING_URL=https://resourcehive.thisismalindu.com
 JWT_SECRET=the_same_secret_used_in_env_production
+NEXT_PUBLIC_FIREBASE_API_KEY=your-production-web-api-key
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your-production-project.firebaseapp.com
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=your-production-firebase-project-id
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your-production-sender-id
+NEXT_PUBLIC_FIREBASE_APP_ID=your-production-web-app-id
+NEXT_PUBLIC_FIREBASE_VAPID_KEY=your-production-public-vapid-key
 ```
 
 `NEXT_PUBLIC_API_URL` is public. `JWT_SECRET` is server-only and must not have a
-`NEXT_PUBLIC_` prefix.
+`NEXT_PUBLIC_` prefix. Firebase's `NEXT_PUBLIC_*` Web App values and VAPID key
+are public client configuration; the service-account JSON remains private.
+`NEXT_PUBLIC_MARKETING_URL` points to the public site that hosts ResourceHive's
+Privacy, Terms, and Cookie notices. In Google Cloud OAuth branding, use
+`https://resourcehive.thisismalindu.com` as the homepage,
+`https://resourcehive.thisismalindu.com/privacy` as the Privacy Policy URL, and
+`https://resourcehive.thisismalindu.com/terms` as the Terms of Service URL.
 
 ### 6. Configure GitHub Actions
 
 Create a GitHub Environment named `production`. Restrict its deployment branch
 to `main` and add these environment secrets:
 
-| Secret | Value |
-| --- | --- |
-| `LINODE_HOST` | Linode IP address or SSH hostname |
-| `LINODE_USERNAME` | `deploy` |
-| `LINODE_SSH_PRIVATE_KEY` | Contents of the dedicated private key |
-| `LINODE_SSH_KNOWN_HOSTS` | Verified SSH host-key entry for the Linode |
+| Secret                          | Value                                             |
+| ------------------------------- | ------------------------------------------------- |
+| `LINODE_HOST`                   | Linode IP address or SSH hostname                 |
+| `LINODE_USERNAME`               | `deploy`                                          |
+| `LINODE_SSH_PRIVATE_KEY`        | Contents of the dedicated private key             |
+| `LINODE_SSH_KNOWN_HOSTS`        | Verified SSH host-key entry for the Linode        |
+| `FIREBASE_SERVICE_ACCOUNT_JSON` | Complete production Firebase service-account JSON |
 
 Create the known-hosts entry on a trusted machine:
 
@@ -401,7 +670,9 @@ ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub
 ```
 
 The workflow uses GitHub's short-lived token for GHCR, so no permanent registry
-token is needed on the server.
+token is needed on the server. The workflow validates
+`FIREBASE_SERVICE_ACCOUNT_JSON`, installs it on the Linode with restricted file
+permissions, and mounts it only into Notification Service.
 
 ### 7. Release to production
 

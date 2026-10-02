@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CoinsIcon, PackageIcon } from "lucide-react";
+import { CoinsIcon, PackageIcon, StarIcon } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import {
@@ -59,6 +59,21 @@ export function ResourceCatalogueCard({
             </dt>
             <dd className="font-medium">
               {formatOrganizationPoints(resource.pointCost)} points
+            </dd>
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <dt className="flex items-center gap-2 text-muted-foreground">
+              <StarIcon className="size-4" />
+              Rating
+            </dt>
+            <dd className="font-medium">
+              {resource.ratingSummary?.total && resource.ratingSummary.total > 0 ? (
+                <span className="flex items-center gap-1">
+                  {resource.ratingSummary.average.toFixed(1)} <span className="text-muted-foreground">({resource.ratingSummary.total})</span>
+                </span>
+              ) : (
+                <span className="text-muted-foreground font-normal">Unrated</span>
+              )}
             </dd>
           </div>
           <div className="flex items-center justify-between gap-4">

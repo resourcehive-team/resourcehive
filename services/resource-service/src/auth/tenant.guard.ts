@@ -4,7 +4,11 @@ import {
   Injectable,
   ForbiddenException,
 } from '@nestjs/common';
-import { OrganizationMembership, PrismaService } from '@resourcehive/database';
+import {
+  OrganizationMembership,
+  Prisma,
+  PrismaService,
+} from '@resourcehive/database';
 import type { AuthenticatedRequest } from '@resourcehive/service-auth';
 
 interface TenantRequest extends AuthenticatedRequest {
@@ -33,11 +37,38 @@ export class TenantGuard implements CanActivate {
       return true;
     }
 
+    if (!user.rootOrganizationId) {
+      throw new ForbiddenException(
+        'Select a university before accessing organizations.',
+      );
+    }
+
+    return this.prisma.withUniversity(
+      { rootOrganizationId: user.rootOrganizationId, userId: user.userId },
+      async (transaction) =>
+        this.checkOrganizationAccess(
+          request,
+          organizationId,
+          user.userId,
+          transaction,
+        ),
+    );
+  }
+
+  private async checkOrganizationAccess(
+    request: TenantRequest,
+    organizationId: string,
+    userId: string,
+    transaction: Pick<
+      Prisma.TransactionClient,
+      'organization' | 'organizationMembership'
+    >,
+  ): Promise<boolean> {
     // Verify if the user has a direct membership to this organization
     const directMembership =
-      await this.prisma.organizationMembership.findUnique({
+      await transaction.organizationMembership.findUnique({
         where: {
-          userId_organizationId: { userId: user.userId, organizationId },
+          userId_organizationId: { userId, organizationId },
         },
       });
 
@@ -46,14 +77,7 @@ export class TenantGuard implements CanActivate {
         ? directMembership
         : null;
 
-    // If the direct membership is ADMIN, they have the highest access, so return immediately
-    if (bestMembership && bestMembership.role === 'ADMIN') {
-      request.membership = bestMembership;
-      return true;
-    }
-
-    // Otherwise, check inherited admin access up to the root
-    const targetOrg = await this.prisma.organization.findUnique({
+    const targetOrg = await transaction.organization.findUnique({
       where: { id: organizationId },
     });
 
@@ -67,12 +91,24 @@ export class TenantGuard implements CanActivate {
       );
     }
 
+    if (targetOrg.status !== 'ACTIVE') {
+      throw new ForbiddenException(
+        'This organization is suspended and cannot be accessed.',
+      );
+    }
+
+    // If the direct membership is ADMIN, they have the highest access.
+    if (bestMembership && bestMembership.role === 'ADMIN') {
+      request.membership = bestMembership;
+      return true;
+    }
+
     // Trace ancestors up to the root to find an inherited ADMIN membership
     let currentOrgId: string | null = targetOrg.parentId;
 
     while (currentOrgId) {
       // Fetch the current ancestor organization to ensure we stay within the tenant
-      const currentOrg = await this.prisma.organization.findUnique({
+      const currentOrg = await transaction.organization.findUnique({
         where: { id: currentOrgId },
       });
 
@@ -86,10 +122,10 @@ export class TenantGuard implements CanActivate {
 
       // Check if user is an ADMIN of this ancestor organization
       const ancestorMembership =
-        await this.prisma.organizationMembership.findUnique({
+        await transaction.organizationMembership.findUnique({
           where: {
             userId_organizationId: {
-              userId: user.userId,
+              userId,
               organizationId: currentOrgId,
             },
           },
@@ -110,6 +146,11 @@ export class TenantGuard implements CanActivate {
 
     // If no inherited admin was found, but they have a direct non-admin membership, use that
     if (bestMembership) {
+      if (targetOrg.status !== 'ACTIVE') {
+        throw new ForbiddenException(
+          'This organization is suspended and cannot be accessed.',
+        );
+      }
       request.membership = bestMembership;
       return true;
     }

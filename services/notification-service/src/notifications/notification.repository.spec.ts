@@ -10,9 +10,15 @@ describe("NotificationRepository", () => {
     updateMany: jest.fn(),
   };
   const user = { findFirst: jest.fn() };
+  const webPushSubscription = {
+    upsert: jest.fn(),
+    findMany: jest.fn(),
+    updateMany: jest.fn(),
+  };
   const repository = new NotificationRepository({
     notification,
     user,
+    webPushSubscription,
   } as unknown as PrismaService);
 
   beforeEach(() => jest.clearAllMocks());
@@ -22,6 +28,7 @@ describe("NotificationRepository", () => {
 
     await repository.create({
       userId: "user-id",
+      rootOrganizationId: "root-id",
       type: "BOOKING_CREATED",
       title: "Booking confirmed",
       message: "Your booking was confirmed.",
@@ -30,6 +37,7 @@ describe("NotificationRepository", () => {
     expect(notification.create).toHaveBeenCalledWith({
       data: {
         userId: "user-id",
+        rootOrganizationId: "root-id",
         type: "BOOKING_CREATED",
         title: "Booking confirmed",
         message: "Your booking was confirmed.",
@@ -41,12 +49,17 @@ describe("NotificationRepository", () => {
     notification.findMany.mockResolvedValue([]);
     await repository.findManyForUser({
       userId: "recipient-id",
+      rootOrganizationId: "root-id",
       unreadOnly: true,
       skip: 5,
       take: 10,
     });
     expect(notification.findMany).toHaveBeenCalledWith({
-      where: { userId: "recipient-id", readAt: null },
+      where: {
+        userId: "recipient-id",
+        rootOrganizationId: "root-id",
+        readAt: null,
+      },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       skip: 5,
       take: 10,
@@ -60,6 +73,7 @@ describe("NotificationRepository", () => {
       repository.markReadForUser({
         notificationId: "notification-id",
         userId: "recipient-id",
+        rootOrganizationId: "root-id",
       }),
     ).resolves.toBe(record);
     expect(notification.update).not.toHaveBeenCalled();
@@ -71,13 +85,36 @@ describe("NotificationRepository", () => {
     await repository.findByIdForUser({
       notificationId: "notification-id",
       userId: "recipient-id",
+      rootOrganizationId: "root-id",
     });
 
     expect(notification.findFirst).toHaveBeenCalledWith({
       where: {
         id: "notification-id",
         userId: "recipient-id",
+        rootOrganizationId: "root-id",
       },
+    });
+  });
+
+  it("registers one browser token for the authenticated user", async () => {
+    webPushSubscription.upsert.mockResolvedValue({ id: "subscription-id" });
+
+    await repository.registerWebPush("user-id", "root-id", "fcm-token");
+
+    expect(webPushSubscription.upsert).toHaveBeenCalledWith({
+      where: {
+        rootOrganizationId_token: {
+          rootOrganizationId: "root-id",
+          token: "fcm-token",
+        },
+      },
+      create: {
+        userId: "user-id",
+        rootOrganizationId: "root-id",
+        token: "fcm-token",
+      },
+      update: { userId: "user-id", active: true },
     });
   });
 });

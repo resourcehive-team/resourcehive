@@ -23,7 +23,7 @@ describe("session refresh client", () => {
     expect(second).toBe(true);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://localhost:8000/auth/refresh",
+      "http://localhost:8088/auth/refresh",
       expect.objectContaining({ method: "POST", credentials: "include" }),
     );
   });
@@ -41,7 +41,7 @@ describe("session refresh client", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const response = await fetchWithSessionRefresh(
-      "http://localhost:8000/resources/resource-id",
+      "http://localhost:8088/resources/resource-id",
       { credentials: "include" },
     );
 
@@ -59,7 +59,7 @@ describe("session refresh client", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const response = await fetchWithSessionRefresh(
-      "http://localhost:8000/resources/resource-id",
+      "http://localhost:8088/resources/resource-id",
     );
 
     expect(response).toBe(unauthorized);

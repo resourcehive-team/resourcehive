@@ -11,12 +11,15 @@
     "db:migrate:dev": "pnpm -F @resourcehive/database run migrate:dev",
     "db:migrate:status": "pnpm -F @resourcehive/database run migrate:status",
     "db:seed:demo": "pnpm -F identity-service run seed:demo",
+    "db:seed:university": "pnpm -F identity-service run seed:university",
     "db:studio": "pnpm -F @resourcehive/database run studio",
     "db:test": "bash db/schema/tests/run.sh",
     "db:validate": "pnpm -F @resourcehive/database run validate",
     "dev:identity": "pnpm -F identity-service run start:dev",
     "dev:setup": "pnpm run db:init && pnpm run db:seed:demo",
     "dev:web": "pnpm -F frontend run dev",
+    "perf:seed": "pnpm --filter identity-service exec ts-node scripts/seed-performance.ts",
+    "perf:k6": "docker compose --env-file perf/.env -f docker-compose.yml -f docker-compose.perf.yml --profile perf run --rm k6",
     "test:web": "pnpm -F frontend run test"
   },
   "devDependencies": {

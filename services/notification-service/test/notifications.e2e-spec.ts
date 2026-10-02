@@ -26,6 +26,7 @@ describe("Notification reads (e2e)", () => {
           userId: "00000000-0000-4000-8000-000000000003",
           email: "user@example.edu",
           organizationId: "00000000-0000-4000-8000-000000000002",
+          rootOrganizationId: "00000000-0000-4000-8000-000000000002",
           role: "member",
         };
         return true;
@@ -52,6 +53,7 @@ describe("Notification reads (e2e)", () => {
       expect.objectContaining({
         where: {
           userId: "00000000-0000-4000-8000-000000000003",
+          rootOrganizationId: "00000000-0000-4000-8000-000000000002",
           readAt: null,
         },
       }),

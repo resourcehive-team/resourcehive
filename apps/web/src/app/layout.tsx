@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Geist, Instrument_Serif } from "next/font/google";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Toaster } from "@/components/ui/sonner";
 import { Analytics } from "@vercel/analytics/next";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist" });
@@ -26,13 +27,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${geist.variable} ${instrumentSerif.variable}`}
-    >
+    <html lang="en" className={`${geist.variable} ${instrumentSerif.variable}`}>
       <body>
         <TooltipProvider>{children}</TooltipProvider>
-        <Analytics />
+        <Toaster />
+        {process.env.VERCEL === "1" ? <Analytics /> : null}
       </body>
     </html>
   );

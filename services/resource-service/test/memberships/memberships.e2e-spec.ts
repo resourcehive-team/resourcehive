@@ -5,7 +5,14 @@ import { App } from 'supertest/types';
 import { AppModule } from '../../src/app.module';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { PrismaClient, PrismaService } from '@resourcehive/database';
+import {
+  PrismaClient,
+  UniversityContextInterceptor,
+} from '@resourcehive/database';
+
+const fixturePrisma = new PrismaClient({
+  datasources: { db: { url: process.env.DATABASE_URL } },
+});
 
 describe('MembershipsController (e2e)', () => {
   jest.setTimeout(60000);
@@ -21,6 +28,7 @@ describe('MembershipsController (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    app.useGlobalInterceptors(new UniversityContextInterceptor());
     await app.init();
 
     const configService = app.get(ConfigService);
@@ -28,7 +36,7 @@ describe('MembershipsController (e2e)', () => {
       configService.get<string>('JWT_SECRET') ||
       'development-only-resourcehive-secret-change-before-production';
     const jwtService = app.get(JwtService);
-    const prisma = app.get(PrismaService);
+    const prisma = fixturePrisma;
 
     // Ensure demo user is an ADMIN for these tests, as the routes require AdminGuard
     await prisma.organizationMembership.updateMany({
@@ -41,6 +49,7 @@ describe('MembershipsController (e2e)', () => {
         sub: demoUserId,
         email: 'demo@example.edu',
         organizationId: demoOrganizationId,
+        rootOrganizationId: demoOrganizationId,
         role: 'member',
       },
       { secret },
@@ -49,10 +58,11 @@ describe('MembershipsController (e2e)', () => {
 
   afterAll(async () => {
     await app.close();
+    await fixturePrisma.$disconnect();
   });
 
   it('gets my memberships', async () => {
-    const prisma = app.get(PrismaService);
+    const prisma = fixturePrisma;
     await prisma.$executeRawUnsafe(`SELECT 1`);
     const response = await request(app.getHttpServer())
       .get('/memberships/my-memberships')
@@ -82,18 +92,20 @@ describe('MembershipsController (e2e)', () => {
 
   it('approves a membership request', async () => {
     const targetUserId = '00000000-0000-4000-8000-000000000888';
-    const prisma = app.get(PrismaService);
+    const targetEmail = 'target-approve-test@unconfigured.invalid';
+    const prisma = fixturePrisma;
 
     // Create or update a dummy user to satisfy foreign key constraints
     await prisma.user.upsert({
       where: { id: targetUserId },
-      update: {},
+      update: { email: targetEmail, emailVerifiedAt: new Date() },
       create: {
         id: targetUserId,
-        email: 'target-approve-test@example.edu',
+        email: targetEmail,
         passwordHash: 'dummyhash',
         firstName: 'Target',
         lastName: 'User',
+        emailVerifiedAt: new Date(),
       },
     });
 
@@ -107,8 +119,9 @@ describe('MembershipsController (e2e)', () => {
     const targetJwtToken = jwtService.sign(
       {
         sub: targetUserId,
-        email: 'target-approve-test@example.edu',
+        email: targetEmail,
         organizationId: demoOrganizationId,
+        rootOrganizationId: demoOrganizationId,
         role: 'member',
       },
       { secret },
@@ -120,10 +133,13 @@ describe('MembershipsController (e2e)', () => {
     });
 
     // Target user requests membership
-    await request(app.getHttpServer())
+    const membershipRequest = await request(app.getHttpServer())
       .post(`/memberships/${demoOrganizationId}/request`)
       .set('Authorization', `Bearer ${targetJwtToken}`)
       .expect(201);
+    expect(membershipRequest.body).toEqual(
+      expect.objectContaining({ status: 'PENDING' }),
+    );
 
     // Ensure the approving user (demoUserId) has ADMIN role in DB
     await prisma.organizationMembership.update({
@@ -154,8 +170,123 @@ describe('MembershipsController (e2e)', () => {
     });
   });
 
-  it('allows access via deep ancestor administrator inheritance', async () => {
-    const freshPrisma = new PrismaClient();
+  describe('Membership Administration', () => {
+    it('updates a membership role (200 OK)', async () => {
+      const targetUserId = '00000000-0000-4000-8000-000000000889';
+      const prisma = fixturePrisma;
+      await prisma.user.upsert({
+        where: { id: targetUserId },
+        update: {},
+        create: {
+          id: targetUserId,
+          email: 'target-role-test@example.edu',
+          passwordHash: 'dummyhash',
+          firstName: 'Target',
+          lastName: 'User',
+        },
+      });
+
+      await prisma.organizationMembership.upsert({
+        where: {
+          userId_organizationId: {
+            userId: targetUserId,
+            organizationId: demoOrganizationId,
+          },
+        },
+        update: { role: 'MEMBER' },
+        create: {
+          userId: targetUserId,
+          organizationId: demoOrganizationId,
+          role: 'MEMBER',
+          status: 'APPROVED',
+        },
+      });
+
+      await request(app.getHttpServer())
+        .patch(
+          `/memberships/organization/${demoOrganizationId}/users/${targetUserId}/role`,
+        )
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .send({ role: 'ADMIN' })
+        .expect(200);
+
+      const updated = await prisma.organizationMembership.findUnique({
+        where: {
+          userId_organizationId: {
+            userId: targetUserId,
+            organizationId: demoOrganizationId,
+          },
+        },
+      });
+      expect(updated?.role).toBe('ADMIN');
+
+      await prisma.organizationMembership.delete({
+        where: {
+          userId_organizationId: {
+            userId: targetUserId,
+            organizationId: demoOrganizationId,
+          },
+        },
+      });
+      await prisma.user.delete({ where: { id: targetUserId } });
+    });
+
+    it('removes a membership (200 OK)', async () => {
+      const targetUserId = '00000000-0000-4000-8000-000000000890';
+      const prisma = fixturePrisma;
+      await prisma.user.upsert({
+        where: { id: targetUserId },
+        update: {},
+        create: {
+          id: targetUserId,
+          email: 'target-remove-test@example.edu',
+          passwordHash: 'dummyhash',
+          firstName: 'Target',
+          lastName: 'User',
+        },
+      });
+
+      await prisma.organizationMembership.upsert({
+        where: {
+          userId_organizationId: {
+            userId: targetUserId,
+            organizationId: demoOrganizationId,
+          },
+        },
+        update: {},
+        create: {
+          userId: targetUserId,
+          organizationId: demoOrganizationId,
+          role: 'MEMBER',
+          status: 'APPROVED',
+        },
+      });
+
+      await request(app.getHttpServer())
+        .delete(
+          `/memberships/organization/${demoOrganizationId}/users/${targetUserId}`,
+        )
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .expect(200);
+
+      const removed = await prisma.organizationMembership.findUnique({
+        where: {
+          userId_organizationId: {
+            userId: targetUserId,
+            organizationId: demoOrganizationId,
+          },
+        },
+      });
+      expect(removed).toBeNull();
+
+      await prisma.user.delete({ where: { id: targetUserId } });
+    });
+  });
+
+  it('denies access through a deep ancestor administrator without direct membership', async () => {
+    const freshPrisma = new PrismaClient({
+      datasources: { db: { url: process.env.DATABASE_URL } },
+    });
     await freshPrisma.$connect();
 
     const deepRootId = '00000000-0000-4000-8000-000000000100';
@@ -215,11 +346,11 @@ describe('MembershipsController (e2e)', () => {
       },
     });
 
-    // 3. Verify user can access Grandchild endpoint (inherited from Root -> Child -> Grandchild)
+    // 3. Exact-organization authorization does not inherit root authority.
     await request(app.getHttpServer())
       .get(`/memberships/organization/${deepGrandchildId}`)
       .set('Authorization', `Bearer ${jwtToken}`)
-      .expect(200);
+      .expect(403);
 
     // Cleanup
     await freshPrisma.organizationMembership.delete({

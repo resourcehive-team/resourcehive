@@ -5,6 +5,7 @@
     "scripts",
     "test",
     "dist",
-    "**/*spec.ts"
+    "**/*spec.ts",
+    "eslint.config.mjs"
   ]
 }

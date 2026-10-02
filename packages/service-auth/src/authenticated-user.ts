@@ -2,6 +2,7 @@ export interface AuthenticatedUser {
   userId: string;
   email: string;
   organizationId: string | null;
+  rootOrganizationId: string | null;
   role: string | null;
 }
 

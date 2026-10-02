@@ -30,6 +30,7 @@ redis/
 !.env.example
 !.env.production.example
 .neon
+/secrets/
 
 # OS files
 .DS_Store
@@ -41,3 +42,8 @@ redis/
 # internal documentation/context
 .internal-documentation/
 internal-documentation/
+
+# temporary codex output files
+tmp/
+perf/results/*
+!perf/results/.gitkeep

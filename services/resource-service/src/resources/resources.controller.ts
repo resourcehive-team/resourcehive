@@ -10,61 +10,197 @@ import {
   Query,
   DefaultValuePipe,
   ParseIntPipe,
+  UseInterceptors,
+  UploadedFile,
+  Inject,
 } from '@nestjs/common';
+import { CacheInterceptor, CACHE_MANAGER } from '@nestjs/cache-manager';
+import type { Cache } from 'cache-manager';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ResourcesService } from './resources.service';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { CreateResourceDto } from './dto/create-resource.dto';
 import { UpdateResourceDto } from './dto/update-resource.dto';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { CreateRatingDto } from './dto/create-rating.dto';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
+  ApiCookieAuth,
+  ApiCreatedResponse,
+  ApiBadRequestResponse,
+  ApiForbiddenResponse,
+  ApiOkResponse,
+  ApiNotFoundResponse,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { CurrentUser, JwtAuthGuard } from '@resourcehive/service-auth';
 import type { AuthenticatedUser } from '@resourcehive/service-auth';
 import { TenantGuard } from '../auth/tenant.guard';
 import { AdminGuard } from '../auth/admin.guard';
+import {
+  PaginatedResourcesResponseDto,
+  ResourceAccessResponseDto,
+  ResourceRatingSummaryResponseDto,
+  ResourceRatingSubmissionResponseDto,
+  ResourceResponseDto,
+} from '../docs/resource-responses.dto';
 
 @ApiTags('Resources')
 @ApiBearerAuth()
+@ApiCookieAuth('resourcehive_access_token')
 @UseGuards(JwtAuthGuard)
 @Controller('resources')
 export class ResourcesController {
-  constructor(private readonly resourcesService: ResourcesService) {}
+  constructor(
+    private readonly resourcesService: ResourcesService,
+    private readonly cloudinaryService: CloudinaryService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
+  ) {}
 
   @UseGuards(TenantGuard, AdminGuard)
   @Post('organization/:organizationId')
   @ApiOperation({ summary: 'Create a new resource' })
-  create(
+  @ApiCreatedResponse({
+    description: 'The resource has been created successfully.',
+    type: ResourceResponseDto,
+  })
+  @ApiBadRequestResponse({ description: 'Invalid request data.' })
+  @ApiForbiddenResponse({
+    description: 'Forbidden. Requires Admin privileges.',
+  })
+  async create(
     @Param('organizationId') organizationId: string,
     @Body() createResourceDto: CreateResourceDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.resourcesService.create(
+    const result = await this.resourcesService.create(
       organizationId,
       user.userId,
       createResourceDto,
     );
+    await this.cacheManager.clear();
+    return result;
   }
 
   @UseGuards(TenantGuard, AdminGuard)
   @Patch('organization/:organizationId/:resourceId')
   @ApiOperation({ summary: 'Update a resource' })
-  update(
+  @ApiOkResponse({
+    description: 'The resource has been updated successfully.',
+    type: ResourceResponseDto,
+  })
+  @ApiNotFoundResponse({ description: 'Resource not found.' })
+  @ApiForbiddenResponse({
+    description: 'Forbidden. Requires Admin privileges.',
+  })
+  async update(
     @Param('organizationId') organizationId: string,
     @Param('resourceId') resourceId: string,
     @Body() updateResourceDto: UpdateResourceDto,
   ) {
-    return this.resourcesService.update(
+    const result = await this.resourcesService.update(
       organizationId,
       resourceId,
       updateResourceDto,
     );
+    await this.cacheManager.clear();
+    return result;
   }
 
   @UseGuards(TenantGuard, AdminGuard)
   @Delete('organization/:organizationId/:resourceId')
   @ApiOperation({ summary: 'Archive/Delete a resource' })
-  remove(
+  @ApiOkResponse({
+    description: 'The resource has been archived/deleted successfully.',
+    type: ResourceResponseDto,
+  })
+  @ApiNotFoundResponse({ description: 'Resource not found.' })
+  @ApiForbiddenResponse({
+    description: 'Forbidden. Requires Admin privileges.',
+  })
+  async remove(
     @Param('organizationId') organizationId: string,
     @Param('resourceId') resourceId: string,
   ) {
-    return this.resourcesService.remove(organizationId, resourceId);
+    const result = await this.resourcesService.remove(
+      organizationId,
+      resourceId,
+    );
+    await this.cacheManager.clear();
+    return result;
+  }
+
+  @UseGuards(TenantGuard)
+  @Post('organization/:organizationId/:resourceId/ratings')
+  @ApiOperation({ summary: 'Submit a rating for a resource' })
+  @ApiCreatedResponse({
+    description: 'Rating submitted successfully.',
+    type: ResourceRatingSubmissionResponseDto,
+  })
+  submitRating(
+    @Param('organizationId') organizationId: string,
+    @Param('resourceId') resourceId: string,
+    @Body() dto: CreateRatingDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.resourcesService.upsertRating(
+      organizationId,
+      resourceId,
+      user.userId,
+      dto.rating,
+      dto.comment,
+    );
+  }
+
+  @UseGuards(TenantGuard, AdminGuard)
+  @Post('organization/:organizationId/:resourceId/image')
+  @ApiOperation({ summary: 'Upload an image for a resource' })
+  @ApiCreatedResponse({
+    description: 'Image uploaded successfully.',
+    type: ResourceResponseDto,
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['file'],
+      properties: { file: { type: 'string', format: 'binary' } },
+    },
+  })
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadImage(
+    @Param('organizationId') organizationId: string,
+    @Param('resourceId') resourceId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    const uploadResult = await this.cloudinaryService.uploadFile(
+      file,
+      `resources/${organizationId}/${resourceId}`,
+    );
+    const result = await this.resourcesService.uploadImage(
+      organizationId,
+      resourceId,
+      uploadResult.secure_url,
+    );
+    await this.cacheManager.clear();
+    return result;
+  }
+
+  @UseGuards(TenantGuard)
+  @Get('organization/:organizationId/:resourceId/ratings')
+  @ApiOperation({ summary: 'Get ratings for a resource' })
+  @ApiOkResponse({
+    description: 'Returns ratings and average.',
+    type: ResourceRatingSummaryResponseDto,
+  })
+  getRatings(
+    @Param('organizationId') organizationId: string,
+    @Param('resourceId') resourceId: string,
+  ) {
+    return this.resourcesService.getRatings(organizationId, resourceId);
   }
 
   @UseGuards(TenantGuard)
@@ -72,18 +208,58 @@ export class ResourcesController {
   @ApiOperation({
     summary: 'List all resources available to this organization',
   })
+  @ApiOkResponse({
+    description: 'The resources have been listed successfully.',
+    type: PaginatedResourcesResponseDto,
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    minimum: 1,
+    default: 1,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    minimum: 1,
+    default: 10,
+  })
+  @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiQuery({ name: 'status', required: false, type: String })
+  @ApiForbiddenResponse({
+    description: 'Forbidden. You do not have access to this organization.',
+  })
+  @UseInterceptors(CacheInterceptor)
   findAll(
     @Param('organizationId') organizationId: string,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
     @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
     @Query('search') search?: string,
+    @Query('status') status?: string,
   ) {
-    return this.resourcesService.findAll(organizationId, page, limit, search);
+    return this.resourcesService.findAll(
+      organizationId,
+      page,
+      limit,
+      search,
+      status,
+    );
   }
 
   @UseGuards(TenantGuard)
   @Get('organization/:organizationId/:resourceId')
   @ApiOperation({ summary: 'Get details of a specific resource' })
+  @ApiOkResponse({
+    description: 'The resource has been retrieved successfully.',
+    type: ResourceResponseDto,
+  })
+  @ApiNotFoundResponse({ description: 'Resource not found.' })
+  @ApiForbiddenResponse({
+    description: 'Forbidden. User is not part of the organization.',
+  })
+  @UseInterceptors(CacheInterceptor)
   findOne(
     @Param('organizationId') organizationId: string,
     @Param('resourceId') resourceId: string,
@@ -96,6 +272,15 @@ export class ResourcesController {
   @ApiOperation({
     summary: 'Internal check for Booking Service to verify resource access',
   })
+  @ApiOkResponse({
+    description:
+      'Returns bookable true if access is allowed and resource is active.',
+    type: ResourceAccessResponseDto,
+  })
+  @ApiForbiddenResponse({
+    description: 'Forbidden. Resource is inactive or user lacks access.',
+  })
+  @ApiNotFoundResponse({ description: 'Resource not found.' })
   checkAccess(
     @Param('organizationId') organizationId: string,
     @Param('resourceId') resourceId: string,

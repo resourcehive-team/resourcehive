@@ -47,6 +47,8 @@ describe("SlotRepository", () => {
             rootOrganizationId: true,
             ownerOrganizationId: true,
             pointCost: true,
+            cancellationNoticeMinutes: true,
+            allowedOrganizations: { select: { organizationId: true } },
           },
         },
         bookings: {
@@ -109,7 +111,12 @@ describe("SlotRepository", () => {
     });
     expect(transactionSlot.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: { resourceId: "resource-id", startsAt, endsAt },
+        data: {
+          resourceId: "resource-id",
+          rootOrganizationId: "tenant-id",
+          startsAt,
+          endsAt,
+        },
       }),
     );
   });

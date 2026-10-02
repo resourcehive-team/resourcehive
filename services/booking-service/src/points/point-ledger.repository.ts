@@ -1,8 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { PrismaService } from "@resourcehive/database";
 import {
-  AppendBookingDeductionInput,
-  AppendBookingRefundInput,
+  AppendBookingEntryInput,
   PointLedgerClient,
   PointLedgerEntry,
 } from "./point-ledger.types";
@@ -13,40 +12,42 @@ export class PointLedgerRepository {
 
   async getBalance(
     userId: string,
+    rootOrganizationId: string,
     client: PointLedgerClient = this.prisma,
   ): Promise<number> {
     const result = await client.pointTransaction.aggregate({
-      where: { userId },
+      where: { userId, rootOrganizationId },
       _sum: { amount: true },
     });
     return result._sum.amount ?? 0;
   }
 
   appendBookingDeduction(
-    input: AppendBookingDeductionInput,
+    input: AppendBookingEntryInput,
     client: PointLedgerClient = this.prisma,
   ): Promise<PointLedgerEntry> {
-    return client.pointTransaction.create({
-      data: {
-        userId: input.userId,
-        bookingId: input.bookingId,
-        amount: input.amount,
-        transactionType: "BOOKING",
-        description: input.description,
-      },
-    });
+    return this.append(input, "BOOKING", client);
   }
 
   appendBookingRefund(
-    input: AppendBookingRefundInput,
+    input: AppendBookingEntryInput,
     client: PointLedgerClient = this.prisma,
+  ): Promise<PointLedgerEntry> {
+    return this.append(input, "BOOKING_REFUND", client);
+  }
+
+  private append(
+    input: AppendBookingEntryInput,
+    transactionType: "BOOKING" | "BOOKING_REFUND",
+    client: PointLedgerClient,
   ): Promise<PointLedgerEntry> {
     return client.pointTransaction.create({
       data: {
         userId: input.userId,
         bookingId: input.bookingId,
+        rootOrganizationId: input.rootOrganizationId,
         amount: input.amount,
-        transactionType: "BOOKING_REFUND",
+        transactionType,
         description: input.description,
       },
     });

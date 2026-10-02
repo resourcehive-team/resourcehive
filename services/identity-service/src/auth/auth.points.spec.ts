@@ -1,5 +1,6 @@
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '@resourcehive/database';
+import { runWithUniversityContext } from '@resourcehive/database';
 import { EmailService } from '../email/email.service';
 import { AuthService } from './auth.service';
 
@@ -22,13 +23,22 @@ describe('AuthService current user points', () => {
       updatedAt: new Date('2026-08-19T10:30:00.000Z'),
     });
 
-    await expect(service.getCurrentUserPoints('user-id')).resolves.toEqual({
-      userId: 'user-id',
-      availablePoints: 75,
-      updatedAt: '2026-08-19T10:30:00.000Z',
-    });
+    await runWithUniversityContext(
+      { userId: 'user-id', rootOrganizationId: 'university-id' },
+      async () =>
+        expect(service.getCurrentUserPoints('user-id')).resolves.toEqual({
+          userId: 'user-id',
+          availablePoints: 75,
+          updatedAt: '2026-08-19T10:30:00.000Z',
+        }),
+    );
     expect(userPointBalance.findUnique).toHaveBeenCalledWith({
-      where: { userId: 'user-id' },
+      where: {
+        userId_rootOrganizationId: {
+          userId: 'user-id',
+          rootOrganizationId: 'university-id',
+        },
+      },
       select: {
         availablePoints: true,
         updatedAt: true,
@@ -39,10 +49,14 @@ describe('AuthService current user points', () => {
   it('returns zero when the user has no point transactions yet', async () => {
     userPointBalance.findUnique.mockResolvedValue(null);
 
-    await expect(service.getCurrentUserPoints('new-user-id')).resolves.toEqual({
-      userId: 'new-user-id',
-      availablePoints: 0,
-      updatedAt: null,
-    });
+    await runWithUniversityContext(
+      { userId: 'new-user-id', rootOrganizationId: 'university-id' },
+      async () =>
+        expect(service.getCurrentUserPoints('new-user-id')).resolves.toEqual({
+          userId: 'new-user-id',
+          availablePoints: 0,
+          updatedAt: null,
+        }),
+    );
   });
 });

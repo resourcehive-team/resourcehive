@@ -1,0 +1,331 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import { ResourcesService } from './resources.service';
+import { PrismaService } from '@resourcehive/database';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
+
+describe('ResourcesService', () => {
+  let service: ResourcesService;
+
+  const mockPrismaService = {
+    resource: {
+      create: jest.fn(),
+      update: jest.fn(),
+      findUnique: jest.fn(),
+      findMany: jest.fn(),
+      count: jest.fn(),
+    },
+    resourceRating: {
+      upsert: jest.fn(),
+      findMany: jest.fn(),
+      groupBy: jest.fn(),
+    },
+    organization: {
+      findUnique: jest.fn(),
+    },
+  };
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        ResourcesService,
+        { provide: PrismaService, useValue: mockPrismaService },
+      ],
+    }).compile();
+
+    service = module.get<ResourcesService>(ResourcesService);
+
+    // Mock global fetch to prevent unhandled rejections from fire-and-forget network calls
+    global.fetch = jest.fn(() =>
+      Promise.resolve(new Response(null, { status: 200 })),
+    );
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+    jest.restoreAllMocks();
+  });
+
+  it('should be defined', () => {
+    expect(service).toBeDefined();
+  });
+
+  describe('checkBookingAccess', () => {
+    it('should return bookable true for an ACTIVE resource', async () => {
+      // Mock findOne to return an active resource
+      jest.spyOn(service, 'findOne').mockResolvedValue({
+        id: 'res-1',
+        status: 'ACTIVE',
+        name: 'Test Room',
+        pointCost: 10,
+        ownerOrganizationId: 'org-1',
+      } as unknown as Awaited<ReturnType<ResourcesService['findOne']>>);
+
+      const result = await service.checkBookingAccess('org-1', 'res-1');
+
+      expect(result.bookable).toBe(true);
+      expect(result.resourceId).toBe('res-1');
+      expect(result.name).toBe('Test Room');
+      expect(result.pointCost).toBe(10);
+      expect(result.ownerOrganizationId).toBe('org-1');
+    });
+
+    it('should throw ForbiddenException if resource is INACTIVE', async () => {
+      // Mock findOne to return an inactive resource
+      jest.spyOn(service, 'findOne').mockResolvedValue({
+        id: 'res-1',
+        status: 'INACTIVE',
+      } as unknown as Awaited<ReturnType<ResourcesService['findOne']>>);
+
+      await expect(
+        service.checkBookingAccess('org-1', 'res-1'),
+      ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('create', () => {
+    it('should create a resource successfully', async () => {
+      mockPrismaService.organization.findUnique.mockResolvedValue({
+        id: 'org-1',
+      });
+      const createdResource = { id: 'res-1', name: 'New Room' };
+      mockPrismaService.resource.create.mockResolvedValue(createdResource);
+
+      const result = await service.create('org-1', 'user-1', {
+        name: 'New Room',
+        description: 'Desc',
+      });
+
+      expect(result).toEqual(createdResource);
+      expect(mockPrismaService.resource.create).toHaveBeenCalled();
+    });
+
+    it('should throw NotFoundException if organization not found', async () => {
+      mockPrismaService.organization.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.create('org-1', 'user-1', { name: 'Room' }),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('findOne', () => {
+    it('should return a resource if the user is the owner', async () => {
+      const resource = {
+        id: 'res-1',
+        ownerOrganizationId: 'org-1',
+        allowedOrganizations: [],
+      };
+      mockPrismaService.resource.findUnique.mockResolvedValue(resource);
+
+      const result = await service.findOne('org-1', 'res-1');
+
+      expect(result).toEqual(resource);
+    });
+
+    it('should throw NotFoundException if resource not found', async () => {
+      mockPrismaService.resource.findUnique.mockResolvedValue(null);
+
+      await expect(service.findOne('org-1', 'res-1')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('should throw ForbiddenException if user has no access', async () => {
+      const resource = {
+        id: 'res-1',
+        ownerOrganizationId: 'org-2',
+        allowedOrganizations: [],
+      };
+      mockPrismaService.resource.findUnique.mockResolvedValue(resource);
+
+      await expect(service.findOne('org-1', 'res-1')).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+  });
+
+  describe('findAll', () => {
+    it('should return a paginated list of resources', async () => {
+      const data = [{ id: 'res-1' }];
+      mockPrismaService.resource.findMany.mockResolvedValue(data);
+      mockPrismaService.resource.count.mockResolvedValue(1);
+      mockPrismaService.resourceRating.groupBy.mockResolvedValue([
+        { resourceId: 'res-1', _avg: { rating: 4 }, _count: { rating: 2 } },
+      ]);
+
+      const result = await service.findAll('org-1', 1, 10);
+
+      expect(result).toEqual({
+        data: [{ id: 'res-1', ratingSummary: { average: 4, total: 2 } }],
+        total: 1,
+        page: 1,
+        limit: 10,
+        totalPages: 1,
+      });
+    });
+  });
+
+  describe('update', () => {
+    it('should update a resource', async () => {
+      mockPrismaService.resource.findUnique.mockResolvedValue({
+        id: 'res-1',
+        ownerOrganizationId: 'org-1',
+      });
+      mockPrismaService.resource.update.mockResolvedValue({
+        id: 'res-1',
+        name: 'Updated',
+      });
+
+      const result = await service.update('org-1', 'res-1', {
+        name: 'Updated',
+      });
+
+      expect(result.name).toBe('Updated');
+    });
+  });
+
+  describe('remove', () => {
+    it('should archive (INACTIVE) a resource', async () => {
+      mockPrismaService.resource.findUnique.mockResolvedValue({
+        id: 'res-1',
+        ownerOrganizationId: 'org-1',
+      });
+      mockPrismaService.resource.update.mockResolvedValue({
+        id: 'res-1',
+        status: 'INACTIVE',
+      });
+
+      const result = await service.remove('org-1', 'res-1');
+
+      expect(result.status).toBe('INACTIVE');
+    });
+  });
+
+  describe('uploadImage', () => {
+    it('should update the resource imageUrl', async () => {
+      mockPrismaService.resource.findUnique.mockResolvedValue({
+        id: 'res-1',
+        ownerOrganizationId: 'org-1',
+      });
+      mockPrismaService.resource.update.mockResolvedValue({
+        id: 'res-1',
+        imageUrl: 'http://example.com/image.png',
+      });
+
+      const result = await service.uploadImage(
+        'org-1',
+        'res-1',
+        'http://example.com/image.png',
+      );
+
+      expect(mockPrismaService.resource.update).toHaveBeenCalledWith({
+        where: { id: 'res-1' },
+        data: { imageUrl: 'http://example.com/image.png' },
+      });
+      expect(result.imageUrl).toBe('http://example.com/image.png');
+    });
+
+    it('should throw NotFoundException if resource not found or unauthorized', async () => {
+      mockPrismaService.resource.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.uploadImage('org-1', 'res-1', 'http://example.com/image.png'),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('upsertRating', () => {
+    it('should upsert a rating if user has access to the resource', async () => {
+      // Mock findOne for access check
+      jest.spyOn(service, 'findOne').mockResolvedValue({
+        id: 'res-1',
+        ownerOrganizationId: 'org-1',
+        allowedOrganizations: [],
+      } as unknown as Awaited<ReturnType<ResourcesService['findOne']>>);
+
+      const mockUpsertResult = { id: 'rating-1', rating: 5, comment: 'Great' };
+      mockPrismaService.resourceRating.upsert.mockResolvedValue(
+        mockUpsertResult,
+      );
+
+      const result = await service.upsertRating(
+        'org-1',
+        'res-1',
+        'user-1',
+        5,
+        'Great',
+      );
+
+      expect(result).toEqual(mockUpsertResult);
+      expect(mockPrismaService.resourceRating.upsert).toHaveBeenCalledWith({
+        where: { resourceId_userId: { resourceId: 'res-1', userId: 'user-1' } },
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        update: { rating: 5, comment: 'Great', createdAt: expect.any(Date) },
+        create: {
+          resourceId: 'res-1',
+          userId: 'user-1',
+          rating: 5,
+          comment: 'Great',
+        },
+      });
+    });
+
+    it('should throw if user does not have access', async () => {
+      jest
+        .spyOn(service, 'findOne')
+        .mockRejectedValue(new ForbiddenException());
+
+      await expect(
+        service.upsertRating('org-1', 'res-1', 'user-1', 5, 'Great'),
+      ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('getRatings', () => {
+    it('should return ratings and average', async () => {
+      jest.spyOn(service, 'findOne').mockResolvedValue({
+        id: 'res-1',
+        ownerOrganizationId: 'org-1',
+        allowedOrganizations: [],
+      } as unknown as Awaited<ReturnType<ResourcesService['findOne']>>);
+
+      const mockRatings = [{ rating: 4 }, { rating: 5 }];
+      mockPrismaService.resourceRating.findMany.mockResolvedValue(mockRatings);
+
+      const result = await service.getRatings('org-1', 'res-1');
+
+      expect(result.total).toBe(2);
+      expect(result.average).toBe(4.5);
+      expect(result.ratings).toEqual(mockRatings);
+      expect(mockPrismaService.resourceRating.findMany).toHaveBeenCalledWith({
+        where: { resourceId: 'res-1' },
+        orderBy: { createdAt: 'desc' },
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              avatarUrl: true,
+            },
+          },
+        },
+      });
+    });
+
+    it('should return 0 average if no ratings exist', async () => {
+      jest
+        .spyOn(service, 'findOne')
+        .mockResolvedValue(
+          {} as unknown as Awaited<ReturnType<ResourcesService['findOne']>>,
+        );
+      mockPrismaService.resourceRating.findMany.mockResolvedValue([]);
+
+      const result = await service.getRatings('org-1', 'res-1');
+
+      expect(result.total).toBe(0);
+      expect(result.average).toBe(0);
+    });
+  });
+});

@@ -34,9 +34,11 @@ type RequestState =
 export function MembershipRequestCard({
   organizationId,
   organizationName,
+  onMembershipCreated,
 }: {
   organizationId: string;
   organizationName: string;
+  onMembershipCreated?: (membership: Membership) => void;
 }) {
   const router = useRouter();
   const requestController = React.useRef<AbortController>(null);
@@ -60,6 +62,7 @@ export function MembershipRequestCard({
 
       if (!controller.signal.aborted) {
         setState({ status: "success", membership });
+        onMembershipCreated?.(membership);
       }
     } catch (requestError) {
       if (controller.signal.aborted) {

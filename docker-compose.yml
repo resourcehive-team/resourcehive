@@ -1,12 +1,45 @@
 name: resourcehive
 
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+  init: true
+  stop_grace_period: 30s
+
+x-kafka-client-environment: &kafka-client-environment
+  KAFKA_ENABLED: ${KAFKA_ENABLED:-true}
+  KAFKA_BROKERS: ${KAFKA_BROKERS}
+  KAFKA_SSL: ${KAFKA_SSL:-true}
+  KAFKA_SASL_USERNAME: ${KAFKA_SASL_USERNAME:-}
+  KAFKA_SASL_PASSWORD: ${KAFKA_SASL_PASSWORD:-}
+
 services:
-  api-gateway:
-    image: caddy:2-alpine
-    container_name: resourcehive-api-gateway
+  redis:
+    image: redis:7-alpine
+    hostname: redis
     restart: unless-stopped
     ports:
-      - "${API_PORT:-8000}:8000"
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api-gateway:
+    image: caddy:2-alpine
+    <<: *service-defaults
+    command:
+      - caddy
+      - run
+      - --config
+      - /etc/caddy/Caddyfile
+      - --adapter
+      - caddyfile
+      - --watch
+    ports:
+      - "${API_PORT:-8088}:8000"
     environment:
       API_DOMAIN: ${API_DOMAIN:-http://localhost:8000}
       ACME_EMAIL: ${ACME_EMAIL:-admin@localhost}
@@ -23,12 +56,12 @@ services:
         condition: service_healthy
 
   identity-service:
+    <<: *service-defaults
     build:
       context: .
       dockerfile: services/identity-service/Dockerfile
-    container_name: resourcehive-identity
-    restart: unless-stopped
     environment:
+      APP_DATABASE_URL: ${AUTH_DATABASE_URL}
       DATABASE_URL: ${DATABASE_URL}
       DATABASE_URL_UNPOOLED: ${DATABASE_URL_UNPOOLED}
       JWT_SECRET: ${JWT_SECRET}
@@ -37,71 +70,78 @@ services:
       PORT: 3000
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
       APP_URL: ${APP_URL:-http://localhost:3000}
+      GOOGLE_OAUTH_ENABLED: ${GOOGLE_OAUTH_ENABLED:-false}
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:-}
+      GOOGLE_OAUTH_CALLBACK_URL: ${GOOGLE_OAUTH_CALLBACK_URL:-http://localhost:8088/auth/google/callback}
       AUTH_COOKIE_DOMAIN: ${AUTH_COOKIE_DOMAIN:-}
       AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
       BCRYPT_ROUNDS: ${BCRYPT_ROUNDS:-12}
       EMAIL_VERIFICATION_TOKEN_EXPIRES_IN: ${EMAIL_VERIFICATION_TOKEN_EXPIRES_IN:-24h}
       PASSWORD_RESET_TOKEN_EXPIRES_IN: ${PASSWORD_RESET_TOKEN_EXPIRES_IN:-1h}
-      EMAIL_TRANSPORT: ${EMAIL_TRANSPORT:-console}
-      EMAIL_FROM: ${EMAIL_FROM:-ResourceHive <no-reply@resourcehive.local>}
-      SMTP_HOST: ${SMTP_HOST:-}
-      SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_SECURE: ${SMTP_SECURE:-false}
-      SMTP_USER: ${SMTP_USER:-}
-      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      <<: *kafka-client-environment
       NODE_ENV: development
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
     command: >-
-      sh -c "pnpm --filter @resourcehive/database exec prisma migrate deploy
-      --schema ../../db/schema/schema.prisma &&
-      exec pnpm --filter identity-service run start:prod"
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
+      sh -c "/migrator/node_modules/.bin/prisma migrate deploy
+      --schema /migrator/schema/schema.prisma &&
+      unset DATABASE_URL DATABASE_URL_UNPOOLED &&
+      exec node dist/main.js"
 
   resource-service:
+    <<: *service-defaults
     build:
       context: .
       dockerfile: services/resource-service/Dockerfile
-    container_name: resourcehive-resource
-    restart: unless-stopped
     environment:
-      DATABASE_URL: ${DATABASE_URL}
+      APP_DATABASE_URL: ${APP_DATABASE_URL}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN}
       JWT_SECRET: ${JWT_SECRET}
       PORT: 3004
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      <<: *kafka-client-environment
       NODE_ENV: development
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3004/health"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
 
   booking-service:
+    <<: *service-defaults
     build:
       context: .
       dockerfile: services/booking-service/Dockerfile
-    container_name: resourcehive-booking
-    restart: unless-stopped
     environment:
-      DATABASE_URL: ${DATABASE_URL}
+      APP_DATABASE_URL: ${APP_DATABASE_URL}
+      PLATFORM_REPORT_DATABASE_URL: ${PLATFORM_REPORT_DATABASE_URL}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN}
       JWT_SECRET: ${JWT_SECRET}
       PORT: 3002
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      <<: *kafka-client-environment
       NODE_ENV: development
 
   notification-service:
+    <<: *service-defaults
     build:
       context: .
       dockerfile: services/notification-service/Dockerfile
-    container_name: resourcehive-notification
-    restart: unless-stopped
     environment:
-      DATABASE_URL: ${DATABASE_URL}
+      APP_DATABASE_URL: ${APP_DATABASE_URL}
+      WORKER_DATABASE_URL: ${WORKER_DATABASE_URL}
       JWT_SECRET: ${JWT_SECRET}
       PORT: 3003
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
       NODE_ENV: development
+      <<: *kafka-client-environment
+      KAFKA_CLIENT_ID: notification-service
+      KAFKA_CONSUMER_GROUP: notification-service-v1
+      RESEND_ENABLED: ${RESEND_ENABLED:-false}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-}
+
+volumes:
+  redis_data:

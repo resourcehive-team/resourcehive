@@ -4,7 +4,7 @@ on:
   push:
     branches: ["dev"]
   pull_request:
-    branches: ["dev"]
+    branches: ["dev", "main"]
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -16,7 +16,12 @@ permissions:
 env:
   CI_DATABASE_URL: postgresql://postgres:password@localhost:5432/testdb?schema=public
   CI_TEST_DATABASE_URL: postgresql://postgres:password@localhost:5432/integritydb
+  CI_APP_DATABASE_URL: postgresql://resourcehive_app_login:ci-password@localhost:5432/testdb?schema=public
+  CI_AUTH_DATABASE_URL: postgresql://resourcehive_auth_login:ci-password@localhost:5432/testdb?schema=public
+  CI_WORKER_DATABASE_URL: postgresql://resourcehive_worker_login:ci-password@localhost:5432/testdb?schema=public
+  CI_PLATFORM_REPORT_DATABASE_URL: postgresql://resourcehive_platform_login:ci-password@localhost:5432/testdb?schema=public
   CI_JWT_SECRET: resourcehive-ci-secret-at-least-thirty-two-characters
+  CI_INTERNAL_SERVICE_TOKEN: resourcehive-ci-internal-service-token
 
 jobs:
   database:
@@ -48,7 +53,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: pnpm
 
       - name: Install dependencies
@@ -68,6 +73,34 @@ jobs:
         env:
           DATABASE_URL: ${{ env.CI_DATABASE_URL }}
           DATABASE_URL_UNPOOLED: ${{ env.CI_DATABASE_URL }}
+
+      - name: Create restricted CI runtime logins
+        run: psql "postgresql://postgres:password@localhost:5432/testdb" -v ON_ERROR_STOP=1 -f db/schema/tests/create-ci-roles.sql
+
+      - name: Build database client for RLS checks
+        run: pnpm --filter @resourcehive/database run build
+        env:
+          DATABASE_URL: ${{ env.CI_DATABASE_URL }}
+          DATABASE_URL_UNPOOLED: ${{ env.CI_DATABASE_URL }}
+
+      - name: Verify production database-role setup against restricted CI logins
+        run: pnpm --filter identity-service exec ts-node scripts/setup-runtime-roles.ts
+        env:
+          DATABASE_URL_UNPOOLED: ${{ env.CI_DATABASE_URL }}
+          APP_DATABASE_URL: ${{ env.CI_APP_DATABASE_URL }}
+          AUTH_DATABASE_URL: ${{ env.CI_AUTH_DATABASE_URL }}
+          WORKER_DATABASE_URL: ${{ env.CI_WORKER_DATABASE_URL }}
+          PLATFORM_REPORT_DATABASE_URL: ${{ env.CI_PLATFORM_REPORT_DATABASE_URL }}
+
+      - name: Verify university isolation, email rules, and join bonuses with restricted roles
+        run: node db/schema/tests/rls-test.cjs
+        env:
+          DATABASE_URL: ${{ env.CI_DATABASE_URL }}
+          CI_OWNER_DATABASE_URL: ${{ env.CI_DATABASE_URL }}
+          APP_DATABASE_URL: ${{ env.CI_APP_DATABASE_URL }}
+          AUTH_DATABASE_URL: ${{ env.CI_AUTH_DATABASE_URL }}
+          WORKER_DATABASE_URL: ${{ env.CI_WORKER_DATABASE_URL }}
+          PLATFORM_REPORT_DATABASE_URL: ${{ env.CI_PLATFORM_REPORT_DATABASE_URL }}
 
       - name: Create disposable integrity-test database
         run: createdb --host localhost --username postgres integritydb
@@ -94,7 +127,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: pnpm
 
       - name: Install dependencies
@@ -115,6 +148,12 @@ jobs:
       - name: Build shared authentication package
         run: pnpm --filter @resourcehive/service-auth run build
 
+      - name: Check shared notification client
+        run: |
+          pnpm --filter @resourcehive/notification-client run lint
+          pnpm --filter @resourcehive/notification-client run test
+          pnpm --filter @resourcehive/notification-client run build
+
       - name: Lint frontend
         run: pnpm --filter frontend run lint
 
@@ -128,7 +167,7 @@ jobs:
         run: pnpm --filter frontend run build
         env:
           JWT_SECRET: ${{ env.CI_JWT_SECRET }}
-          NEXT_PUBLIC_API_URL: http://localhost:8000
+          NEXT_PUBLIC_API_URL: http://localhost:8088
 
   services:
     name: ${{ matrix.label }} quality
@@ -161,7 +200,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: pnpm
 
       - name: Install dependencies
@@ -171,6 +210,7 @@ jobs:
         run: |
           pnpm --filter @resourcehive/database run build
           pnpm --filter @resourcehive/service-auth run build
+          pnpm --filter @resourcehive/notification-client run build
         env:
           DATABASE_URL: ${{ env.CI_DATABASE_URL }}
           DATABASE_URL_UNPOOLED: ${{ env.CI_DATABASE_URL }}
@@ -207,6 +247,11 @@ jobs:
       DATABASE_URL: postgresql://postgres:password@localhost:5432/testdb?schema=public
       DATABASE_URL_UNPOOLED: postgresql://postgres:password@localhost:5432/testdb?schema=public
       TEST_DATABASE_URL: postgresql://postgres:password@localhost:5432/testdb?schema=public
+      APP_DATABASE_URL: postgresql://resourcehive_app_login:ci-password@localhost:5432/testdb?schema=public
+      AUTH_DATABASE_URL: postgresql://resourcehive_auth_login:ci-password@localhost:5432/testdb?schema=public
+      WORKER_DATABASE_URL: postgresql://resourcehive_worker_login:ci-password@localhost:5432/testdb?schema=public
+      PLATFORM_REPORT_DATABASE_URL: postgresql://resourcehive_platform_login:ci-password@localhost:5432/testdb?schema=public
+      INTERNAL_SERVICE_TOKEN: resourcehive-ci-internal-service-token
       JWT_SECRET: resourcehive-ci-secret-at-least-thirty-two-characters
       BCRYPT_ROUNDS: "4"
 
@@ -220,7 +265,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: pnpm
 
       - name: Install dependencies
@@ -229,34 +274,59 @@ jobs:
       - name: Initialize test database and shared packages
         run: |
           pnpm run db:init
+          psql "postgresql://postgres:password@localhost:5432/testdb" -v ON_ERROR_STOP=1 -f db/schema/tests/create-ci-roles.sql
           pnpm --filter @resourcehive/service-auth run build
+          pnpm --filter @resourcehive/notification-client run build
 
       - name: Seed integration fixtures
         run: pnpm run db:seed:demo
 
       - name: Run Identity Service e2e tests
         run: pnpm --filter identity-service run test:e2e
+        env:
+          APP_DATABASE_URL: ${{ env.CI_AUTH_DATABASE_URL }}
 
-      - name: Run Resource Service e2e tests
+      - name: Run Resource Service e2e tests, including child organization and email rules
         run: pnpm --filter resource-service run test:e2e
 
       - name: Run Booking Service e2e tests
         run: pnpm --filter booking-service run test:e2e
 
       - name: Run Booking Service integration tests
-        run: pnpm --filter booking-service run test:integration
+        run: pnpm --filter booking-service run test:integration --testPathIgnorePatterns dispute-routing.integration-spec.ts
+        env:
+          APP_DATABASE_URL: ${{ env.CI_DATABASE_URL }}
+
+      - name: Run dispute routing integration tests with restricted credentials
+        run: pnpm --filter booking-service run test:integration --runTestsByPath test/integration/dispute-routing.integration-spec.ts
+        env:
+          APP_DATABASE_URL: ${{ env.CI_APP_DATABASE_URL }}
 
       - name: Run Booking Service concurrency tests
         run: pnpm --filter booking-service run test:concurrency
+        env:
+          APP_DATABASE_URL: ${{ env.CI_DATABASE_URL }}
 
       - name: Run Notification Service e2e tests
         run: pnpm --filter notification-service run test:e2e
 
       - name: Run Notification Service integration tests
         run: pnpm --filter notification-service run test:integration
+        env:
+          APP_DATABASE_URL: ${{ env.CI_DATABASE_URL }}
 
       - name: Run Notification Service concurrency tests
         run: pnpm --filter notification-service run test:concurrency
+        env:
+          APP_DATABASE_URL: ${{ env.CI_DATABASE_URL }}
+
+      - name: Seed the presentation dataset and verify its repeat guard
+        run: |
+          pnpm run db:seed:university
+          pnpm run db:seed:university
+        env:
+          DATABASE_URL: ${{ env.CI_DATABASE_URL }}
+          DATABASE_URL_UNPOOLED: ${{ env.CI_DATABASE_URL }}
 
   infrastructure:
     name: Deployment configuration
@@ -271,11 +341,24 @@ jobs:
       - name: Validate Docker Compose configurations
         run: |
           docker compose config --quiet
+          docker compose -f docker-compose.yml -f docker-compose.fcm.yml config --quiet
           docker compose --env-file .env.production.example -f docker-compose.prod.yml config --quiet
         env:
           DATABASE_URL: ${{ env.CI_DATABASE_URL }}
           DATABASE_URL_UNPOOLED: ${{ env.CI_DATABASE_URL }}
+          APP_DATABASE_URL: ${{ env.CI_APP_DATABASE_URL }}
+          AUTH_DATABASE_URL: ${{ env.CI_AUTH_DATABASE_URL }}
+          WORKER_DATABASE_URL: ${{ env.CI_WORKER_DATABASE_URL }}
+          PLATFORM_REPORT_DATABASE_URL: ${{ env.CI_PLATFORM_REPORT_DATABASE_URL }}
+          INTERNAL_SERVICE_TOKEN: ${{ env.CI_INTERNAL_SERVICE_TOKEN }}
+          FIREBASE_PROJECT_ID: resourcehive-ci
+          GOOGLE_APPLICATION_CREDENTIALS: .env.example
           JWT_SECRET: ${{ env.CI_JWT_SECRET }}
+          KAFKA_ENABLED: "false"
+          KAFKA_BROKERS: kafka.invalid:9093
+          KAFKA_SSL: "true"
+          KAFKA_SASL_USERNAME: ci-config-check
+          KAFKA_SASL_PASSWORD: ci-config-check
 
       - name: Validate Caddy configuration
         run: >-
@@ -285,10 +368,52 @@ jobs:
           --volume "$PWD/services/api-gateway/Caddyfile:/etc/caddy/Caddyfile:ro"
           caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile
 
+      - name: Smoke-test API gateway service routing
+        run: bash services/api-gateway/tests/routing-smoke.sh
+
+  containers:
+    name: Build ${{ matrix.label }} image
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: Identity Service
+            dockerfile: services/identity-service/Dockerfile
+          - label: Resource Service
+            dockerfile: services/resource-service/Dockerfile
+          - label: Booking Service
+            dockerfile: services/booking-service/Dockerfile
+          - label: Notification Service
+            dockerfile: services/notification-service/Dockerfile
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: false
+
   ci-success:
     name: CI success
     if: always()
-    needs: [database, shared-and-frontend, services, integration, infrastructure]
+    needs:
+      [
+        database,
+        shared-and-frontend,
+        services,
+        integration,
+        infrastructure,
+        containers,
+      ]
     runs-on: ubuntu-latest
     timeout-minutes: 2
 
@@ -301,6 +426,7 @@ jobs:
           SERVICES_RESULT: ${{ needs.services.result }}
           INTEGRATION_RESULT: ${{ needs.integration.result }}
           INFRASTRUCTURE_RESULT: ${{ needs.infrastructure.result }}
+          CONTAINERS_RESULT: ${{ needs.containers.result }}
         run: |
           failed=0
 
@@ -309,7 +435,8 @@ jobs:
             "$FRONTEND_RESULT" \
             "$SERVICES_RESULT" \
             "$INTEGRATION_RESULT" \
-            "$INFRASTRUCTURE_RESULT"; do
+            "$INFRASTRUCTURE_RESULT" \
+            "$CONTAINERS_RESULT"; do
             if [[ "$result" != "success" ]]; then
               failed=1
             fi

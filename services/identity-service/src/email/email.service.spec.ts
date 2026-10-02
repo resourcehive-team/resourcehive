@@ -1,16 +1,16 @@
-import { InternalServerErrorException } from '@nestjs/common';
-import nodemailer from 'nodemailer';
+import { NotificationClientService } from '@resourcehive/notification-client';
 import { EmailService } from './email.service';
 
-jest.mock('nodemailer', () => ({
-  __esModule: true,
-  default: {
-    createTransport: jest.fn(),
-  },
-}));
-
 describe('EmailService', () => {
-  const service = new EmailService();
+  const sendVerificationEmail = jest.fn();
+  const sendPasswordResetEmail = jest.fn();
+  const sendPasswordChangedEmail = jest.fn();
+  const notifications = {
+    sendVerificationEmail,
+    sendPasswordResetEmail,
+    sendPasswordChangedEmail,
+  } as unknown as NotificationClientService;
+  const service = new EmailService(notifications);
   const originalEnvironment = { ...process.env };
 
   afterEach(() => {
@@ -18,91 +18,73 @@ describe('EmailService', () => {
     jest.clearAllMocks();
   });
 
-  it('returns the verification link when using the console transport', async () => {
-    process.env.EMAIL_TRANSPORT = 'console';
+  it('publishes verification email and returns the link in development', async () => {
+    process.env.NODE_ENV = 'development';
     process.env.APP_URL = 'http://localhost:3000';
+    sendVerificationEmail.mockResolvedValue({});
 
     await expect(
-      service.sendVerificationEmail('alex@example.edu', 'verification-token'),
+      service.sendVerificationEmail(
+        '11111111-1111-4111-8111-111111111111',
+        'alex@example.edu',
+        'verification-token',
+      ),
     ).resolves.toEqual({
       developmentVerificationUrl:
         'http://localhost:3000/verify-email?token=verification-token',
     });
-    expect(nodemailer.createTransport).not.toHaveBeenCalled();
+    expect(sendVerificationEmail).toHaveBeenCalledWith({
+      recipientUserId: '11111111-1111-4111-8111-111111111111',
+      email: 'alex@example.edu',
+      verificationUrl:
+        'http://localhost:3000/verify-email?token=verification-token',
+      correlationId: '11111111-1111-4111-8111-111111111111',
+    });
   });
 
-  it('sends the verification link through SMTP without returning it', async () => {
-    const sendMail = jest
-      .fn<
-        Promise<{ messageId: string }>,
-        [{ to: string; text: string; subject?: string; from?: string }]
-      >()
-      .mockResolvedValue({ messageId: 'message-id' });
-    (nodemailer.createTransport as jest.Mock).mockReturnValue({ sendMail });
-    process.env.EMAIL_TRANSPORT = 'smtp';
+  it('does not expose the verification link in production', async () => {
+    process.env.NODE_ENV = 'production';
     process.env.APP_URL = 'https://resourcehive.example';
-    process.env.SMTP_HOST = 'smtp.example';
-    process.env.SMTP_PORT = '587';
-    process.env.SMTP_USER = 'smtp-user';
-    process.env.SMTP_PASSWORD = 'smtp-password';
+    sendVerificationEmail.mockResolvedValue({});
 
     await expect(
-      service.sendVerificationEmail('alex@example.edu', 'verification-token'),
+      service.sendVerificationEmail(
+        '11111111-1111-4111-8111-111111111111',
+        'alex@example.edu',
+        'verification-token',
+      ),
     ).resolves.toEqual({});
-    const message = sendMail.mock.calls[0][0] as {
-      to: string;
-      text: string;
-    };
-    expect(message.to).toBe('alex@example.edu');
-    expect(message.text).toContain(
-      'https://resourcehive.example/verify-email?token=verification-token',
-    );
   });
 
-  it('prints a trusted frontend password reset link for local development', async () => {
-    process.env.EMAIL_TRANSPORT = 'console';
+  it('publishes a password reset command with a trusted frontend link', async () => {
     process.env.APP_URL = 'http://localhost:3000';
 
     await expect(
-      service.sendPasswordResetEmail('alex@example.edu', 'reset-token'),
+      service.sendPasswordResetEmail(
+        '11111111-1111-4111-8111-111111111111',
+        'alex@example.edu',
+        'reset-token',
+      ),
     ).resolves.toBeUndefined();
-    expect(nodemailer.createTransport).not.toHaveBeenCalled();
+    expect(sendPasswordResetEmail).toHaveBeenCalledWith({
+      recipientUserId: '11111111-1111-4111-8111-111111111111',
+      email: 'alex@example.edu',
+      resetUrl: 'http://localhost:3000/reset-password?token=reset-token',
+      correlationId: '11111111-1111-4111-8111-111111111111',
+    });
   });
 
-  it('sends password reset and password changed messages through SMTP', async () => {
-    const sendMail = jest
-      .fn<
-        Promise<{ messageId: string }>,
-        [{ to: string; text: string; subject?: string; from?: string }]
-      >()
-      .mockResolvedValue({ messageId: 'message-id' });
-    (nodemailer.createTransport as jest.Mock).mockReturnValue({ sendMail });
-    process.env.EMAIL_TRANSPORT = 'smtp';
-    process.env.APP_URL = 'https://resourcehive.example';
-    process.env.SMTP_HOST = 'smtp.example';
-    process.env.SMTP_PORT = '587';
-
-    await service.sendPasswordResetEmail('alex@example.edu', 'reset-token');
-    await service.sendPasswordChangedEmail('alex@example.edu');
-
-    const resetMessage = sendMail.mock.calls[0][0];
-    expect(resetMessage.to).toBe('alex@example.edu');
-    expect(resetMessage.subject).toBe('Reset your ResourceHive password');
-    expect(resetMessage.text).toContain(
-      'https://resourcehive.example/reset-password?token=reset-token',
-    );
-    const changedMessage = sendMail.mock.calls[1][0];
-    expect(changedMessage.to).toBe('alex@example.edu');
-    expect(changedMessage.subject).toBe(
-      'Your ResourceHive password was changed',
-    );
-  });
-
-  it('rejects an unsupported email transport', async () => {
-    process.env.EMAIL_TRANSPORT = 'unknown';
-
+  it('publishes password changed confirmation through Notification Service', async () => {
     await expect(
-      service.sendVerificationEmail('alex@example.edu', 'verification-token'),
-    ).rejects.toBeInstanceOf(InternalServerErrorException);
+      service.sendPasswordChangedEmail(
+        '11111111-1111-4111-8111-111111111111',
+        'alex@example.edu',
+      ),
+    ).resolves.toBeUndefined();
+    expect(sendPasswordChangedEmail).toHaveBeenCalledWith({
+      recipientUserId: '11111111-1111-4111-8111-111111111111',
+      email: 'alex@example.edu',
+      correlationId: '11111111-1111-4111-8111-111111111111',
+    });
   });
 });

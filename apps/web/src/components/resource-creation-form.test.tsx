@@ -96,7 +96,10 @@ const adminMembership: MembershipWithOrganization = {
   role: "ADMIN",
   status: "APPROVED",
   joinedAt: "2026-07-01T00:00:00.000Z",
-  approvedBy: "root-admin",
+  reviewedBy: "root-admin",
+  reviewedAt: "2026-07-01T00:00:00.000Z",
+  reviewNote: null,
+  latestAudit: null,
   organization: engineeringOrganization,
 };
 
@@ -109,8 +112,10 @@ const createdResource: Resource = {
   createdByUserId: "admin-user",
   status: "ACTIVE",
   pointCost: 25,
+  cancellationNoticeMinutes: 0,
   createdAt: "2026-08-04T00:00:00.000Z",
-  allowedOrganizations: [],
+  imageUrl: null,
+      allowedOrganizations: [],
 };
 
 describe("ResourceCreationForm", () => {
@@ -150,6 +155,13 @@ describe("ResourceCreationForm", () => {
     fireEvent.change(screen.getByRole("spinbutton", { name: /Point cost/ }), {
       target: { value: "25" },
     });
+    fireEvent.change(
+      screen.getByRole("spinbutton", { name: "Minutes" }),
+      { target: { value: "0" } },
+    );
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Hours" }), {
+      target: { value: "1" },
+    });
     fireEvent.click(
       screen.getByRole("checkbox", {
         name: "Department of Computer Science",
@@ -164,6 +176,7 @@ describe("ResourceCreationForm", () => {
         name: "Robotics Lab",
         description: "Shared robotics equipment.",
         pointCost: 25,
+        cancellationNoticeMinutes: 60,
         allowedOrganizationIds: [
           engineeringOrganization.id,
           computingOrganization.id,

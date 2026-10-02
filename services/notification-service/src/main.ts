@@ -1,10 +1,15 @@
 import { ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
-import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
+import { MicroserviceOptions } from "@nestjs/microservices";
 import { AppModule } from "./app.module";
+import { getNotificationKafkaConfig } from "./kafka/kafka.config";
+import { setupNotificationSwagger } from "./swagger";
+import { UniversityContextInterceptor } from "@resourcehive/database";
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
+  app.enableShutdownHooks();
+  app.useGlobalInterceptors(new UniversityContextInterceptor());
   const allowedOrigins = (process.env.CORS_ORIGINS ?? "http://localhost:3000")
     .split(",")
     .map((origin) => origin.trim())
@@ -22,17 +27,13 @@ async function bootstrap(): Promise<void> {
     }),
   );
 
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle("ResourceHive Notification Service")
-    .setDescription("Persistent, real-time, and fallback notification APIs")
-    .setVersion("0.1")
-    .addBearerAuth()
-    .build();
-  SwaggerModule.setup(
-    "docs",
-    app,
-    SwaggerModule.createDocument(app, swaggerConfig),
-  );
+  setupNotificationSwagger(app);
+
+  const kafka = getNotificationKafkaConfig();
+  if (kafka.enabled) {
+    app.connectMicroservice<MicroserviceOptions>(kafka.options);
+    await app.startAllMicroservices();
+  }
 
   await app.listen(Number(process.env.PORT ?? 3003), "0.0.0.0");
 }

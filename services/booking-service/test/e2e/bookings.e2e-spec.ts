@@ -1,34 +1,39 @@
 import { INestApplication, ValidationPipe } from "@nestjs/common";
+import { CACHE_MANAGER, CacheModule } from "@nestjs/cache-manager";
 import { Test } from "@nestjs/testing";
 import { JwtAuthGuard } from "@resourcehive/service-auth";
 import request from "supertest";
 import { App } from "supertest/types";
-import { BookingCancellationService } from "../../src/bookings/booking-cancellation.service";
-import { BookingCompletionService } from "../../src/bookings/booking-completion.service";
-import { BookingCreationService } from "../../src/bookings/booking-creation.service";
-import { BookingReadService } from "../../src/bookings/booking-read.service";
+import { BookingService } from "../../src/bookings/booking.service";
 import { BookingsController } from "../../src/bookings/bookings.controller";
 
 describe("BookingsController (e2e)", () => {
   let app: INestApplication<App>;
-  const create = jest.fn();
+  const createBooking = jest.fn();
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
+      imports: [CacheModule.register()],
       controllers: [BookingsController],
       providers: [
-        { provide: BookingCreationService, useValue: { create } },
         {
-          provide: BookingCompletionService,
-          useValue: { complete: jest.fn() },
+          provide: BookingService,
+          useValue: {
+            createBooking,
+            completeBooking: jest.fn(),
+            cancelBooking: jest.fn(),
+            getUserBookings: jest.fn(),
+            getOrgBookings: jest.fn(),
+          },
         },
         {
-          provide: BookingCancellationService,
-          useValue: { cancel: jest.fn() },
-        },
-        {
-          provide: BookingReadService,
-          useValue: { getUserBookings: jest.fn(), getOrgBookings: jest.fn() },
+          provide: CACHE_MANAGER,
+          useValue: {
+            get: jest.fn(),
+            set: jest.fn(),
+            del: jest.fn(),
+            clear: jest.fn(),
+          },
         },
       ],
     })
@@ -41,6 +46,7 @@ describe("BookingsController (e2e)", () => {
             userId: "user-id",
             email: "user@example.edu",
             organizationId: "organization-id",
+            rootOrganizationId: "university-id",
             role: "member",
           };
           return true;
@@ -56,11 +62,11 @@ describe("BookingsController (e2e)", () => {
   });
 
   beforeEach(() => {
-    create.mockReset();
+    createBooking.mockReset();
   });
 
   it("creates a booking from only the slot identifier", async () => {
-    create.mockResolvedValue({
+    createBooking.mockResolvedValue({
       id: "booking-id",
       resourceSlotId: "1ce65168-e330-4a82-a95b-72b25e761999",
       resourceId: "resource-id",
@@ -84,7 +90,7 @@ describe("BookingsController (e2e)", () => {
           pointsDeducted: 25,
         });
       });
-    expect(create).toHaveBeenCalledWith(
+    expect(createBooking).toHaveBeenCalledWith(
       "1ce65168-e330-4a82-a95b-72b25e761999",
       expect.objectContaining({ userId: "user-id" }),
     );
@@ -95,7 +101,7 @@ describe("BookingsController (e2e)", () => {
       .post("/bookings")
       .send({ resourceSlotId: "not-a-uuid", pointCost: 0 })
       .expect(400);
-    expect(create).not.toHaveBeenCalled();
+    expect(createBooking).not.toHaveBeenCalled();
   });
 
   afterAll(async () => {

@@ -5,6 +5,7 @@ import {
 } from "@nestjs/common";
 import { AuthenticatedUser } from "@resourcehive/service-auth";
 import { ListNotificationsDto } from "./dto/list-notifications.dto";
+import { RegisterWebPushDto } from "./dto/register-web-push.dto";
 import { NotificationRepository } from "./notification.repository";
 import { NotificationRecord, NotificationView } from "./notification.types";
 
@@ -19,6 +20,7 @@ export class NotificationReadService {
     await this.assertActive(user.userId);
     const notifications = await this.repository.findManyForUser({
       userId: user.userId,
+      rootOrganizationId: this.requireRoot(user),
       ...query,
     });
     return notifications.map((notification) => this.toView(notification));
@@ -32,6 +34,7 @@ export class NotificationReadService {
     const notification = await this.repository.findByIdForUser({
       notificationId,
       userId: user.userId,
+      rootOrganizationId: this.requireRoot(user),
     });
     if (!notification) throw new NotFoundException("Notification not found");
     return this.toView(notification);
@@ -45,6 +48,21 @@ export class NotificationReadService {
     const notification = await this.repository.markReadForUser({
       notificationId,
       userId: user.userId,
+      rootOrganizationId: this.requireRoot(user),
+    });
+    if (!notification) throw new NotFoundException("Notification not found");
+    return this.toView(notification);
+  }
+
+  async markUnread(
+    notificationId: string,
+    user: AuthenticatedUser,
+  ): Promise<NotificationView> {
+    await this.assertActive(user.userId);
+    const notification = await this.repository.markUnreadForUser({
+      notificationId,
+      userId: user.userId,
+      rootOrganizationId: this.requireRoot(user),
     });
     if (!notification) throw new NotFoundException("Notification not found");
     return this.toView(notification);
@@ -55,14 +73,55 @@ export class NotificationReadService {
   ): Promise<{ updatedCount: number }> {
     await this.assertActive(user.userId);
     return {
-      updatedCount: await this.repository.markAllReadForUser(user.userId),
+      updatedCount: await this.repository.markAllReadForUser(
+        user.userId,
+        this.requireRoot(user),
+      ),
     };
+  }
+
+  async registerWebPush(user: AuthenticatedUser, input: RegisterWebPushDto) {
+    await this.assertActive(user.userId);
+    return this.subscriptionView(
+      await this.repository.registerWebPush(
+        user.userId,
+        this.requireRoot(user),
+        input.token.trim(),
+      ),
+    );
+  }
+
+  async listWebPush(user: AuthenticatedUser) {
+    await this.assertActive(user.userId);
+    return (
+      await this.repository.listWebPush(user.userId, this.requireRoot(user))
+    ).map((subscription) => this.subscriptionView(subscription));
+  }
+
+  async removeWebPush(id: string, user: AuthenticatedUser) {
+    await this.assertActive(user.userId);
+    if (
+      !(await this.repository.removeWebPush(
+        id,
+        user.userId,
+        this.requireRoot(user),
+      ))
+    ) {
+      throw new NotFoundException("Web push subscription not found");
+    }
+    return { removed: true };
   }
 
   private async assertActive(userId: string): Promise<void> {
     if (!(await this.repository.isActiveUser(userId))) {
       throw new UnauthorizedException("An active account is required");
     }
+  }
+
+  private requireRoot(user: AuthenticatedUser): string {
+    if (!user.rootOrganizationId)
+      throw new UnauthorizedException("Select a university first");
+    return user.rootOrganizationId;
   }
 
   private toView(notification: NotificationRecord): NotificationView {
@@ -73,6 +132,18 @@ export class NotificationReadService {
       message: notification.message,
       readAt: notification.readAt,
       createdAt: notification.createdAt,
+    };
+  }
+
+  private subscriptionView(subscription: {
+    id: string;
+    active: boolean;
+    updatedAt: Date;
+  }) {
+    return {
+      id: subscription.id,
+      active: subscription.active,
+      updatedAt: subscription.updatedAt,
     };
   }
 }

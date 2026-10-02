@@ -37,6 +37,7 @@ describe("Booking slot availability (e2e)", () => {
           userId: "00000000-0000-4000-8000-000000000003",
           email: "user@example.edu",
           organizationId: "00000000-0000-4000-8000-000000000002",
+          rootOrganizationId: "00000000-0000-4000-8000-000000000002",
           role: "member",
         };
         return true;

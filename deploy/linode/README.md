@@ -27,8 +27,10 @@ A push to `main` triggers the backend deployment workflow. It:
 3. copies `docker-compose.prod.yml` and the Caddyfile to the Linode;
 4. logs the Linode in to GHCR;
 5. pulls the prebuilt images;
-6. runs committed Prisma migrations against Neon;
-7. starts the services and waits for their health checks.
+6. applies committed Prisma migrations against Neon;
+7. creates and verifies four dedicated runtime login roles with RLS bypass disabled;
+8. runs the one-time Moratuwa and SLIIT presentation seed;
+9. starts Redis, all four backend services, and Caddy, then checks the public API.
 
 The server needs a one-time bootstrap before this automation can work.
 
@@ -77,8 +79,26 @@ Generate the JWT secret with:
 openssl rand -base64 48
 ```
 
-Use Neon's pooled connection for `DATABASE_URL` and its direct connection for
-`DATABASE_URL_UNPOOLED`. If only one connection is available, use it for both.
+Use Neon's pooled connection for `DATABASE_URL` and its direct owner connection
+for `DATABASE_URL_UNPOOLED`. The four runtime URLs must use the dedicated login
+names shown in `.env.production.example`; GitHub Actions creates those roles
+from the usernames and passwords in those URLs, grants each role its existing
+database capability, and verifies that all four logins cannot bypass RLS.
+Use the same Neon project, database, and unique login passwords in every URL.
+
+Complete every required placeholder in `.env.production.example` before you
+merge into `main`. The deployment stops before starting the app when required
+values are missing. Resend, Kafka, Cloudinary, API and application domains,
+database connections, JWT secret, CORS origin, and internal service token are
+required. Google OAuth requires its client ID, secret, and exact callback URL
+when enabled. Add `FIREBASE_SERVICE_ACCOUNT_JSON` to the GitHub production
+environment only when enabling FCM; the deploy script checks that the protected
+credential is present and mode `600`. Keep `FCM_ENABLED=false` otherwise.
+
+Generate independent application and service secrets with
+`openssl rand -base64 48`. Cloudinary, Resend, and Kafka values come from their
+respective service dashboards. Do not commit `.env.production` or send its
+values to GitHub as repository variables.
 
 Because the Linode has 2 GB RAM, a 1 GB swap file provides emergency headroom:
 
@@ -149,11 +169,30 @@ cannot be deployed from this monorepo until that application exists.
 
 ## First and later deployments
 
-After DNS, the server env file, and GitHub secrets are ready, open a pull request
-from `dev` into `main`. Merging that pull request starts the production backend
-deployment.
+After DNS, the server env file, GitHub production environment secrets, and the
+GHCR/SSH configuration are ready, open a pull request from `dev` into `main`.
+CI now runs on that promotion PR. Merge it after the checks pass; the push to
+`main` starts the production backend deployment automatically. Vercel continues
+its existing automatic web deployment.
 
-No SSH session is normally required for later deployments.
+The first successful production seed removes the exact older built-in demo
+tenant and accounts, creates Moratuwa and SLIIT, and records that the
+presentation dataset has been installed. Later automatic deployments retain
+presentation changes and only run migrations and service updates. Seeded demo
+accounts use the passwords in
+[`university-demo-accounts.md`](../../docs/university-demo-accounts.md).
+
+No SSH session is normally required for later deployments. To manually recover
+the latest published `main` release after checking or updating the server ENV:
+
+```bash
+cd ~/resourcehive
+bash ./deploy.sh
+```
+
+The recovery command reads `IMAGE_TAG` from `.env.production` and repeats the
+migration, restricted-role verification, one-time seed check, service startup,
+and public health check without printing database credentials.
 
 ## Verify and troubleshoot
 

@@ -46,6 +46,7 @@ describe("resource API", () => {
           name: "Electronics Lab",
           description: "Shared equipment",
           pointCost: 25,
+          cancellationNoticeMinutes: 0,
           allowedOrganizationIds: [
             "organization/one",
             "organization/two",
@@ -66,6 +67,16 @@ describe("resource API", () => {
       "fractional point cost",
       { name: "Lab", pointCost: 1.5 },
       "Point cost must be a non-negative integer.",
+    ],
+    [
+      "negative cancellation notice",
+      { name: "Lab", cancellationNoticeMinutes: -1 },
+      "Cancellation notice must be a non-negative integer.",
+    ],
+    [
+      "fractional cancellation notice",
+      { name: "Lab", cancellationNoticeMinutes: 1.5 },
+      "Cancellation notice must be a non-negative integer.",
     ],
   ])("rejects an invalid create request with %s", (_name, input, message) => {
     expect(() => createResource("organization-id", input)).toThrow(message);

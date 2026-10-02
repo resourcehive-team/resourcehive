@@ -1,12 +1,22 @@
 import { ServiceUnavailableException } from "@nestjs/common";
 import { PrismaService } from "@resourcehive/database";
+import { NotificationConfigurationService } from "../config/notification-configuration.service";
 import { HealthService } from "./health.service";
 
 describe("HealthService", () => {
   const queryRaw = jest.fn();
-  const service = new HealthService({
-    $queryRaw: queryRaw,
-  } as unknown as PrismaService);
+  const service = new HealthService(
+    {
+      $queryRaw: queryRaw,
+    } as unknown as PrismaService,
+    {
+      modes: () => ({
+        kafka: "disabled",
+        email: "console",
+        push: "console",
+      }),
+    } as NotificationConfigurationService,
+  );
 
   beforeEach(() => queryRaw.mockReset());
 
@@ -17,6 +27,11 @@ describe("HealthService", () => {
       service: "notification-service",
       status: "ok",
       database: "connected",
+      providers: {
+        kafka: "disabled",
+        email: "console",
+        push: "console",
+      },
     });
   });
 

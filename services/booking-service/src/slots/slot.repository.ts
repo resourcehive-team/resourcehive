@@ -15,6 +15,8 @@ const resourceSelection = {
   rootOrganizationId: true,
   ownerOrganizationId: true,
   pointCost: true,
+  cancellationNoticeMinutes: true,
+  allowedOrganizations: { select: { organizationId: true } },
 } satisfies Prisma.ResourceSelect;
 
 const slotWithResource = {
@@ -85,6 +87,7 @@ export class SlotRepository {
         return transaction.resourceSlot.create({
           data: {
             resourceId: resource.id,
+            rootOrganizationId: input.rootOrganizationId,
             startsAt: input.startsAt,
             endsAt: input.endsAt,
           },

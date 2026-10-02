@@ -1,0 +1,23 @@
+services:
+  k6:
+    image: grafana/k6:2.3.0
+    profiles: ["perf"]
+    entrypoint: ["k6"]
+    command:
+      - run
+      - --summary-export=/results/${PERF_RUN_NAME:-latest-summary}.json
+      - /scripts/suite.js
+    environment:
+      PERF_BASE_URL: http://api-gateway:8000
+      PERF_USER_COUNT: ${PERF_USER_COUNT:-100}
+      PERF_USER_PASSWORD: ${PERF_USER_PASSWORD:-PerfOnly-1024!}
+      PERF_VUS: ${PERF_VUS:-10}
+      PERF_RAMP: ${PERF_RAMP:-30s}
+      PERF_DURATION: ${PERF_DURATION:-2m}
+      PERF_ORGANIZATION_IDS: ${PERF_ORGANIZATION_IDS:-f0000000-0000-4000-8000-000000000001,f0000000-0000-4000-8000-000000000002}
+    volumes:
+      - ./perf/k6:/scripts:ro
+      - ./perf/results:/results
+    depends_on:
+      api-gateway:
+        condition: service_started

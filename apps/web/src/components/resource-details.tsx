@@ -2,7 +2,9 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Building2Icon, CalendarDaysIcon, PackageIcon } from "lucide-react";
+import Link from "next/link";
+import { Building2Icon, CalendarDaysIcon, PackageIcon, PencilIcon } from "lucide-react";
+
 
 import {
   BookingHistory,
@@ -10,9 +12,11 @@ import {
 } from "@/components/booking-history";
 import { RequestErrorCard } from "@/components/request-error-card";
 import { ResourceBookingDialog } from "@/components/resource-booking-dialog";
+import { ResourceRatingsList } from "@/components/resource-ratings";
 import { ResourceSlotCreationDialog } from "@/components/resource-slot-creation-dialog";
 import { ScreenHeading } from "@/components/screen-heading";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ApiAuthenticationError } from "@/lib/api-client";
 import { getOrganizationBookings } from "@/lib/booking-service/booking-api";
@@ -28,6 +32,7 @@ import type {
   MembershipWithOrganization,
   ResourceDetails as ResourceDetailsData,
 } from "@/lib/resource-service/types";
+import { useBookingRealtime } from "@/hooks/use-booking-realtime";
 
 type ResourceState =
   | { status: "loading" }
@@ -115,11 +120,26 @@ export function ResourceDetails({
               resourceId={resource.id}
               resourceName={resource.name}
             />
+            <ProtectedEditResourceLink
+              ownerOrganizationId={resource.ownerOrganizationId}
+              resourceId={resource.id}
+              organizationId={organizationId}
+            />
           </div>
         }
       />
       <section className="grid gap-px border border-line bg-line lg:grid-cols-12">
-        <article className="bg-paper-alt p-5 lg:col-span-8 lg:p-7">
+        {resource.imageUrl && (
+          <aside className="bg-paper-alt p-5 lg:col-span-3 lg:p-7 flex flex-col justify-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img 
+              src={resource.imageUrl} 
+              alt={resource.name} 
+              className="max-h-64 w-full object-contain rounded-md" 
+            />
+          </aside>
+        )}
+        <article className={`bg-paper-alt p-5 lg:p-7 ${resource.imageUrl ? 'lg:col-span-6' : 'lg:col-span-8'}`}>
           <div className="flex items-start justify-between gap-4 border-b border-line pb-5">
             <div>
               <p className="eyebrow text-clay">Resource information</p>
@@ -158,7 +178,7 @@ export function ResourceDetails({
             />
           </dl>
         </article>
-        <aside className="flex flex-col justify-between gap-8 bg-ink p-5 text-paper lg:col-span-4 lg:p-7">
+        <aside className={`flex flex-col justify-between gap-8 bg-ink p-5 text-paper lg:p-7 ${resource.imageUrl ? 'lg:col-span-3' : 'lg:col-span-4'}`}>
           <div>
             <p className="eyebrow text-ochre">Booking cost</p>
             <p className="mt-3 font-heading text-5xl leading-none">
@@ -184,6 +204,11 @@ export function ResourceDetails({
       <ProtectedBookingHistory
         ownerOrganizationId={resource.ownerOrganizationId}
         resourceId={resource.id}
+      />
+      <ResourceRatingsList
+        organizationId={organizationId}
+        resourceId={resourceId}
+        isActive={isActive}
       />
     </>
   );
@@ -296,6 +321,45 @@ function ProtectedSlotCreationDialog({
   ) : null;
 }
 
+function ProtectedEditResourceLink({
+  ownerOrganizationId,
+  resourceId,
+  organizationId,
+}: {
+  ownerOrganizationId: string;
+  resourceId: string;
+  organizationId: string;
+}) {
+  const [isAuthorized, setIsAuthorized] = React.useState(false);
+
+  React.useEffect(() => {
+    const controller = new AbortController();
+
+    getCurrentUserMemberships(controller.signal)
+      .then((memberships) => {
+        if (!controller.signal.aborted) {
+          setIsAuthorized(
+            isOwnerOrganizationAdmin(memberships, ownerOrganizationId),
+          );
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setIsAuthorized(false);
+        }
+      });
+
+    return () => controller.abort();
+  }, [ownerOrganizationId]);
+
+  return isAuthorized ? (
+    <Button variant="outline" nativeButton={false} render={<Link href={`/dashboard/resources/${resourceId}/edit?organization=${organizationId}`} />}>
+      <PencilIcon data-icon="inline-start" />
+      Edit Resource
+    </Button>
+  ) : null;
+}
+
 function ResourceBookingHistory({ resourceId }: { resourceId: string }) {
   const router = useRouter();
   const [attempt, setAttempt] = React.useState(0);
@@ -340,6 +404,10 @@ function ResourceBookingHistory({ resourceId }: { resourceId: string }) {
 
     return () => controller.abort();
   }, [attempt, resourceId, router]);
+
+  useBookingRealtime(resourceId, () => {
+    setAttempt((currentAttempt) => currentAttempt + 1);
+  });
 
   const handleBookingUpdated = React.useCallback(
     (updatedBooking: OrganizationBooking) => {

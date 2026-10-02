@@ -131,6 +131,74 @@ VALUES
     );
 
 SELECT pg_temp.expect_error(
+    'platform administrator cannot receive an organization membership',
+    $statement$
+        INSERT INTO organization_memberships (
+            id, user_id, organization_id, role, status
+        )
+        VALUES (
+            '70000000-0000-0000-0000-000000000001',
+            '10000000-0000-0000-0000-000000000001',
+            '20000000-0000-0000-0000-000000000001',
+            'MEMBER', 'PENDING'
+        )
+    $statement$
+);
+
+INSERT INTO organization_memberships (
+    id, user_id, organization_id, role, status, review_note
+)
+VALUES (
+    '70000000-0000-0000-0000-000000000002',
+    '10000000-0000-0000-0000-000000000002',
+    '20000000-0000-0000-0000-000000000001',
+    'ADMIN', 'APPROVED', 'Approved during integrity test'
+);
+
+INSERT INTO organization_membership_audits (
+    id, membership_id, actor_user_id, action, note
+)
+VALUES (
+    '71000000-0000-0000-0000-000000000001',
+    '70000000-0000-0000-0000-000000000002',
+    '10000000-0000-0000-0000-000000000002',
+    'APPROVED', 'Integrity test decision'
+);
+
+SELECT pg_temp.expect_error(
+    'membership audit rows are immutable',
+    $statement$
+        UPDATE organization_membership_audits
+        SET note = 'tampered'
+        WHERE id = '71000000-0000-0000-0000-000000000001'
+    $statement$
+);
+
+SELECT pg_temp.expect_error(
+    'platform promotion requires memberships to be removed first',
+    $statement$
+        UPDATE users
+        SET platform_role = 'PLATFORM_ADMIN'
+        WHERE id = '10000000-0000-0000-0000-000000000002'
+    $statement$
+);
+
+DELETE FROM organization_memberships
+WHERE id = '70000000-0000-0000-0000-000000000002';
+
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM organization_membership_audits
+        WHERE id = '71000000-0000-0000-0000-000000000001'
+    ) THEN
+        RAISE EXCEPTION 'membership audit did not cascade with membership deletion';
+    END IF;
+END;
+$$;
+
+SELECT pg_temp.expect_error(
     'self-parenting organization during insert',
     $statement$
         INSERT INTO organizations (
@@ -464,6 +532,68 @@ SELECT pg_temp.expect_error(
         )
     $statement$
 );
+
+INSERT INTO users (
+    id,
+    email,
+    password_hash,
+    first_name,
+    last_name
+)
+VALUES (
+    '10000000-0000-0000-0000-000000000003',
+    'google@example.com',
+    NULL,
+    'Google',
+    'User'
+);
+
+INSERT INTO external_identities (
+    user_id,
+    provider,
+    provider_subject,
+    provider_email
+)
+VALUES (
+    '10000000-0000-0000-0000-000000000003',
+    'GOOGLE',
+    'google-subject-1',
+    'google@example.com'
+);
+
+SELECT pg_temp.expect_error(
+    'external identity provider restriction',
+    $statement$
+        INSERT INTO external_identities (user_id, provider, provider_subject, provider_email)
+        VALUES ('10000000-0000-0000-0000-000000000003', 'GITHUB', 'github-1', 'google@example.com')
+    $statement$
+);
+
+SELECT pg_temp.expect_error(
+    'external identity subject uniqueness',
+    $statement$
+        INSERT INTO external_identities (user_id, provider, provider_subject, provider_email)
+        VALUES ('10000000-0000-0000-0000-000000000002', 'GOOGLE', 'google-subject-1', 'google@example.com')
+    $statement$
+);
+
+SELECT pg_temp.expect_error(
+    'one Google identity per ResourceHive user',
+    $statement$
+        INSERT INTO external_identities (user_id, provider, provider_subject, provider_email)
+        VALUES ('10000000-0000-0000-0000-000000000003', 'GOOGLE', 'google-subject-2', 'other@example.com')
+    $statement$
+);
+
+DELETE FROM users WHERE id = '10000000-0000-0000-0000-000000000003';
+
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM external_identities WHERE provider_subject = 'google-subject-1') THEN
+        RAISE EXCEPTION 'external identity did not cascade with user deletion';
+    END IF;
+END;
+$$;
 
 ROLLBACK;
 

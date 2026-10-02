@@ -8,8 +8,8 @@ import {
 import { Prisma } from "@resourcehive/database";
 import { AuthenticatedUser } from "@resourcehive/service-auth";
 import { BookingAuthorizationService } from "../authorization/booking-authorization.service";
-import { CreateSlotDto } from "./dto/create-slot.dto";
-import { ListSlotsDto } from "./dto/list-slots.dto";
+import { BookingNotificationService } from "../notifications/booking-notification.service";
+import { CreateSlotDto, ListSlotsDto } from "./slot.dto";
 import { SlotResourceNotFoundError } from "./slot.errors";
 import { SlotRepository } from "./slot.repository";
 import { SlotRecord, SlotView } from "./slot.types";
@@ -19,6 +19,7 @@ export class SlotsService {
   constructor(
     private readonly repository: SlotRepository,
     private readonly authorization: BookingAuthorizationService,
+    private readonly notifications: BookingNotificationService,
   ) {}
 
   async create(dto: CreateSlotDto, user: AuthenticatedUser): Promise<SlotView> {
@@ -38,6 +39,18 @@ export class SlotsService {
       const slot = await this.repository.create({
         ...dto,
         rootOrganizationId: context.rootOrganizationId,
+      });
+      await this.notifications.slotCreated({
+        slotId: slot.id,
+        actorUserId: context.userId,
+        resourceId: slot.resourceId,
+        resourceName: slot.resource.name,
+        startsAt: slot.startsAt,
+        endsAt: slot.endsAt,
+        ownerOrganizationId: slot.resource.ownerOrganizationId,
+        allowedOrganizationIds: slot.resource.allowedOrganizations.map(
+          (allowed) => allowed.organizationId,
+        ),
       });
       return this.toView(slot);
     } catch (error) {

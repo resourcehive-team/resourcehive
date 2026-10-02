@@ -80,14 +80,14 @@ async function seedDemo() {
       update: {
         role: 'MEMBER',
         status: 'APPROVED',
-        approvedBy: user.id,
+        reviewedBy: user.id,
       },
       create: {
         userId: user.id,
         organizationId: demoOrganizationId,
         role: 'MEMBER',
         status: 'APPROVED',
-        approvedBy: user.id,
+        reviewedBy: user.id,
       },
     });
   });

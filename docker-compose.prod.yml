@@ -1,15 +1,28 @@
 name: resourcehive-production
 
 x-service-environment: &service-environment
-  DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env.production}
   JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env.production}
   CORS_ORIGINS: ${CORS_ORIGINS:?Set CORS_ORIGINS in .env.production}
   NODE_ENV: production
 
 x-service-defaults: &service-defaults
   restart: unless-stopped
+  init: true
+  stop_grace_period: 30s
 
 services:
+  redis:
+    image: redis:7-alpine
+    <<: *service-defaults
+    command: ["redis-server", "--appendonly", "yes", "--save", "60", "1"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
   api-gateway:
     image: caddy:2-alpine
     <<: *service-defaults
@@ -45,23 +58,33 @@ services:
     <<: *service-defaults
     environment:
       <<: *service-environment
-      DATABASE_URL_UNPOOLED: ${DATABASE_URL_UNPOOLED:?Set DATABASE_URL_UNPOOLED in .env.production}
+      APP_DATABASE_URL: ${AUTH_DATABASE_URL:?Set AUTH_DATABASE_URL in .env.production}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-15m}
       REFRESH_TOKEN_EXPIRES_IN: ${REFRESH_TOKEN_EXPIRES_IN:-30d}
       PORT: 3000
       APP_URL: ${APP_URL:?Set APP_URL in .env.production}
+      GOOGLE_OAUTH_ENABLED: ${GOOGLE_OAUTH_ENABLED:-false}
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:-}
+      GOOGLE_OAUTH_CALLBACK_URL: ${GOOGLE_OAUTH_CALLBACK_URL:-https://api.resourcehive.thisismalindu.com/auth/google/callback}
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:?Set CLOUDINARY_CLOUD_NAME in .env.production}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:?Set CLOUDINARY_API_KEY in .env.production}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:?Set CLOUDINARY_API_SECRET in .env.production}
       AUTH_COOKIE_DOMAIN: ${AUTH_COOKIE_DOMAIN:-}
       AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-true}
       BCRYPT_ROUNDS: ${BCRYPT_ROUNDS:-12}
       EMAIL_VERIFICATION_TOKEN_EXPIRES_IN: ${EMAIL_VERIFICATION_TOKEN_EXPIRES_IN:-24h}
       PASSWORD_RESET_TOKEN_EXPIRES_IN: ${PASSWORD_RESET_TOKEN_EXPIRES_IN:-1h}
-      EMAIL_TRANSPORT: ${EMAIL_TRANSPORT:-smtp}
-      EMAIL_FROM: ${EMAIL_FROM:?Set EMAIL_FROM in .env.production}
-      SMTP_HOST: ${SMTP_HOST:-}
-      SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_SECURE: ${SMTP_SECURE:-false}
-      SMTP_USER: ${SMTP_USER:-}
-      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      KAFKA_ENABLED: "true"
+      KAFKA_BROKERS: ${KAFKA_BROKERS:?Set KAFKA_BROKERS in .env.production}
+      KAFKA_SSL: "true"
+      KAFKA_SASL_USERNAME: ${KAFKA_SASL_USERNAME:?Set KAFKA_SASL_USERNAME in .env.production}
+      KAFKA_SASL_PASSWORD: ${KAFKA_SASL_PASSWORD:?Set KAFKA_SASL_PASSWORD in .env.production}
+    depends_on:
+      redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/"]
       interval: 15s
@@ -74,7 +97,22 @@ services:
     <<: *service-defaults
     environment:
       <<: *service-environment
+      APP_DATABASE_URL: ${APP_DATABASE_URL:?Set APP_DATABASE_URL in .env.production}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?Set INTERNAL_SERVICE_TOKEN in .env.production}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:?Set CLOUDINARY_CLOUD_NAME in .env.production}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:?Set CLOUDINARY_API_KEY in .env.production}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:?Set CLOUDINARY_API_SECRET in .env.production}
       PORT: 3004
+      KAFKA_ENABLED: "true"
+      KAFKA_BROKERS: ${KAFKA_BROKERS:?Set KAFKA_BROKERS in .env.production}
+      KAFKA_SSL: "true"
+      KAFKA_SASL_USERNAME: ${KAFKA_SASL_USERNAME:?Set KAFKA_SASL_USERNAME in .env.production}
+      KAFKA_SASL_PASSWORD: ${KAFKA_SASL_PASSWORD:?Set KAFKA_SASL_PASSWORD in .env.production}
+    depends_on:
+      redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3004/health"]
       interval: 15s
@@ -87,14 +125,47 @@ services:
     <<: *service-defaults
     environment:
       <<: *service-environment
+      APP_DATABASE_URL: ${APP_DATABASE_URL:?Set APP_DATABASE_URL in .env.production}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?Set INTERNAL_SERVICE_TOKEN in .env.production}
+      PLATFORM_REPORT_DATABASE_URL: ${PLATFORM_REPORT_DATABASE_URL:?Set PLATFORM_REPORT_DATABASE_URL in .env.production}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
       PORT: 3002
+      KAFKA_ENABLED: "true"
+      KAFKA_BROKERS: ${KAFKA_BROKERS:?Set KAFKA_BROKERS in .env.production}
+      KAFKA_SSL: "true"
+      KAFKA_SASL_USERNAME: ${KAFKA_SASL_USERNAME:?Set KAFKA_SASL_USERNAME in .env.production}
+      KAFKA_SASL_PASSWORD: ${KAFKA_SASL_PASSWORD:?Set KAFKA_SASL_PASSWORD in .env.production}
+    depends_on:
+      redis:
+        condition: service_healthy
 
   notification-service:
     image: ghcr.io/resourcehive-team/resourcehive-notification:${IMAGE_TAG:?Set IMAGE_TAG in .env.production}
     <<: *service-defaults
     environment:
       <<: *service-environment
+      APP_DATABASE_URL: ${APP_DATABASE_URL:?Set APP_DATABASE_URL in .env.production}
+      WORKER_DATABASE_URL: ${WORKER_DATABASE_URL:?Set WORKER_DATABASE_URL in .env.production}
       PORT: 3003
+      DELIVERY_POLL_INTERVAL_MS: ${DELIVERY_POLL_INTERVAL_MS:-5000}
+      KAFKA_ENABLED: "true"
+      KAFKA_BROKERS: ${KAFKA_BROKERS:?Set KAFKA_BROKERS in .env.production}
+      KAFKA_SSL: "true"
+      KAFKA_SASL_USERNAME: ${KAFKA_SASL_USERNAME:?Set KAFKA_SASL_USERNAME in .env.production}
+      KAFKA_SASL_PASSWORD: ${KAFKA_SASL_PASSWORD:?Set KAFKA_SASL_PASSWORD in .env.production}
+      KAFKA_CLIENT_ID: ${KAFKA_CLIENT_ID:-notification-service}
+      KAFKA_CONSUMER_GROUP: ${KAFKA_CONSUMER_GROUP:-notification-service-v1}
+      RESEND_ENABLED: "true"
+      RESEND_API_KEY: ${RESEND_API_KEY:?Set RESEND_API_KEY in .env.production}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:?Set RESEND_FROM_EMAIL in .env.production}
+      FCM_ENABLED: ${FCM_ENABLED:-false}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
+      WEB_APP_URL: ${WEB_APP_URL:-}
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/firebase-service-account.json
+    secrets:
+      - source: firebase_service_account
+        target: firebase-service-account.json
 
   migrate:
     image: ghcr.io/resourcehive-team/resourcehive-identity:${IMAGE_TAG:?Set IMAGE_TAG in .env.production}
@@ -103,17 +174,22 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env.production}
       DATABASE_URL_UNPOOLED: ${DATABASE_URL_UNPOOLED:?Set DATABASE_URL_UNPOOLED in .env.production}
+      APP_DATABASE_URL: ${APP_DATABASE_URL:?Set APP_DATABASE_URL in .env.production}
+      AUTH_DATABASE_URL: ${AUTH_DATABASE_URL:?Set AUTH_DATABASE_URL in .env.production}
+      WORKER_DATABASE_URL: ${WORKER_DATABASE_URL:?Set WORKER_DATABASE_URL in .env.production}
+      PLATFORM_REPORT_DATABASE_URL: ${PLATFORM_REPORT_DATABASE_URL:?Set PLATFORM_REPORT_DATABASE_URL in .env.production}
     command:
-      - pnpm
-      - --filter
-      - "@resourcehive/database"
-      - exec
-      - prisma
+      - /migrator/node_modules/.bin/prisma
       - migrate
       - deploy
       - --schema
-      - ../../db/schema/schema.prisma
+      - /migrator/schema/schema.prisma
 
 volumes:
   caddy_data:
   caddy_config:
+  redis_data:
+
+secrets:
+  firebase_service_account:
+    file: ./secrets/firebase-service-account.json

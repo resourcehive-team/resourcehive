@@ -57,7 +57,10 @@ const adminMembership: MembershipWithOrganization = {
   role: "ADMIN",
   status: "APPROVED",
   joinedAt: "2026-07-01T00:00:00.000Z",
-  approvedBy: "admin-2",
+  reviewedBy: "admin-2",
+  reviewedAt: "2026-07-01T00:00:00.000Z",
+  reviewNote: null,
+  latestAudit: null,
   organization,
 };
 
@@ -67,11 +70,16 @@ const organizationMember: OrganizationMember = {
   role: "MEMBER",
   status: "APPROVED",
   joinedAt: "2026-07-10T00:00:00.000Z",
+  reviewedBy: "admin-1",
+  reviewedAt: "2026-07-10T00:00:00.000Z",
+  reviewNote: null,
+  latestAudit: null,
   user: {
     id: "user-2",
     firstName: "Nimal",
     lastName: "Perera",
     email: "nimal@example.edu",
+    avatarUrl: null,
     status: "ACTIVE",
   },
 };

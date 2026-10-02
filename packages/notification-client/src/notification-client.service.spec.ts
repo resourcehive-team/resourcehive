@@ -1,0 +1,203 @@
+import { NOTIFICATION_TOPICS } from "./contracts";
+import { KafkaNotificationTransport } from "./kafka-notification.transport";
+import { NotificationKafkaOptions } from "./notification-client.options";
+import { NotificationClientService } from "./notification-client.service";
+
+describe("NotificationClientService", () => {
+  const publish = jest.fn<Promise<void>, [string, string, unknown]>();
+  const transport = {
+    publish,
+  } as unknown as KafkaNotificationTransport;
+  const options: NotificationKafkaOptions = {
+    enabled: true,
+    brokers: ["broker:9092"],
+    clientId: "resource-service",
+    producer: "resource-service",
+    ssl: true,
+  };
+  const service = new NotificationClientService(options, transport);
+
+  beforeEach(() => jest.clearAllMocks());
+
+  it("publishes a validated general command keyed by recipient", async () => {
+    const command = await service.send({
+      commandId: "11111111-1111-4111-8111-111111111111",
+      recipientUserId: "22222222-2222-4222-8222-222222222222",
+      title: "Resource updated",
+      message: "Lab hours changed.",
+      correlationId: "33333333-3333-4333-8333-333333333333",
+    });
+
+    expect(command.producer).toBe("resource-service");
+    expect(command.channels).toEqual(["IN_APP", "PUSH"]);
+    expect(publish).toHaveBeenCalledWith(
+      NOTIFICATION_TOPICS.commands,
+      "22222222-2222-4222-8222-222222222222",
+      command,
+    );
+  });
+
+  it("prevents non-identity producers from sending verification email", async () => {
+    await expect(
+      service.sendVerificationEmail({
+        recipientUserId: "22222222-2222-4222-8222-222222222222",
+        email: "user@example.edu",
+        verificationUrl: "https://app.example/verify?token=x",
+      }),
+    ).rejects.toThrow("Only Identity Service");
+    expect(publish).not.toHaveBeenCalled();
+  });
+
+  it("publishes verification email to the restricted identity topic", async () => {
+    const identityService = new NotificationClientService(
+      {
+        ...options,
+        clientId: "identity-service",
+        producer: "identity-service",
+      },
+      transport,
+    );
+    const command = await identityService.sendVerificationEmail({
+      commandId: "11111111-1111-4111-8111-111111111111",
+      recipientUserId: "22222222-2222-4222-8222-222222222222",
+      email: "user@example.edu",
+      verificationUrl: "https://app.example/verify?token=x",
+      correlationId: "33333333-3333-4333-8333-333333333333",
+    });
+
+    expect(command.channels).toEqual(["EMAIL"]);
+    expect(publish).toHaveBeenCalledWith(
+      NOTIFICATION_TOPICS.identityCommands,
+      "22222222-2222-4222-8222-222222222222",
+      command,
+    );
+  });
+
+  it("publishes password reset email to the restricted identity topic", async () => {
+    const identityService = new NotificationClientService(
+      {
+        ...options,
+        clientId: "identity-service",
+        producer: "identity-service",
+      },
+      transport,
+    );
+    const command = await identityService.sendPasswordResetEmail({
+      commandId: "11111111-1111-4111-8111-111111111111",
+      recipientUserId: "22222222-2222-4222-8222-222222222222",
+      email: "user@example.edu",
+      resetUrl: "https://app.example/reset-password?token=x",
+      correlationId: "33333333-3333-4333-8333-333333333333",
+    });
+
+    expect(command.template).toEqual({
+      key: "identity.password-reset.v1",
+      version: 1,
+      variables: { resetUrl: "https://app.example/reset-password?token=x" },
+    });
+    expect(publish).toHaveBeenCalledWith(
+      NOTIFICATION_TOPICS.identityCommands,
+      "22222222-2222-4222-8222-222222222222",
+      command,
+    );
+  });
+
+  it("publishes password changed email to the restricted identity topic", async () => {
+    const identityService = new NotificationClientService(
+      {
+        ...options,
+        clientId: "identity-service",
+        producer: "identity-service",
+      },
+      transport,
+    );
+    const command = await identityService.sendPasswordChangedEmail({
+      recipientUserId: "22222222-2222-4222-8222-222222222222",
+      email: "user@example.edu",
+    });
+
+    expect(command.template).toEqual({
+      key: "identity.password-changed.v1",
+      version: 1,
+      variables: {},
+    });
+    expect(publish).toHaveBeenCalledWith(
+      NOTIFICATION_TOPICS.identityCommands,
+      "22222222-2222-4222-8222-222222222222",
+      command,
+    );
+  });
+
+  it("publishes membership decisions to the general notification topic", async () => {
+    const command = await service.sendMembershipDecision({
+      recipientUserId: "22222222-2222-4222-8222-222222222222",
+      organizationName: "Engineering Faculty",
+      decision: "APPROVED",
+    });
+
+    expect(command.template).toEqual({
+      key: "membership.approved.v1",
+      version: 1,
+      variables: { organizationName: "Engineering Faculty" },
+    });
+    expect(publish).toHaveBeenCalledWith(
+      NOTIFICATION_TOPICS.commands,
+      "22222222-2222-4222-8222-222222222222",
+      command,
+    );
+  });
+
+  it("propagates Kafka publishing failures", async () => {
+    publish.mockRejectedValueOnce(new Error("broker unavailable"));
+    await expect(
+      service.send({
+        recipientUserId: "22222222-2222-4222-8222-222222222222",
+        title: "Resource updated",
+        message: "Lab hours changed.",
+      }),
+    ).rejects.toThrow("broker unavailable");
+  });
+
+  it("publishes a booking event keyed by booking ID", async () => {
+    const bookingService = new NotificationClientService(
+      { ...options, clientId: "booking-service", producer: "booking-service" },
+      transport,
+    );
+    const event = await bookingService.publishBookingEvent({
+      eventId: "11111111-1111-4111-8111-111111111111",
+      eventType: "booking.cancelled",
+      bookingId: "22222222-2222-4222-8222-222222222222",
+      userId: "33333333-3333-4333-8333-333333333333",
+      rootOrganizationId: "66666666-6666-4666-8666-666666666666",
+      resourceId: "44444444-4444-4444-8444-444444444444",
+      organizationId: "55555555-5555-4555-8555-555555555555",
+      resourceName: "Robotics Lab",
+      startsAt: "2026-01-01T10:00:00.000Z",
+      refundPoints: 10,
+    });
+
+    expect(event.payload.refundPoints).toBe(10);
+    expect(event.payload.rootOrganizationId).toBe(
+      "66666666-6666-4666-8666-666666666666",
+    );
+    expect(publish).toHaveBeenCalledWith(
+      NOTIFICATION_TOPICS.bookingEvents,
+      "22222222-2222-4222-8222-222222222222",
+      event,
+    );
+  });
+
+  it("prevents non-booking producers from publishing booking events", async () => {
+    await expect(
+      service.publishBookingEvent({
+        eventType: "booking.confirmed",
+        bookingId: "22222222-2222-4222-8222-222222222222",
+        userId: "33333333-3333-4333-8333-333333333333",
+        resourceId: "44444444-4444-4444-8444-444444444444",
+        organizationId: "55555555-5555-4555-8555-555555555555",
+        resourceName: "Robotics Lab",
+        startsAt: "2026-01-01T10:00:00.000Z",
+      }),
+    ).rejects.toThrow("Only Booking Service");
+  });
+});

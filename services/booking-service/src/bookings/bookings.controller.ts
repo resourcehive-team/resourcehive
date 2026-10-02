@@ -2,20 +2,32 @@ import {
   Body,
   Controller,
   Get,
+  HttpException,
+  InternalServerErrorException,
   Param,
   ParseUUIDPipe,
   Patch,
   Post,
   Query,
   UseGuards,
+  UseInterceptors,
+  Inject,
+  Headers,
+  UnauthorizedException,
 } from "@nestjs/common";
+import { timingSafeEqual } from "node:crypto";
+import { CACHE_MANAGER } from "@nestjs/cache-manager";
+import type { Cache } from "cache-manager";
+import { UserCacheInterceptor } from "../common/interceptors/user-cache.interceptor";
 import {
   ApiBearerAuth,
+  ApiCookieAuth,
   ApiConflictResponse,
   ApiCreatedResponse,
   ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiTags,
+  ApiOperation,
   ApiUnauthorizedResponse,
   ApiOkResponse,
 } from "@nestjs/swagger";
@@ -24,30 +36,63 @@ import {
   CurrentUser,
   JwtAuthGuard,
 } from "@resourcehive/service-auth";
-import { BookingCreationService } from "./booking-creation.service";
-import { BookingCompletionService } from "./booking-completion.service";
-import { BookingCancellationService } from "./booking-cancellation.service";
-import { CancelBookingDto } from "./dto/cancel-booking.dto";
-import { CreateBookingDto } from "./dto/create-booking.dto";
-import { GetUserBookingsDto } from "./dto/get-user-bookings.dto";
-import { GetOrgBookingsDto } from "./dto/get-org-bookings.dto";
-import { BookingReadService } from "./booking-read.service";
+import { BookingService } from "./booking.service";
+import { InternalReevaluateDto } from "./internal-reevaluate.dto";
+import {
+  CancelBookingDto,
+  CreateBookingDto,
+  GetOrgBookingsDto,
+  GetUserBookingsDto,
+} from "./bookings.dto";
+import {
+  CancelledBookingResponseDto,
+  CreatedBookingResponseDto,
+  OrganizationBookingResponseDto,
+  BookingResponseDto,
+} from "../docs/booking-responses.dto";
 
 @ApiTags("bookings")
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@ApiCookieAuth("resourcehive_access_token")
 @Controller("bookings")
 export class BookingsController {
   constructor(
-    private readonly bookingCreation: BookingCreationService,
-    private readonly bookingRead: BookingReadService,
-    private readonly bookingCompletion: BookingCompletionService,
-    private readonly bookingCancellation: BookingCancellationService,
+    private readonly bookings: BookingService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
+  @Post("internal/reevaluate")
+  @ApiOperation({
+    summary:
+      "Re-evaluate bookings for a resource when access is revoked or resource is removed",
+  })
+  async reevaluateBookings(
+    @Body() body: InternalReevaluateDto,
+    @Headers("x-internal-service-token") serviceToken: string | undefined,
+  ): Promise<void> {
+    const expected = process.env.INTERNAL_SERVICE_TOKEN;
+    if (
+      !expected ||
+      !serviceToken ||
+      Buffer.byteLength(expected) !== Buffer.byteLength(serviceToken) ||
+      !timingSafeEqual(Buffer.from(expected), Buffer.from(serviceToken))
+    ) {
+      throw new UnauthorizedException(
+        "Internal service authentication is required.",
+      );
+    }
+    await this.bookings.reevaluateBookings(
+      body.resourceId,
+      body.rootOrganizationId,
+    );
+  }
+
   @Post()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: "Create a booking for an available resource slot" })
   @ApiCreatedResponse({
     description: "Booking confirmed and points deducted atomically",
+    type: CreatedBookingResponseDto,
   })
   @ApiUnauthorizedResponse({
     description: "Authentication or active membership is missing",
@@ -62,32 +107,70 @@ export class BookingsController {
     description:
       "The slot is unavailable, points are insufficient, or a concurrent update prevented booking",
   })
-  create(
+  async create(
     @Body() dto: CreateBookingDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.bookingCreation.create(dto.resourceSlotId, user);
+    try {
+      const result = await this.bookings.createBooking(
+        dto.resourceSlotId,
+        user,
+      );
+      await this.cacheManager.del(`/bookings/me-${user.userId}`);
+      await this.cacheManager.del(`/bookings/org-${user.userId}`);
+      return result;
+    } catch (error) {
+      this.handleError(error);
+    }
   }
+
   @Get("me")
-  @ApiOkResponse({ description: "List of bookings for the current user" })
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: "List bookings for the current user" })
+  @ApiOkResponse({
+    description: "List of bookings for the current user",
+    type: [BookingResponseDto],
+  })
+  @UseInterceptors(UserCacheInterceptor)
   async getMyBookings(
     @Query() query: GetUserBookingsDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.bookingRead.getUserBookings(user.userId, query);
+    try {
+      return await this.bookings.getUserBookings(user.userId, query);
+    } catch (error) {
+      this.handleError(error);
+    }
   }
 
   @Get("org")
-  @ApiOkResponse({ description: "List of bookings for admin's organizations" })
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({
+    summary: "List bookings for organizations administered by the current user",
+  })
+  @ApiOkResponse({
+    description: "List of bookings for admin's organizations",
+    type: [OrganizationBookingResponseDto],
+  })
+  @UseInterceptors(UserCacheInterceptor)
   async getOrgBookings(
     @Query() query: GetOrgBookingsDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.bookingRead.getOrgBookings(user.userId, query);
+    try {
+      return await this.bookings.getOrgBookings(user.userId, query);
+    } catch (error) {
+      this.handleError(error);
+    }
   }
 
   @Patch(":bookingId/complete")
-  @ApiOkResponse({ description: "Booking marked as completed" })
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: "Mark a booking as completed" })
+  @ApiOkResponse({
+    description: "Booking marked as completed",
+    type: OrganizationBookingResponseDto,
+  })
   @ApiForbiddenResponse({
     description: "The user does not administer the resource's organization",
   })
@@ -95,15 +178,32 @@ export class BookingsController {
   @ApiConflictResponse({
     description: "The booking is not in a confirmable state",
   })
-  complete(
+  async complete(
     @Param("bookingId", ParseUUIDPipe) bookingId: string,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.bookingCompletion.complete(bookingId, user.userId);
+    try {
+      const result = await this.bookings.completeBooking(
+        bookingId,
+        user.userId,
+      );
+      await this.cacheManager.del(`/bookings/me-${user.userId}`);
+      await this.cacheManager.del(`/bookings/org-${user.userId}`);
+      return result;
+    } catch (error) {
+      this.handleError(error);
+    }
   }
 
   @Patch(":bookingId/cancel")
-  @ApiOkResponse({ description: "Booking cancelled and points refunded" })
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({
+    summary: "Cancel a booking and refund points when applicable",
+  })
+  @ApiOkResponse({
+    description: "Booking cancelled and points refunded",
+    type: CancelledBookingResponseDto,
+  })
   @ApiForbiddenResponse({
     description: "The user cannot cancel this booking",
   })
@@ -111,11 +211,27 @@ export class BookingsController {
   @ApiConflictResponse({
     description: "The booking cannot be cancelled in its current state",
   })
-  cancel(
+  async cancel(
     @Param("bookingId", ParseUUIDPipe) bookingId: string,
     @Body() dto: CancelBookingDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.bookingCancellation.cancel(bookingId, user.userId, dto);
+    try {
+      const result = await this.bookings.cancelBooking(
+        bookingId,
+        user.userId,
+        dto,
+      );
+      await this.cacheManager.del(`/bookings/me-${user.userId}`);
+      await this.cacheManager.del(`/bookings/org-${user.userId}`);
+      return result;
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  private handleError(error: unknown): never {
+    if (error instanceof HttpException) throw error;
+    throw new InternalServerErrorException("Unable to process booking request");
   }
 }

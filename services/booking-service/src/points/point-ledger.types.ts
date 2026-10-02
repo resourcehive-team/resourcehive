@@ -5,16 +5,10 @@ export type PointLedgerClient = Pick<
   "pointTransaction"
 >;
 
-export interface AppendBookingDeductionInput {
+export interface AppendBookingEntryInput {
   userId: string;
   bookingId: string;
-  amount: number;
-  description?: string;
-}
-
-export interface AppendBookingRefundInput {
-  userId: string;
-  bookingId: string;
+  rootOrganizationId: string;
   amount: number;
   description?: string;
 }

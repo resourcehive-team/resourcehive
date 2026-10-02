@@ -11,6 +11,7 @@ describe("BookingAuthorizationService", () => {
     userId: "user-id",
     email: "user@example.edu",
     organizationId: "organization-id",
+    rootOrganizationId: "root-id",
     role: "member",
   };
 

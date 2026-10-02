@@ -6,12 +6,15 @@ import type {
   PaginatedResources,
   Resource,
   ResourceDetails,
+  ResourceRatingSubmission,
+  ResourceRatingSummary,
 } from "@/lib/resource-service/types";
 
 export interface CreateResourceInput {
   name: string;
   description?: string;
   pointCost?: number;
+  cancellationNoticeMinutes?: number;
   allowedOrganizationIds?: string[];
 }
 
@@ -19,7 +22,13 @@ export interface ResourceListOptions {
   page?: number;
   limit?: number;
   search?: string;
+  status?: string;
   signal?: AbortSignal;
+}
+
+export interface SubmitRatingInput {
+  rating: number;
+  comment?: string;
 }
 
 export function createResource(
@@ -31,6 +40,7 @@ export function createResource(
   const name = input.name.trim();
   const description = input.description?.trim();
   const pointCost = input.pointCost ?? 0;
+  const cancellationNoticeMinutes = input.cancellationNoticeMinutes ?? 0;
 
   if (!name) {
     throw new Error("Resource name is required.");
@@ -38,6 +48,13 @@ export function createResource(
 
   if (!Number.isInteger(pointCost) || pointCost < 0) {
     throw new Error("Point cost must be a non-negative integer.");
+  }
+
+  if (
+    !Number.isInteger(cancellationNoticeMinutes) ||
+    cancellationNoticeMinutes < 0
+  ) {
+    throw new Error("Cancellation notice must be a non-negative integer.");
   }
 
   const allowedOrganizationIds = [
@@ -61,8 +78,76 @@ export function createResource(
       name,
       ...(description ? { description } : {}),
       pointCost,
+      cancellationNoticeMinutes,
       allowedOrganizationIds,
     },
+  });
+}
+
+export interface UpdateResourceInput {
+  name?: string;
+  description?: string;
+  pointCost?: number;
+  cancellationNoticeMinutes?: number;
+  allowedOrganizationIds?: string[];
+  status?: string;
+}
+
+export function updateResource(
+  organizationId: string,
+  resourceId: string,
+  input: UpdateResourceInput,
+): Promise<Resource> {
+  const ownerOrganizationId = organizationId.trim();
+  const owner = apiPathSegment(ownerOrganizationId, "Organization ID");
+  const resource = apiPathSegment(resourceId, "Resource ID");
+  
+  const payload: Record<string, unknown> = {};
+  
+  if (input.name !== undefined) {
+    const name = input.name.trim();
+    if (!name) throw new Error("Resource name cannot be empty.");
+    payload.name = name;
+  }
+  
+  if (input.description !== undefined) {
+    payload.description = input.description.trim() || null;
+  }
+  
+  if (input.pointCost !== undefined) {
+    if (!Number.isInteger(input.pointCost) || input.pointCost < 0) {
+      throw new Error("Point cost must be a non-negative integer.");
+    }
+    payload.pointCost = input.pointCost;
+  }
+  
+  if (input.cancellationNoticeMinutes !== undefined) {
+    if (!Number.isInteger(input.cancellationNoticeMinutes) || input.cancellationNoticeMinutes < 0) {
+      throw new Error("Cancellation notice must be a non-negative integer.");
+    }
+    payload.cancellationNoticeMinutes = input.cancellationNoticeMinutes;
+  }
+  
+  if (input.allowedOrganizationIds !== undefined) {
+    payload.allowedOrganizationIds = [
+      ...new Set([
+        ownerOrganizationId,
+        ...input.allowedOrganizationIds.map((id) => {
+          const normalizedId = id.trim();
+          if (!normalizedId) throw new Error("Allowed organization ID is required.");
+          return normalizedId;
+        }),
+      ]),
+    ];
+  }
+  
+  if (input.status !== undefined) {
+    payload.status = input.status;
+  }
+
+  return apiRequest<Resource>(`/resources/organization/${owner}/${resource}`, {
+    method: "PATCH",
+    json: payload,
   });
 }
 
@@ -78,9 +163,14 @@ export function getAccessibleResources(
     limit: String(limit),
   });
   const search = options.search?.trim();
+  const status = options.status?.trim();
 
   if (search) {
     query.set("search", search);
+  }
+
+  if (status) {
+    query.set("status", status);
   }
 
   return apiRequest<PaginatedResources>(
@@ -103,6 +193,44 @@ export function getResourceDetails(
   );
 }
 
+export function getResourceRatings(
+  organizationId: string,
+  resourceId: string,
+  signal?: AbortSignal,
+): Promise<ResourceRatingSummary> {
+  const organization = apiPathSegment(organizationId, "Organization ID");
+  const resource = apiPathSegment(resourceId, "Resource ID");
+
+  return apiRequest<ResourceRatingSummary>(
+    `/resources/organization/${organization}/${resource}/ratings`,
+    { signal },
+  );
+}
+
+export function submitResourceRating(
+  organizationId: string,
+  resourceId: string,
+  input: SubmitRatingInput,
+): Promise<ResourceRatingSubmission> {
+  const organization = apiPathSegment(organizationId, "Organization ID");
+  const resource = apiPathSegment(resourceId, "Resource ID");
+
+  if (!Number.isInteger(input.rating) || input.rating < 1 || input.rating > 5) {
+    throw new Error("Rating must be an integer between 1 and 5.");
+  }
+
+  return apiRequest<ResourceRatingSubmission>(
+    `/resources/organization/${organization}/${resource}/ratings`,
+    {
+      method: "POST",
+      json: {
+        rating: input.rating,
+        ...(input.comment?.trim() ? { comment: input.comment.trim() } : {}),
+      },
+    },
+  );
+}
+
 function positiveInteger(value: number, label: string): number {
   if (!Number.isInteger(value) || value < 1) {
     throw new Error(`${label} must be a positive integer.`);
@@ -110,3 +238,41 @@ function positiveInteger(value: number, label: string): number {
 
   return value;
 }
+
+export interface ResourceImageUploadResponse {
+  imageUrl: string;
+}
+
+export function uploadResourceImage(
+  organizationId: string,
+  resourceId: string,
+  file: File,
+): Promise<ResourceImageUploadResponse> {
+  const organization = apiPathSegment(organizationId, "Organization ID");
+  const resource = apiPathSegment(resourceId, "Resource ID");
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+  return apiRequest<ResourceImageUploadResponse>(
+    `/resources/organization/${organization}/${resource}/image`,
+    {
+      method: "POST",
+      body: formData,
+    },
+  );
+}
+
+export function removeResource(
+  organizationId: string,
+  resourceId: string,
+): Promise<void> {
+  const organization = apiPathSegment(organizationId, "Organization ID");
+  const resource = apiPathSegment(resourceId, "Resource ID");
+
+  return apiRequest<void>(
+    `/resources/organization/${organization}/${resource}`,
+    { method: "DELETE" },
+  );
+}
+

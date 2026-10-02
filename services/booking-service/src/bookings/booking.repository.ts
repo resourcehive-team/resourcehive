@@ -4,6 +4,7 @@ import {
   BookingTransactionClient,
   CreateConfirmedBookingInput,
 } from "./booking.types";
+import { BookingStatus } from "./bookingStatus";
 
 @Injectable()
 export class BookingRepository {
@@ -15,7 +16,9 @@ export class BookingRepository {
       data: {
         resourceSlotId: input.resourceSlotId,
         userId: input.userId,
-        status: "CONFIRMED",
+        rootOrganizationId: input.rootOrganizationId,
+        status: BookingStatus.CONFIRMED,
+        cancellationNoticeMinutes: input.cancellationNoticeMinutes,
       },
       include: {
         resourceSlot: {
@@ -27,6 +30,7 @@ export class BookingRepository {
                 id: true,
                 name: true,
                 pointCost: true,
+                ownerOrganizationId: true,
               },
             },
           },

@@ -28,6 +28,7 @@ const booking: UserBooking = {
       id: "resource-1",
       name: "Engineering Robotics Lab",
       pointCost: 25,
+      ownerOrganizationId: "organization-1",
     },
   },
 };
@@ -45,6 +46,7 @@ describe("BookingHistory", () => {
         firstName: "Alice",
         lastName: "Perera",
         email: "alice@example.edu",
+        avatarUrl: null,
         status: "ACTIVE",
         emailVerifiedAt: "2030-07-01T00:00:00+05:30",
         createdAt: "2030-06-01T00:00:00+05:30",

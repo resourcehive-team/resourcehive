@@ -13,6 +13,7 @@ import {
 
 import { BookingConfirmation } from "@/components/booking-confirmation";
 import { BookingCancellationDialog } from "@/components/booking-cancellation-dialog";
+import { UserAvatar } from "@/components/user-avatar";
 import {
   CopyBookingReferenceButton,
   DownloadBookingReceiptButton,
@@ -206,7 +207,15 @@ function BookingRow({
           <div className="flex flex-wrap items-center gap-2">
             {isAdminView ? (
               member ? (
-                <MemberDetailsDialog member={member} />
+                <div className="flex items-center gap-2">
+                  <UserAvatar
+                    name={formatMemberName(member)}
+                    email={member.email}
+                    avatarUrl={member.avatarUrl}
+                    size="sm"
+                  />
+                  <MemberDetailsDialog member={member} />
+                </div>
               ) : (
                 <h4 className="font-medium text-muted-foreground">
                   Member details unavailable
@@ -394,6 +403,12 @@ function MemberDetailsDialog({ member }: { member: BookingMember }) {
       <DialogContent className="rounded-none sm:max-w-xl">
         <DialogHeader>
           <UserRoundIcon className="size-6 text-clay" />
+          <UserAvatar
+            name={memberName}
+            email={member.email}
+            avatarUrl={member.avatarUrl}
+            size="lg"
+          />
           <p className="eyebrow text-clay">Booking member</p>
           <DialogTitle className="text-3xl font-normal leading-none">
             {memberName}
@@ -614,6 +629,9 @@ function isBookingMember(member: unknown): member is BookingMember {
     typeof candidate.lastName === "string" &&
     typeof candidate.email === "string" &&
     typeof candidate.status === "string" &&
+    (candidate.avatarUrl === undefined ||
+      typeof candidate.avatarUrl === "string" ||
+      candidate.avatarUrl === null) &&
     typeof candidate.createdAt === "string"
   );
 }

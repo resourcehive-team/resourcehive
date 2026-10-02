@@ -9,7 +9,10 @@ import {
 } from "@/lib/booking-service/booking-api";
 import type { OrganizationBooking } from "@/lib/booking-service/types";
 import { getCurrentUserMemberships } from "@/lib/resource-service/membership-api";
-import { getResourceDetails } from "@/lib/resource-service/resource-api";
+import {
+  getResourceDetails,
+  getResourceRatings,
+} from "@/lib/resource-service/resource-api";
 import type {
   MembershipWithOrganization,
   ResourceDetails as ResourceDetailsData,
@@ -26,6 +29,7 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("@/lib/resource-service/resource-api", () => ({
   getResourceDetails: vi.fn(),
+  getResourceRatings: vi.fn(),
 }));
 
 vi.mock("@/lib/resource-service/membership-api", () => ({
@@ -51,6 +55,7 @@ vi.mock("@/components/resource-slot-creation-dialog", () => ({
 }));
 
 const getResourceDetailsMock = vi.mocked(getResourceDetails);
+const getResourceRatingsMock = vi.mocked(getResourceRatings);
 const getCurrentUserMembershipsMock = vi.mocked(getCurrentUserMemberships);
 const getOrganizationBookingsMock = vi.mocked(getOrganizationBookings);
 const completeOrganizationBookingMock = vi.mocked(completeOrganizationBooking);
@@ -65,8 +70,10 @@ const resource: ResourceDetailsData = {
   createdByUserId: "admin-1",
   status: "ACTIVE",
   pointCost: 10,
+  cancellationNoticeMinutes: 0,
   createdAt: "2026-08-10T00:00:00.000Z",
-  allowedOrganizations: [
+  imageUrl: null,
+    allowedOrganizations: [
     {
       resourceId: "resource-1",
       organizationId: "organization-1",
@@ -93,7 +100,10 @@ const administratorMembership: MembershipWithOrganization = {
   role: "ADMIN",
   status: "APPROVED",
   joinedAt: "2026-01-01T00:00:00.000Z",
-  approvedBy: "admin-1",
+  reviewedBy: "admin-1",
+  reviewedAt: "2026-07-01T00:00:00.000Z",
+  reviewNote: null,
+  latestAudit: null,
   organization: resource.ownerOrganization,
 };
 
@@ -110,12 +120,14 @@ const organizationBooking: OrganizationBooking = {
       id: "resource-1",
       name: "Main Library Study Room",
       pointCost: 10,
+      ownerOrganizationId: "organization-1",
     },
   },
   user: {
     firstName: "Alice",
     lastName: "Perera",
     email: "student.alice@demo.uni",
+    avatarUrl: null,
     status: "ACTIVE",
     emailVerifiedAt: "2026-07-01T00:00:00.000Z",
     createdAt: "2026-06-01T00:00:00.000Z",
@@ -127,6 +139,11 @@ describe("ResourceDetails", () => {
     navigation.refresh.mockReset();
     navigation.replace.mockReset();
     getResourceDetailsMock.mockReset().mockResolvedValue(resource);
+    getResourceRatingsMock.mockReset().mockResolvedValue({
+      average: 0,
+      total: 0,
+      ratings: [],
+    });
     getCurrentUserMembershipsMock
       .mockReset()
       .mockResolvedValue([administratorMembership]);
@@ -175,7 +192,7 @@ describe("ResourceDetails", () => {
   });
 
   it("omits organization booking history for a normal member", async () => {
-    getCurrentUserMembershipsMock.mockResolvedValueOnce([
+    getCurrentUserMembershipsMock.mockResolvedValue([
       { ...administratorMembership, role: "MEMBER" },
     ]);
 

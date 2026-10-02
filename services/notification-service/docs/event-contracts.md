@@ -1,68 +1,83 @@
-# Notification Event Consumption Proposal
+# Notification Event Contracts
 
-Status: **approved by Person C.**
+Topics:
 
-The Notification Service is the intended consumer of the versioned Booking
-events documented by the Booking Service. Week 2 implements only the
-notification persistence boundary.
+| Topic                                            | Key        | Purpose                             |
+| ------------------------------------------------ | ---------- | ----------------------------------- |
+| `resourcehive.notification.commands.v1`          | user ID    | General typed notification commands |
+| `resourcehive.identity.notification-commands.v1` | user ID    | Verification email commands only    |
+| `resourcehive.booking.events.v1`                 | booking/slot ID | Booking lifecycle and slot-created events |
+| `resourcehive.notification.dead-letter.v1`       | source key | Permanently rejected input records  |
 
-## Initial mapping
+Every envelope has a UUID event or command ID, version, producer, correlation
+ID, occurrence time, and a typed payload. Consumers reject unknown versions.
+Application services should create these envelopes through
+`@resourcehive/notification-client` instead of duplicating this JSON manually.
 
-| Event | Notification type | Recipient |
-| --- | --- | --- |
-| `booking.created.v1` | `BOOKING_CREATED` | `payload.recipientUserId` |
-| `booking.cancelled.v1` | `BOOKING_CANCELLED` | `payload.recipientUserId` |
-| `booking.completed.v1` | `BOOKING_COMPLETED` | `payload.recipientUserId` |
+Approved initial templates:
 
-Only `booking.created.v1` has a proposed full payload in Week 2.
+- `identity.verify-email.v1`
+- `identity.password-reset.v1`
+- `identity.password-changed.v1`
+- `booking.confirmed.v1`
+- `booking.cancelled.v1`
+- `booking.completed.v1`
+- `notification.message.v1`
 
-## Persistence rules
+Only Identity Service templates may request `EMAIL`, and they must request no
+other channel. Booking templates use `IN_APP` and `PUSH`.
+`notification.message.v1` lets Identity, Booking, and Resource services send
+plain-text in-app and browser push messages. It requires `title` and `message`
+variables and cannot request email.
 
-- Validate event name, version, identifiers, and timestamps before persistence.
-- Store one notification for the intended recipient.
-- New notifications always have `readAt = null`.
-- Do not trust an arbitrary recipient added by a public HTTP caller.
-- Do not mark the originating booking transaction failed because downstream
-  real-time or email delivery failed.
-- Duplicate-event handling must be finalized before event transport is enabled.
+## General push command
 
-## Current limitation
-
-The approved Notification schema has no event ID/deduplication field. Week 2
-does not modify the schema. Before at-least-once delivery is implemented, Person
-C must decide whether deduplication belongs in a new notification-event receipt
-table, an approved field/index, or the chosen transport.
-
-## Future delivery
-
-WebSocket and email delivery are later milestones. Redis will be added only if
-its coordination/pub-sub role is justified and approved; it will not replace
-PostgreSQL persistence.
-
-## Authenticated WebSocket foundation
-
-Status: **approved by Person C for Week 4.**
-
-- namespace: `/notifications`;
-- public Socket.IO path: `/notifications/socket.io`;
-- transport: WebSocket;
-- access token: `handshake.auth.token`;
-- authenticated room: server-derived `user:<userId>`;
-- multiple sockets per user are allowed;
-- missing, invalid, expired, or suspended-user connections receive the generic
-  `Authentication failed` rejection;
-- no client may choose a recipient or room;
-- no Redis is required for the single-instance Week 4 foundation.
-
-After joining its private room, a connection receives:
+Publish this JSON to `resourcehive.notification.commands.v1`, keyed by the
+recipient user ID:
 
 ```json
 {
-  "eventType": "notification.connection.ready",
-  "eventVersion": 1,
-  "occurredAt": "2026-08-01T09:55:00.000Z"
+  "kind": "notification.command",
+  "commandId": "11111111-1111-4111-8111-111111111111",
+  "producer": "resource-service",
+  "recipient": {
+    "userId": "22222222-2222-4222-8222-222222222222"
+  },
+  "channels": ["IN_APP", "PUSH"],
+  "template": {
+    "key": "notification.message.v1",
+    "version": 1,
+    "variables": {
+      "title": "Resource updated",
+      "message": "Robotics Lab hours changed."
+    }
+  },
+  "correlationId": "33333333-3333-4333-8333-333333333333",
+  "occurredAt": "2026-09-02T08:00:00.000Z"
 }
 ```
 
-This readiness event contains no JWT or user data. Business notification
-delivery remains a later milestone.
+Generate `commandId` once and reuse the same UUID when retrying the same
+logical command. Notification Service stores that UUID in `processed_events`,
+so Kafka redelivery cannot create duplicate notifications or deliveries.
+
+## Verification email command
+
+Identity Service publishes identity email templates to
+`resourcehive.identity.notification-commands.v1`. Each command must contain a
+ResourceHive `userId`, may contain the destination `email`, and must use only
+the `EMAIL` channel. Verification commands require `verificationUrl`; password
+reset commands require `resetUrl`; password-changed commands contain no token
+or URL variables.
+
+## Rejections and retries
+
+Notification Service commits an offset only after the database transaction
+succeeds. Database and other transient failures are thrown without a manual
+commit so Kafka can redeliver the record.
+
+Invalid contracts and permanently invalid recipients are published to
+`resourcehive.notification.dead-letter.v1` before their source offset is
+committed. Dead-letter records contain source coordinates, message ID, and the
+error, but deliberately omit the original payload so verification tokens and
+other private content are not duplicated.

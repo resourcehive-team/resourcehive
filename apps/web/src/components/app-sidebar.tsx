@@ -1,16 +1,26 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
 
 import { NavMain } from "@/components/nav-main";
 import { NavSecondary } from "@/components/nav-secondary";
 import { NavUser } from "@/components/nav-user";
+import { useDashboardCurrentUser } from "@/components/dashboard-current-user";
 import { Brand } from "@/components/brand";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuItem,
@@ -22,20 +32,22 @@ import {
   CalendarDaysIcon,
   ChartBarIcon,
   CircleHelpIcon,
+  FlagIcon,
   LayoutDashboardIcon,
   UsersIcon,
+  ShieldCheckIcon,
+  FileTextIcon,
+  CookieIcon,
 } from "lucide-react";
-import {
-  AuthenticationRequiredError,
-  getCurrentUser,
-  logout,
-} from "@/lib/auth-api";
+import { marketingPath } from "@/lib/config";
+import { getCurrentUser, switchActiveUniversity } from "@/lib/auth-api";
+import { useRouter } from "next/navigation";
 
 const data = {
   user: {
     name: "Loading user",
     email: "",
-    avatar: "",
+    avatar: null,
   },
   navMain: [
     {
@@ -59,61 +71,66 @@ const data = {
       icon: <UsersIcon />,
     },
     {
-      title: "My bookings",
+      title: "Bookings",
       url: "/dashboard/bookings",
       icon: <CalendarDaysIcon />,
     },
     {
-      title: "Notifications",
-      url: "#",
-      icon: <BellIcon />,
+      title: "Disputes",
+      url: "/dashboard/disputes",
+      icon: <FlagIcon />,
     },
     {
-      title: "Points",
-      url: "#",
+      title: "Analytics",
+      url: "/dashboard/analytics",
       icon: <ChartBarIcon />,
+    },
+    {
+      title: "Notifications",
+      url: "/dashboard/notifications",
+      icon: <BellIcon />,
     },
   ],
   navSecondary: [
     {
       title: "Get Help",
-      url: "#",
+      url: marketingPath("/help"),
       icon: <CircleHelpIcon />,
+      external: true,
+    },
+    {
+      title: "Privacy",
+      url: marketingPath("/privacy"),
+      icon: <ShieldCheckIcon />,
+      external: true,
+    },
+    {
+      title: "Terms",
+      url: marketingPath("/terms"),
+      icon: <FileTextIcon />,
+      external: true,
+    },
+    {
+      title: "Cookie notice",
+      url: marketingPath("/cookies"),
+      icon: <CookieIcon />,
+      external: true,
     },
   ],
 };
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const { state, setAccount } = useDashboardCurrentUser();
   const router = useRouter();
-  const [user, setUser] = React.useState(data.user);
-
-  React.useEffect(() => {
-    const controller = new AbortController();
-
-    getCurrentUser(controller.signal)
-      .then((currentUser) => {
-        setUser({
-          name: currentUser.user.displayName,
-          email: currentUser.user.email,
-          avatar: "",
-        });
-      })
-      .catch((error: unknown) => {
-        if (controller.signal.aborted) {
-          return;
+  const [switching, setSwitching] = React.useState(false);
+  const [switchError, setSwitchError] = React.useState<string | null>(null);
+  const user =
+    state.status === "loaded"
+      ? {
+          name: state.account.user.displayName,
+          email: state.account.user.email,
+          avatar: state.account.user.avatarUrl,
         }
-
-        if (error instanceof AuthenticationRequiredError) {
-          void logout()
-            .catch(() => undefined)
-            .finally(() => {
-              router.replace("/login");
-              router.refresh();
-            });
-        }
-      });
-
-    return () => controller.abort();
-  }, [router]);
+      : data.user;
 
   return (
     <Sidebar collapsible="offcanvas" {...props}>
@@ -125,6 +142,58 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
+        {state.status === "loaded" && state.account.universities.length > 0 && (
+          <SidebarGroup className="pb-0">
+            <SidebarGroupLabel render={<label htmlFor="active-university" />}>
+              University
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <Select
+                items={Object.fromEntries(
+                  state.account.universities.map((university) => [
+                    university.rootOrganizationId,
+                    university.name,
+                  ]),
+                )}
+                value={state.account.organizationContext.rootOrganizationId ?? null}
+                disabled={switching}
+                onValueChange={async (rootOrganizationId) => {
+                  if (typeof rootOrganizationId !== "string" || !rootOrganizationId) return;
+                  setSwitching(true);
+                  setSwitchError(null);
+                  try {
+                    await switchActiveUniversity(rootOrganizationId);
+                    setAccount(await getCurrentUser());
+                    router.refresh();
+                  } catch {
+                    setSwitchError("Unable to switch university. Try again.");
+                  } finally {
+                    setSwitching(false);
+                  }
+                }}
+              >
+                <SelectTrigger id="active-university" className="w-full">
+                  <SelectValue placeholder="Choose a university" />
+                </SelectTrigger>
+                <SelectContent>
+                  {state.account.universities.map((university) => (
+                    <SelectItem
+                      key={university.rootOrganizationId}
+                      value={university.rootOrganizationId}
+                    >
+                      {university.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {switchError && (
+                <p className="mt-1 text-xs text-destructive" role="alert">
+                  {switchError}
+                </p>
+              )}
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
         <NavMain items={data.navMain} />
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>

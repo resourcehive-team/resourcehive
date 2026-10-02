@@ -13,7 +13,7 @@ describe("HealthService", () => {
   it("reports readiness when the database responds", async () => {
     queryRaw.mockResolvedValue([{ "?column?": 1 }]);
 
-    await expect(service.check()).resolves.toMatchObject({
+    await expect(service.checkReadiness()).resolves.toMatchObject({
       service: "booking-service",
       status: "ok",
       database: "connected",
@@ -23,8 +23,16 @@ describe("HealthService", () => {
   it("reports unavailability when the database cannot be reached", async () => {
     queryRaw.mockRejectedValue(new Error("connection failed"));
 
-    await expect(service.check()).rejects.toBeInstanceOf(
+    await expect(service.checkReadiness()).rejects.toBeInstanceOf(
       ServiceUnavailableException,
     );
+  });
+
+  it("reports liveness without touching the database", () => {
+    expect(service.checkLiveness()).toMatchObject({
+      service: "booking-service",
+      status: "ok",
+    });
+    expect(queryRaw).not.toHaveBeenCalled();
   });
 });

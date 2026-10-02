@@ -26,6 +26,7 @@ describe("AccessTokenVerifier", () => {
         sub: "user-id",
         email: "user@example.edu",
         organizationId: "organization-id",
+        rootOrganizationId: null,
         role: "member",
       },
       { secret, expiresIn: "1h" },
@@ -35,6 +36,7 @@ describe("AccessTokenVerifier", () => {
       userId: "user-id",
       email: "user@example.edu",
       organizationId: "organization-id",
+      rootOrganizationId: null,
       role: "member",
     });
   });

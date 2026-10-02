@@ -4,8 +4,12 @@ import {
   ForbiddenException,
 } from "@nestjs/common";
 import { PrismaService } from "@resourcehive/database";
-import { BookingCancellationService } from "../../src/bookings/booking-cancellation.service";
+import { BookingAuthorizationService } from "../../src/authorization/booking-authorization.service";
+import { BookingRepository } from "../../src/bookings/booking.repository";
+import { BookingService } from "../../src/bookings/booking.service";
+import { BookingNotificationService } from "../../src/notifications/booking-notification.service";
 import { PointLedgerService } from "../../src/points/point-ledger.service";
+import { SlotRepository } from "../../src/slots/slot.repository";
 
 const booking = {
   id: "d5000000-0000-4000-8000-000000000001",
@@ -17,6 +21,7 @@ const booking = {
   cancelledByUserId: null,
   cancellationReason: null,
   completedAt: null,
+  cancellationNoticeMinutes: 0,
   user: {
     firstName: "Alice",
     lastName: "Perera",
@@ -43,7 +48,7 @@ interface ResourceSlotUpdateInput {
   where: { id: string };
 }
 
-describe("BookingCancellationService", () => {
+describe("BookingService cancellation", () => {
   const appendBookingRefund = jest.fn();
   let lastResourceSlotUpdate: ResourceSlotUpdateInput | undefined;
   const updateResourceSlot = jest.fn(
@@ -76,7 +81,18 @@ describe("BookingCancellationService", () => {
   const points = {
     appendBookingRefund,
   } as unknown as PointLedgerService;
-  const service = new BookingCancellationService(prisma, points);
+  const bookingCancelled = jest.fn();
+  const notifications = {
+    bookingCancelled,
+  } as unknown as BookingNotificationService;
+  const service = new BookingService(
+    prisma,
+    {} as BookingAuthorizationService,
+    {} as SlotRepository,
+    points,
+    {} as BookingRepository,
+    notifications,
+  );
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -97,10 +113,20 @@ describe("BookingCancellationService", () => {
       .mockReset()
       .mockResolvedValue({ amount: -25 });
     appendBookingRefund.mockReset().mockResolvedValue({});
+    bookingCancelled.mockReset().mockResolvedValue(undefined);
   });
 
   it("refunds half rounded up and republishes the slot for a user cancellation", async () => {
-    const result = await service.cancel(booking.id, booking.userId, {
+    transaction.booking.findUnique
+      .mockReset()
+      .mockResolvedValueOnce(booking)
+      .mockResolvedValueOnce({
+        ...booking,
+        status: "CANCELLED",
+        cancelledAt: new Date(),
+        cancellationReason: "Plans changed",
+      });
+    const result = await service.cancelBooking(booking.id, booking.userId, {
       reason: "Plans changed",
     });
 
@@ -122,10 +148,32 @@ describe("BookingCancellationService", () => {
       }),
       transaction,
     );
+    expect(bookingCancelled).toHaveBeenCalledWith({
+      bookingId: booking.id,
+      userId: booking.userId,
+      studentEmail: booking.user.email,
+      resourceName: booking.resourceSlot.resource.name,
+      startsAt: booking.resourceSlot.startsAt,
+      ownerOrganizationId: booking.resourceSlot.resource.ownerOrganizationId,
+      actorUserId: booking.userId,
+      cancelledByUser: true,
+      reason: "Plans changed",
+      refundPoints: 13,
+      slotStatus: "PUBLISHED",
+    });
   });
 
   it("refunds all points and withdraws the slot for an admin cancellation", async () => {
-    const result = await service.cancel(booking.id, "administrator-1", {
+    transaction.booking.findUnique
+      .mockReset()
+      .mockResolvedValueOnce(booking)
+      .mockResolvedValueOnce({
+        ...booking,
+        status: "CANCELLED",
+        cancelledAt: new Date(),
+        cancellationReason: "Resource unavailable",
+      });
+    const result = await service.cancelBooking(booking.id, "administrator-1", {
       makeSlotAvailable: false,
       reason: "Resource unavailable",
     });
@@ -154,11 +202,20 @@ describe("BookingCancellationService", () => {
       expect.objectContaining({ amount: 25 }),
       transaction,
     );
+    expect(bookingCancelled).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actorUserId: "administrator-1",
+        cancelledByUser: false,
+        reason: "Resource unavailable",
+        refundPoints: 25,
+        slotStatus: "WITHDRAWN",
+      }),
+    );
   });
 
   it("requires an administrator to choose the slot outcome", async () => {
     await expect(
-      service.cancel(booking.id, "administrator-1", {}),
+      service.cancelBooking(booking.id, "administrator-1", {}),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(transaction.booking.updateMany).not.toHaveBeenCalled();
   });
@@ -167,7 +224,7 @@ describe("BookingCancellationService", () => {
     transaction.organizationMembership.findFirst.mockResolvedValue(null);
 
     await expect(
-      service.cancel(booking.id, "administrator-1", {
+      service.cancelBooking(booking.id, "administrator-1", {
         makeSlotAvailable: true,
       }),
     ).rejects.toBeInstanceOf(ForbiddenException);
@@ -184,7 +241,21 @@ describe("BookingCancellationService", () => {
     });
 
     await expect(
-      service.cancel(booking.id, booking.userId, {}),
+      service.cancelBooking(booking.id, booking.userId, {}),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(transaction.booking.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("does not let a user cancel inside the resource's notice period", async () => {
+    const soonSlotStart = new Date(Date.now() + 30 * 60_000);
+    transaction.booking.findUnique.mockReset().mockResolvedValue({
+      ...booking,
+      cancellationNoticeMinutes: 60,
+      resourceSlot: { ...booking.resourceSlot, startsAt: soonSlotStart },
+    });
+
+    await expect(
+      service.cancelBooking(booking.id, booking.userId, {}),
     ).rejects.toBeInstanceOf(ConflictException);
     expect(transaction.booking.updateMany).not.toHaveBeenCalled();
   });
