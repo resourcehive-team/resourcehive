@@ -16,6 +16,7 @@
     "start:debug": "dotenv -e ../../.env -- nest start --debug --watch",
     "start:prod": "node dist/main",
     "seed:demo": "dotenv -e ../../.env -- ts-node scripts/seed-demo.ts",
+    "seed:university": "dotenv -e ../../.env -- ts-node scripts/seed-university.ts",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
     "test:watch": "jest --watch",

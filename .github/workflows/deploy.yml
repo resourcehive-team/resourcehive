@@ -101,6 +101,8 @@ jobs:
           ssh "$target" "mkdir -p ~/resourcehive/services/api-gateway"
           scp docker-compose.prod.yml "$target:~/resourcehive/docker-compose.prod.yml"
           scp services/api-gateway/Caddyfile "$target:~/resourcehive/services/api-gateway/Caddyfile"
+          scp deploy/linode/deploy.sh "$target:~/resourcehive/deploy.sh"
+          ssh "$target" 'chmod 700 "$HOME/resourcehive/deploy.sh"'
 
       - name: Install Firebase service account on Linode
         shell: bash
@@ -109,7 +111,10 @@ jobs:
           LINODE_HOST: ${{ secrets.LINODE_HOST }}
           LINODE_USERNAME: ${{ secrets.LINODE_USERNAME }}
         run: |
-          test -n "$FIREBASE_SERVICE_ACCOUNT_JSON"
+          if [[ -z "$FIREBASE_SERVICE_ACCOUNT_JSON" ]]; then
+            echo "Firebase service-account installation skipped; FCM must be disabled in .env.production."
+            exit 0
+          fi
           printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" |
             jq -e '
               .type == "service_account" and
@@ -146,7 +151,7 @@ jobs:
           printf '%s' "$GHCR_READ_TOKEN" |
             ssh "$target" "docker login ghcr.io --username '$GHCR_USERNAME' --password-stdin"
 
-      - name: Migrate Neon and deploy backend
+      - name: Apply migrations, seed the university, and deploy backend
         shell: bash
         env:
           IMAGE_TAG: ${{ github.sha }}
@@ -156,37 +161,5 @@ jobs:
           target="${LINODE_USERNAME}@${LINODE_HOST}"
           ssh "$target" "IMAGE_TAG='$IMAGE_TAG' bash -se" <<'REMOTE'
           cd ~/resourcehive
-          test -f .env.production
-          test -f secrets/firebase-service-account.json
-          test "$(stat -c '%a' secrets/firebase-service-account.json)" = "600"
-
-          compose="docker compose --env-file .env.production -f docker-compose.prod.yml"
-          $compose config --quiet
-          $compose pull
-
-          # The remote script is supplied over stdin, so the migration container
-          # must not consume the commands that follow it.
-          $compose --profile tools run \
-            --rm \
-            --no-deps \
-            --interactive=false \
-            -T \
-            migrate </dev/null
-
-          $compose up -d --remove-orphans --wait --wait-timeout 180
-          $compose up -d --no-deps --force-recreate --wait --wait-timeout 60 api-gateway
-          $compose ps
-
-          running_services="$($compose ps --services --status running)"
-          for service in \
-            api-gateway \
-            identity-service \
-            resource-service \
-            booking-service \
-            notification-service; do
-            if ! grep -qx "$service" <<<"$running_services"; then
-              echo "Expected service '$service' is not running" >&2
-              exit 1
-            fi
-          done
+          bash ./deploy.sh
           REMOTE

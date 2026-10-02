@@ -4,7 +4,7 @@ on:
   push:
     branches: ["dev"]
   pull_request:
-    branches: ["dev"]
+    branches: ["dev", "main"]
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -82,6 +82,15 @@ jobs:
         env:
           DATABASE_URL: ${{ env.CI_DATABASE_URL }}
           DATABASE_URL_UNPOOLED: ${{ env.CI_DATABASE_URL }}
+
+      - name: Verify production database-role setup against restricted CI logins
+        run: pnpm --filter identity-service exec ts-node scripts/setup-runtime-roles.ts
+        env:
+          DATABASE_URL_UNPOOLED: ${{ env.CI_DATABASE_URL }}
+          APP_DATABASE_URL: ${{ env.CI_APP_DATABASE_URL }}
+          AUTH_DATABASE_URL: ${{ env.CI_AUTH_DATABASE_URL }}
+          WORKER_DATABASE_URL: ${{ env.CI_WORKER_DATABASE_URL }}
+          PLATFORM_REPORT_DATABASE_URL: ${{ env.CI_PLATFORM_REPORT_DATABASE_URL }}
 
       - name: Verify university isolation, email rules, and join bonuses with restricted roles
         run: node db/schema/tests/rls-test.cjs
@@ -308,8 +317,14 @@ jobs:
 
       - name: Run Notification Service concurrency tests
         run: pnpm --filter notification-service run test:concurrency
+
+      - name: Seed the presentation dataset and verify its repeat guard
+        run: |
+          pnpm run db:seed:university
+          pnpm run db:seed:university
         env:
-          APP_DATABASE_URL: ${{ env.CI_DATABASE_URL }}
+          DATABASE_URL: ${{ env.CI_DATABASE_URL }}
+          DATABASE_URL_UNPOOLED: ${{ env.CI_DATABASE_URL }}
 
   infrastructure:
     name: Deployment configuration

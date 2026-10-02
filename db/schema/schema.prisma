@@ -486,3 +486,12 @@ model ResourceRating {
   @@index([resourceId], map: "resource_ratings_resource_idx")
   @@map("resource_ratings")
 }
+
+/// Deployment-only marker makes presentation seeding safe to repeat.
+model UniversityDemoSeedRun {
+  seedKey     String   @id @map("seed_key")
+  completedAt DateTime @default(now()) @map("completed_at") @db.Timestamptz
+  summary     Json
+
+  @@map("university_demo_seed_runs")
+}
