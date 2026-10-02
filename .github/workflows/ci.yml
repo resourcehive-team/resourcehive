@@ -284,9 +284,14 @@ jobs:
         run: pnpm --filter booking-service run test:e2e
 
       - name: Run Booking Service integration tests
-        run: pnpm --filter booking-service run test:integration
+        run: pnpm --filter booking-service run test:integration --testPathIgnorePatterns dispute-routing.integration-spec.ts
         env:
           APP_DATABASE_URL: ${{ env.CI_DATABASE_URL }}
+
+      - name: Run dispute routing integration tests with restricted credentials
+        run: pnpm --filter booking-service run test:integration --runTestsByPath test/integration/dispute-routing.integration-spec.ts
+        env:
+          APP_DATABASE_URL: ${{ env.CI_APP_DATABASE_URL }}
 
       - name: Run Booking Service concurrency tests
         run: pnpm --filter booking-service run test:concurrency

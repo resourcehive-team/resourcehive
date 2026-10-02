@@ -30,6 +30,7 @@ export type ResourceAction = (typeof RESOURCE_ACTIONS)[number];
 
 export interface CreateDisputeInput {
   bookingId: string;
+  rootOrganizationId: string;
   resolverOrganizationId: string;
   submittedByUserId: string;
   reason: DisputeReason;
@@ -58,6 +59,23 @@ export interface DisputeRecord {
   createdAt: Date;
   updatedAt: Date;
   resolvedAt: Date | null;
+  submittedByUser: DisputeSubmitterContact;
+  booking: {
+    id: string;
+    userId: string;
+    status: string;
+    resourceSlot: {
+      startsAt: Date;
+      endsAt: Date;
+      resource: {
+        id: string;
+        name: string;
+        ownerOrganizationId: string;
+        ownerOrganization: { id: string; name: string };
+        unavailableDisputeId: string | null;
+      };
+    };
+  };
 }
 
 export interface DisputeSubmitterContact {
@@ -66,20 +84,5 @@ export interface DisputeSubmitterContact {
   email: string;
 }
 
-export interface DisputeWithSubmitter extends DisputeRecord {
-  submittedByUser: DisputeSubmitterContact;
-}
-
-export interface DisputeWithBookingContext extends DisputeRecord {
-  booking: {
-    userId: string;
-    status: string;
-    resourceSlot: {
-      resource: {
-        id: string;
-        ownerOrganizationId: string;
-        unavailableDisputeId: string | null;
-      };
-    };
-  };
-}
+export type DisputeWithSubmitter = DisputeRecord;
+export type DisputeWithBookingContext = DisputeRecord;

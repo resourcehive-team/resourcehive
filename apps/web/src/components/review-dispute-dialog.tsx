@@ -131,10 +131,32 @@ export function ReviewDisputeDialog({
         <DialogHeader>
           <p className="eyebrow text-clay">Review dispute</p>
           <DialogTitle className="text-3xl font-normal leading-none">
-            {statusLabels[dispute.status]}
+            {dispute.booking.resourceSlot.resource.name}
           </DialogTitle>
-          <DialogDescription>{dispute.description}</DialogDescription>
+          <DialogDescription>
+            {statusLabels[dispute.status]} · {dispute.description}
+          </DialogDescription>
         </DialogHeader>
+        <div className="grid gap-1 border-y border-line py-3 text-sm">
+          <p>{dispute.booking.resourceSlot.resource.ownerOrganization.name}</p>
+          <p className="text-muted-foreground">
+            {new Intl.DateTimeFormat(undefined, {
+              dateStyle: "medium",
+              timeStyle: "short",
+            }).format(new Date(dispute.booking.resourceSlot.startsAt))}
+            {" – "}
+            {new Intl.DateTimeFormat(undefined, {
+              dateStyle: "medium",
+              timeStyle: "short",
+            }).format(new Date(dispute.booking.resourceSlot.endsAt))}
+          </p>
+          {dispute.submittedByUser ? (
+            <p className="text-muted-foreground">
+              Submitted by {dispute.submittedByUser.firstName}{" "}
+              {dispute.submittedByUser.lastName} ({dispute.submittedByUser.email})
+            </p>
+          ) : null}
+        </div>
         <form
           className="grid gap-5"
           aria-busy={isSubmitting}

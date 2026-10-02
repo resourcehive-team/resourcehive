@@ -2,9 +2,10 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { GavelIcon, MailIcon } from "lucide-react";
+import { CheckIcon, GavelIcon, MailIcon } from "lucide-react";
 
 import { DisputeStatusBadge } from "@/components/dispute-status-badge";
+import { DisputeResourceDetails } from "@/components/dispute-resource-details";
 import { RequestErrorCard } from "@/components/request-error-card";
 import { ReviewDisputeDialog } from "@/components/review-dispute-dialog";
 import { Button } from "@/components/ui/button";
@@ -16,7 +17,10 @@ import {
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ApiAuthenticationError } from "@/lib/api-client";
-import { getOrganizationDisputes } from "@/lib/booking-service/dispute-api";
+import {
+  getOrganizationDisputes,
+  updateDispute,
+} from "@/lib/booking-service/dispute-api";
 import { formatDisputeReason } from "@/lib/booking-service/dispute-format";
 import type { Dispute } from "@/lib/booking-service/types";
 import { formatOrganizationDate } from "@/lib/resource-service/organization-format";
@@ -30,6 +34,9 @@ export function OrganizationDisputes() {
   const router = useRouter();
   const [state, setState] = React.useState<State>({ status: "loading" });
   const [requestAttempt, setRequestAttempt] = React.useState(0);
+  const [acknowledging, setAcknowledging] = React.useState<string | null>(null);
+  const [acknowledged, setAcknowledged] = React.useState(false);
+  const [acknowledgementError, setAcknowledgementError] = React.useState("");
 
   React.useEffect(() => {
     const controller = new AbortController();
@@ -67,6 +74,28 @@ export function OrganizationDisputes() {
     );
   }
 
+  async function acknowledge(dispute: Dispute) {
+    if (acknowledging) return;
+    setAcknowledging(dispute.id);
+    setAcknowledgementError("");
+    setAcknowledged(false);
+    try {
+      handleUpdated(await updateDispute(dispute.id, { status: "UNDER_REVIEW" }));
+      setAcknowledged(true);
+    } catch (error) {
+      if (error instanceof ApiAuthenticationError) {
+        router.replace("/login");
+        router.refresh();
+        return;
+      }
+      setAcknowledgementError(
+        error instanceof Error ? error.message : "Unable to acknowledge this dispute.",
+      );
+    } finally {
+      setAcknowledging(null);
+    }
+  }
+
   if (state.status === "loading") {
     return <OrganizationDisputesSkeleton />;
   }
@@ -101,14 +130,25 @@ export function OrganizationDisputes() {
 
   return (
     <div className="border border-line">
+      {acknowledged ? (
+        <p className="border-b border-line p-3 text-sm" role="status">
+          Dispute acknowledged and moved to under review.
+        </p>
+      ) : null}
+      {acknowledgementError ? (
+        <p className="border-b border-line p-3 text-sm text-destructive" role="alert">
+          {acknowledgementError}
+        </p>
+      ) : null}
       {state.disputes.map((dispute) => (
         <div
           key={dispute.id}
           className="grid gap-3 border-b border-line p-4 last:border-b-0 md:grid-cols-[1fr_auto] md:items-center"
         >
           <div>
+            <DisputeResourceDetails dispute={dispute} />
             <div className="flex flex-wrap items-center gap-2">
-              <p className="font-medium">
+              <p className="mt-2 font-medium">
                 {formatDisputeReason(dispute.reason)}
               </p>
               <DisputeStatusBadge status={dispute.status} />
@@ -116,9 +156,14 @@ export function OrganizationDisputes() {
             <p className="mt-1 text-sm text-muted-foreground">
               {dispute.description}
             </p>
+            {dispute.resolutionNotes ? (
+              <p className="mt-2 border-l-2 border-line pl-3 text-sm">
+                <span className="font-medium">Review notes: </span>
+                {dispute.resolutionNotes}
+              </p>
+            ) : null}
             <p className="mt-2 text-xs text-muted-foreground">
-              Opened {formatOrganizationDate(dispute.createdAt)} · Booking{" "}
-              <code>{dispute.bookingId}</code>
+              Submitted {formatOrganizationDate(dispute.createdAt)}
             </p>
             {dispute.submittedByUser ? (
               <p className="mt-1 text-xs text-muted-foreground">
@@ -132,12 +177,24 @@ export function OrganizationDisputes() {
               <Button
                 variant="outline"
                 size="sm"
+                nativeButton={false}
                 render={
                   <a href={`mailto:${dispute.submittedByUser.email}`} />
                 }
               >
                 <MailIcon data-icon="inline-start" />
                 Contact
+              </Button>
+            ) : null}
+            {dispute.status === "OPEN" ? (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={acknowledging !== null}
+                onClick={() => void acknowledge(dispute)}
+              >
+                <CheckIcon data-icon="inline-start" />
+                {acknowledging === dispute.id ? "Acknowledging…" : "Acknowledge"}
               </Button>
             ) : null}
             <ReviewDisputeDialog dispute={dispute} onUpdated={handleUpdated} />
