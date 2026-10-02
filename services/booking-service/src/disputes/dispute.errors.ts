@@ -48,15 +48,15 @@ export class DisputeNoOrganizationError extends ForbiddenException {
   }
 }
 
-export class DisputeTenantAdminCannotOpenError extends ForbiddenException {
+export class DisputeInvalidTransitionError extends ConflictException {
   constructor() {
-    super("Tenant administrators cannot open disputes");
+    super("The dispute cannot move to that status from its current status");
   }
 }
 
-export class DisputeInvalidTransitionError extends BadRequestException {
+export class DisputeConcurrentUpdateError extends ConflictException {
   constructor() {
-    super("The dispute cannot move to that status from its current status");
+    super("This dispute has changed. Refresh the list and try again.");
   }
 }
 

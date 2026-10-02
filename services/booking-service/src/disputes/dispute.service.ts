@@ -1,5 +1,5 @@
 import { HttpException, Injectable } from "@nestjs/common";
-import { PrismaService } from "@resourcehive/database";
+import { Prisma, PrismaService } from "@resourcehive/database";
 import { AuthenticatedUser } from "@resourcehive/service-auth";
 import { CreateDisputeDto, UpdateDisputeDto } from "./dispute.dto";
 import { DisputeRepository } from "./dispute.repository";
@@ -14,7 +14,6 @@ import {
   DisputeNotFoundError,
   DisputeOperationError,
   DisputeResolutionNotesRequiredError,
-  DisputeTenantAdminCannotOpenError,
 } from "./dispute.errors";
 import {
   DisputeRecord,
@@ -42,14 +41,29 @@ export class DisputeService {
     user: AuthenticatedUser,
   ): Promise<DisputeRecord> {
     try {
-      const resolverOrganizationId = await this.resolveResolverOrganizationId(
-        user.userId,
-      );
+      if (!user.rootOrganizationId) throw new DisputeNoOrganizationError();
+      const rootOrganizationId = user.rootOrganizationId;
 
       return await this.prisma.$transaction(async (transaction) => {
+        const membership = await transaction.organizationMembership.findFirst({
+          where: {
+            userId: user.userId,
+            status: "APPROVED",
+            user: { status: "ACTIVE" },
+            organization: { rootOrganizationId, status: "ACTIVE" },
+          },
+          select: { id: true },
+        });
+        if (!membership) throw new DisputeNoOrganizationError();
         const booking = await transaction.booking.findFirst({
-          where: { id: dto.bookingId, userId: user.userId },
-          select: { id: true, status: true },
+          where: { id: dto.bookingId, userId: user.userId, rootOrganizationId },
+          select: {
+            id: true,
+            status: true,
+            resourceSlot: {
+              select: { resource: { select: { ownerOrganizationId: true } } },
+            },
+          },
         });
         if (!booking) throw new DisputeBookingNotFoundError();
         if (booking.status !== "COMPLETED") {
@@ -65,10 +79,12 @@ export class DisputeService {
         const dispute = await this.disputes.create(
           {
             bookingId: dto.bookingId,
-            resolverOrganizationId,
+            rootOrganizationId,
+            resolverOrganizationId:
+              booking.resourceSlot.resource.ownerOrganizationId,
             submittedByUserId: user.userId,
             reason: dto.reason,
-            description: dto.description,
+            description: dto.description.trim(),
             evidence: dto.evidence,
           },
           transaction,
@@ -85,6 +101,12 @@ export class DisputeService {
         return dispute;
       });
     } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        throw new DisputeAlreadyExistsError();
+      }
       this.handleError(error, "open");
     }
   }
@@ -99,13 +121,11 @@ export class DisputeService {
 
   async listForOrg(user: AuthenticatedUser): Promise<DisputeWithSubmitter[]> {
     try {
-      const organizationIds = await this.administeredOrganizationIds(
-        user.userId,
-      );
+      const organizationIds = await this.administeredOrganizationIds(user);
       if (organizationIds.length === 0) {
         throw new DisputeAdministratorRequiredError();
       }
-      return await this.disputes.findForResolverOrganizations(organizationIds);
+      return await this.disputes.findForOwnerOrganizations(organizationIds);
     } catch (error) {
       this.handleError(error, "retrieve");
     }
@@ -115,9 +135,10 @@ export class DisputeService {
     try {
       const dispute = await this.disputes.findById(id);
       if (!dispute) throw new DisputeNotFoundError();
-      if (dispute.submittedByUserId !== user.userId) {
-        await this.assertCanManage(dispute.resolverOrganizationId, user);
-      }
+      await this.assertCanManage(
+        dispute.booking.resourceSlot.resource.ownerOrganizationId,
+        user,
+      );
       return dispute;
     } catch (error) {
       this.handleError(error, "retrieve");
@@ -130,28 +151,39 @@ export class DisputeService {
     user: AuthenticatedUser,
   ): Promise<DisputeRecord> {
     try {
-      const dispute = await this.disputes.findById(id);
-      if (!dispute) throw new DisputeNotFoundError();
-      await this.assertCanManage(dispute.resolverOrganizationId, user);
-
-      const nextStatus = dto.status ?? (dispute.status as DisputeStatus);
-      if (dto.status && dto.status !== dispute.status) {
-        const allowed = ALLOWED_TRANSITIONS[dispute.status as DisputeStatus];
-        if (!allowed?.includes(dto.status)) {
-          throw new DisputeInvalidTransitionError();
-        }
-      }
-      const isTerminal = TERMINAL_STATUSES.includes(nextStatus);
-      if (isTerminal && !dto.resolutionNotes && !dispute.resolutionNotes) {
-        throw new DisputeResolutionNotesRequiredError();
-      }
-
       return await this.prisma.$transaction(async (transaction) => {
+        const dispute = await this.disputes.findById(id, transaction);
+        if (!dispute) throw new DisputeNotFoundError();
+        await this.assertCanManage(
+          dispute.booking.resourceSlot.resource.ownerOrganizationId,
+          user,
+          transaction,
+        );
+
+        const nextStatus = dto.status ?? (dispute.status as DisputeStatus);
+        if (dto.status) {
+          const allowed = ALLOWED_TRANSITIONS[dispute.status as DisputeStatus];
+          if (!allowed?.includes(dto.status))
+            throw new DisputeInvalidTransitionError();
+        }
+        const isTerminal = TERMINAL_STATUSES.includes(nextStatus);
+        const resolutionNotes = dto.resolutionNotes?.trim();
+        if (
+          isTerminal &&
+          !(resolutionNotes ?? dispute.resolutionNotes)?.trim()
+        ) {
+          throw new DisputeResolutionNotesRequiredError();
+        }
+        const input = {
+          ...dto,
+          ...(resolutionNotes !== undefined ? { resolutionNotes } : {}),
+        };
         const updated = await this.disputes.applyTransition(
           id,
+          dispute.status,
           dispute.booking.resourceSlot.resource.id,
           user.userId,
-          dto,
+          input,
           isTerminal,
           transaction,
         );
@@ -161,7 +193,7 @@ export class DisputeService {
             user.userId,
             dispute.status,
             dto.status,
-            dto.resolutionNotes,
+            resolutionNotes,
             dispute.rootOrganizationId,
             transaction,
           );
@@ -173,35 +205,21 @@ export class DisputeService {
     }
   }
 
-  /**
-   * The submitter's own organization resolves their disputes. If the
-   * submitter is themselves an organization admin, resolution escalates to
-   * their closest parent organization's admin, since there is no one above
-   * them within their own organization. A tenant (root organization) admin
-   * has no parent to escalate to and cannot open disputes.
-   */
-  private async resolveResolverOrganizationId(userId: string): Promise<string> {
-    const membership = await this.prisma.organizationMembership.findFirst({
-      where: { userId, status: "APPROVED" },
-      orderBy: { joinedAt: "asc" },
-      select: { organizationId: true, role: true },
-    });
-    if (!membership) throw new DisputeNoOrganizationError();
-    if (membership.role !== "ADMIN") return membership.organizationId;
-
-    const organization = await this.prisma.organization.findUnique({
-      where: { id: membership.organizationId },
-      select: { parentId: true },
-    });
-    if (!organization?.parentId) {
-      throw new DisputeTenantAdminCannotOpenError();
-    }
-    return organization.parentId;
-  }
-
-  private async administeredOrganizationIds(userId: string): Promise<string[]> {
+  private async administeredOrganizationIds(
+    user: AuthenticatedUser,
+  ): Promise<string[]> {
+    if (!user.rootOrganizationId) return [];
     const memberships = await this.prisma.organizationMembership.findMany({
-      where: { userId, role: "ADMIN", status: "APPROVED" },
+      where: {
+        userId: user.userId,
+        role: "ADMIN",
+        status: "APPROVED",
+        user: { status: "ACTIVE" },
+        organization: {
+          rootOrganizationId: user.rootOrganizationId,
+          status: "ACTIVE",
+        },
+      },
       select: { organizationId: true },
     });
     return memberships.map((m) => m.organizationId);
@@ -210,13 +228,21 @@ export class DisputeService {
   private async assertCanManage(
     resolverOrganizationId: string,
     user: AuthenticatedUser,
+    client: Pick<Prisma.TransactionClient, "organizationMembership"> = this
+      .prisma,
   ): Promise<void> {
-    const membership = await this.prisma.organizationMembership.findFirst({
+    if (!user.rootOrganizationId) throw new DisputeForbiddenError();
+    const membership = await client.organizationMembership.findFirst({
       where: {
         userId: user.userId,
         organizationId: resolverOrganizationId,
         role: "ADMIN",
         status: "APPROVED",
+        user: { status: "ACTIVE" },
+        organization: {
+          rootOrganizationId: user.rootOrganizationId,
+          status: "ACTIVE",
+        },
       },
       select: { id: true },
     });

@@ -1,6 +1,9 @@
 import { Injectable } from "@nestjs/common";
 import { Prisma, PrismaService } from "@resourcehive/database";
-import { DisputeResourceActionInvalidError } from "./dispute.errors";
+import {
+  DisputeConcurrentUpdateError,
+  DisputeResourceActionInvalidError,
+} from "./dispute.errors";
 import {
   CreateDisputeInput,
   DisputeRecord,
@@ -12,16 +15,24 @@ import {
 } from "./dispute.types";
 
 const withBookingContext = {
+  submittedByUser: {
+    select: { firstName: true, lastName: true, email: true },
+  },
   booking: {
     select: {
+      id: true,
       userId: true,
       status: true,
       resourceSlot: {
         select: {
+          startsAt: true,
+          endsAt: true,
           resource: {
             select: {
               id: true,
+              name: true,
               ownerOrganizationId: true,
+              ownerOrganization: { select: { id: true, name: true } },
               unavailableDisputeId: true,
             },
           },
@@ -39,20 +50,17 @@ export class DisputeRepository {
     input: CreateDisputeInput,
     client: DisputeTransactionClient,
   ): Promise<DisputeRecord> {
-    const booking = await client.booking.findUnique({
-      where: { id: input.bookingId },
-      select: { resourceSlot: { select: { resource: true } } },
-    });
     return client.bookingDispute.create({
       data: {
         bookingId: input.bookingId,
-        rootOrganizationId: booking!.resourceSlot.resource.rootOrganizationId,
+        rootOrganizationId: input.rootOrganizationId,
         resolverOrganizationId: input.resolverOrganizationId,
         submittedByUserId: input.submittedByUserId,
         reason: input.reason,
         description: input.description,
         evidence: input.evidence ?? Prisma.JsonNull,
       },
+      include: withBookingContext,
     });
   }
 
@@ -69,20 +77,23 @@ export class DisputeRepository {
   findMine(submittedByUserId: string): Promise<DisputeRecord[]> {
     return this.prisma.bookingDispute.findMany({
       where: { submittedByUserId },
+      include: withBookingContext,
       orderBy: { createdAt: "desc" },
     });
   }
 
-  findForResolverOrganizations(
-    resolverOrganizationIds: string[],
+  findForOwnerOrganizations(
+    ownerOrganizationIds: string[],
   ): Promise<DisputeWithSubmitter[]> {
     return this.prisma.bookingDispute.findMany({
-      where: { resolverOrganizationId: { in: resolverOrganizationIds } },
-      include: {
-        submittedByUser: {
-          select: { firstName: true, lastName: true, email: true },
+      where: {
+        booking: {
+          resourceSlot: {
+            resource: { ownerOrganizationId: { in: ownerOrganizationIds } },
+          },
         },
       },
+      include: withBookingContext,
       orderBy: { createdAt: "desc" },
     });
   }
@@ -110,23 +121,25 @@ export class DisputeRepository {
 
   async applyTransition(
     disputeId: string,
+    expectedStatus: string,
     resourceId: string,
     reviewerUserId: string,
     input: TransitionDisputeInput,
     isTerminal: boolean,
     client: DisputeTransactionClient,
   ): Promise<DisputeRecord> {
-    const dispute = await client.bookingDispute.update({
-      where: { id: disputeId },
+    const result = await client.bookingDispute.updateMany({
+      where: { id: disputeId, status: expectedStatus },
       data: {
         ...(input.status ? { status: input.status } : {}),
         ...(input.resolutionNotes !== undefined
           ? { resolutionNotes: input.resolutionNotes }
           : {}),
         reviewedByUserId: reviewerUserId,
-        ...(isTerminal ? { resolvedAt: new Date() } : {}),
+        ...(isTerminal && input.status ? { resolvedAt: new Date() } : {}),
       },
     });
+    if (result.count !== 1) throw new DisputeConcurrentUpdateError();
 
     await this.applyResourceAction(
       resourceId,
@@ -134,7 +147,10 @@ export class DisputeRepository {
       input.resourceAction ?? "NONE",
       client,
     );
-    return dispute;
+    return client.bookingDispute.findUniqueOrThrow({
+      where: { id: disputeId },
+      include: withBookingContext,
+    });
   }
 
   private async applyResourceAction(

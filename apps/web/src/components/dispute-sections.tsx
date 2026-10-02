@@ -9,7 +9,7 @@ import { RequestErrorCard } from "@/components/request-error-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ApiAuthenticationError } from "@/lib/api-client";
 import { AuthenticationRequiredError, getCurrentUser } from "@/lib/auth-api";
-import { getOrganizationDetails } from "@/lib/resource-service/organization-api";
+import { getCurrentUserMemberships } from "@/lib/resource-service/membership-api";
 
 type State =
   | { status: "loading" }
@@ -26,22 +26,28 @@ export function DisputeSections() {
 
     (async () => {
       const account = await getCurrentUser(controller.signal);
-      const isOrgAdmin =
-        account.organizationContext.role?.toUpperCase() === "ADMIN";
-
-      let isTenantAdmin = false;
-      if (isOrgAdmin && account.organizationContext.organizationId) {
-        const organization = await getOrganizationDetails(
-          account.organizationContext.organizationId,
-          controller.signal,
-        );
-        isTenantAdmin = organization?.parentId === null;
-      }
+      const rootOrganizationId = account.organizationContext.rootOrganizationId;
+      const memberships = rootOrganizationId
+        ? await getCurrentUserMemberships(controller.signal)
+        : [];
+      const approvedAdmins = memberships.filter(
+        (membership) =>
+          membership.status === "APPROVED" &&
+          membership.role === "ADMIN" &&
+          membership.organization.status === "ACTIVE" &&
+          membership.organization.rootOrganizationId === rootOrganizationId,
+      );
+      const hasApprovedMembership = memberships.some(
+        (membership) =>
+          membership.status === "APPROVED" &&
+          membership.organization.status === "ACTIVE" &&
+          membership.organization.rootOrganizationId === rootOrganizationId,
+      );
 
       setState({
         status: "loaded",
-        canOpenDisputes: !isTenantAdmin,
-        canManageDisputes: isOrgAdmin,
+        canOpenDisputes: hasApprovedMembership,
+        canManageDisputes: approvedAdmins.length > 0,
       });
     })().catch((requestError: unknown) => {
       if (controller.signal.aborted) {

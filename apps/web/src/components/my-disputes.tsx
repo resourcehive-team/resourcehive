@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { FlagIcon } from "lucide-react";
 
 import { DisputeStatusBadge } from "@/components/dispute-status-badge";
+import { DisputeResourceDetails } from "@/components/dispute-resource-details";
 import { OpenDisputeDialog } from "@/components/open-dispute-dialog";
 import { RequestErrorCard } from "@/components/request-error-card";
 import {
@@ -118,8 +119,9 @@ export function MyDisputes() {
                 className="grid gap-2 border-b border-line p-4 last:border-b-0 md:grid-cols-[1fr_auto] md:items-center"
               >
                 <div>
+                  <DisputeResourceDetails dispute={dispute} />
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-medium">
+                    <p className="mt-2 font-medium">
                       {formatDisputeReason(dispute.reason)}
                     </p>
                     <DisputeStatusBadge status={dispute.status} />
@@ -133,10 +135,10 @@ export function MyDisputes() {
                       {dispute.resolutionNotes}
                     </p>
                   ) : null}
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Submitted {formatOrganizationDate(dispute.createdAt)}
+                  </p>
                 </div>
-                <p className="text-sm text-muted-foreground md:text-right">
-                  Opened {formatOrganizationDate(dispute.createdAt)}
-                </p>
               </div>
             ))}
           </div>

@@ -140,6 +140,21 @@ export interface Dispute {
   createdAt: string;
   updatedAt: string;
   resolvedAt: string | null;
-  /** Only present when listed via the organization/manage endpoint. */
-  submittedByUser?: DisputeSubmitter;
+  submittedByUser: DisputeSubmitter;
+  booking: {
+    id: string;
+    userId: string;
+    status: string;
+    resourceSlot: {
+      startsAt: string;
+      endsAt: string;
+      resource: {
+        id: string;
+        name: string;
+        ownerOrganizationId: string;
+        ownerOrganization: { id: string; name: string };
+        unavailableDisputeId: string | null;
+      };
+    };
+  };
 }
